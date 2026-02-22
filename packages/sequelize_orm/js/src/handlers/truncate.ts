@@ -1,4 +1,5 @@
 import { checkConnection, checkModelDefinition } from '../utils/checkUtils';
+import { convertQueryOptions } from '../utils/queryConverter';
 import { getModels, getSequelize, getOptions } from '../utils/state';
 
 type TruncateParams = {
@@ -7,6 +8,7 @@ type TruncateParams = {
     cascade?: boolean;
     restartIdentity?: boolean;
     withoutForeignKeyChecks?: boolean;
+    transactionId?: string;
   };
 };
 
@@ -19,7 +21,7 @@ export async function handleTruncate(params: TruncateParams): Promise<void> {
   const model = models.get(modelName);
   checkModelDefinition(model, modelName);
 
-  const options: any = { ...(params.options || {}) };
+  const options = convertQueryOptions(params.options || {});
 
   // For PostgreSQL, use raw TRUNCATE query with CASCADE to ensure it works
   // with foreign key constraints. Sequelize's Model.truncate() may not
@@ -30,7 +32,7 @@ export async function handleTruncate(params: TruncateParams): Promise<void> {
     const parts = ['TRUNCATE TABLE', `"${tableName}"`];
     if (options.restartIdentity) parts.push('RESTART IDENTITY');
     parts.push('CASCADE');
-    await sequelize.query(parts.join(' '));
+    await sequelize.query(parts.join(' '), { transaction: options.transaction });
     return;
   }
 
@@ -48,12 +50,6 @@ export async function handleTruncate(params: TruncateParams): Promise<void> {
       }
     });
     return;
-  }
-
-  // For other dialects, use Sequelize's Model.truncate with
-  // withoutForeignKeyChecks when cascade is requested.
-  if (options.cascade && options.withoutForeignKeyChecks === undefined) {
-    options.withoutForeignKeyChecks = true;
   }
 
   await model.truncate(options);

@@ -6,6 +6,7 @@ import 'package:sequelize_orm/src/model/model_interface.dart';
 import 'package:sequelize_orm/src/query/query/query.dart';
 import 'package:sequelize_orm/src/query/query_engine/query_engine.dart';
 import 'package:sequelize_orm/src/sequelize/sequelize.dart';
+import 'package:sequelize_orm/src/transaction/transaction.dart';
 
 /// {@category Models}
 abstract class Model<T> extends ModelInterface {
@@ -130,6 +131,7 @@ abstract class Model<T> extends ModelInterface {
     int? offset,
     QueryAttributes? attributes,
     bool? paranoid,
+    Transaction? transaction,
   }) {
     final query = Query.fromCallbacks(
       where: where,
@@ -142,12 +144,12 @@ abstract class Model<T> extends ModelInterface {
       paranoid: paranoid,
     );
     return QueryEngine().findAll(
-          modelName: modelName,
-          query: query,
-          sequelize: sequelizeInstance,
-          model: sequelizeModel,
-        )
-        as Future<List<T>>;
+      modelName: modelName,
+      query: query,
+      sequelize: sequelizeInstance,
+      model: sequelizeModel,
+      transaction: transaction,
+    ) as Future<List<T>>;
   }
 
   /// Searches for a single instance that matches the query options.
@@ -161,6 +163,7 @@ abstract class Model<T> extends ModelInterface {
     dynamic group,
     QueryAttributes? attributes,
     bool? paranoid,
+    Transaction? transaction,
   }) {
     final query = Query.fromCallbacks(
       where: where,
@@ -171,52 +174,64 @@ abstract class Model<T> extends ModelInterface {
       paranoid: paranoid,
     );
     return QueryEngine().findOne(
-          modelName: modelName,
-          query: query,
-          sequelize: sequelizeInstance,
-          model: sequelizeModel,
-        )
-        as Future<T?>;
+      modelName: modelName,
+      query: query,
+      sequelize: sequelizeInstance,
+      model: sequelizeModel,
+      transaction: transaction,
+    ) as Future<T?>;
   }
 
   /// Creates a new instance in the database and returns the created model
   /// instance with all auto-generated fields populated.
-  Future<T> create(covariant dynamic data) {
+  Future<T> create(covariant dynamic data, {Transaction? transaction}) {
     // Convert data to Map if it's not already (for Create classes)
-    final Map<String, dynamic> dataMap = data is Map<String, dynamic>
-        ? data
-        : (data as dynamic).toJson();
+    final Map<String, dynamic> dataMap =
+        data is Map<String, dynamic> ? data : (data as dynamic).toJson();
 
     return QueryEngine().create(
-          modelName: modelName,
-          data: dataMap,
-          sequelize: sequelizeInstance,
-          model: sequelizeModel,
-        )
-        as Future<T>;
+      modelName: modelName,
+      data: dataMap,
+      sequelize: sequelizeInstance,
+      model: sequelizeModel,
+      transaction: transaction,
+    ) as Future<T>;
   }
 
   /// Counts the number of instances matching the optional [where] clause.
   ///
   /// Returns the total count as an [int].
-  Future<int> count({covariant dynamic where}) {
+  Future<int> count({covariant dynamic where, Transaction? transaction}) {
     final query = Query.fromCallbacks(where: where);
     return QueryEngine().count(
       modelName: modelName,
       query: query,
       sequelize: sequelizeInstance,
       model: sequelizeModel,
+      transaction: transaction,
     );
   }
 
   /// Find the maximum value of a column
-  Future<num?> max(covariant dynamic columnFn, {covariant dynamic where});
+  Future<num?> max(
+    covariant dynamic columnFn, {
+    covariant dynamic where,
+    Transaction? transaction,
+  });
 
   /// Find the minimum value of a column
-  Future<num?> min(covariant dynamic columnFn, {covariant dynamic where});
+  Future<num?> min(
+    covariant dynamic columnFn, {
+    covariant dynamic where,
+    Transaction? transaction,
+  });
 
   /// Sum values of a column
-  Future<num?> sum(covariant dynamic columnFn, {covariant dynamic where});
+  Future<num?> sum(
+    covariant dynamic columnFn, {
+    covariant dynamic where,
+    Transaction? transaction,
+  });
 
   /// Deletes multiple instances, or set their deletedAt timestamp to the current time if `paranoid` is enabled.
   ///
@@ -226,6 +241,7 @@ abstract class Model<T> extends ModelInterface {
     bool? force,
     int? limit,
     bool? individualHooks,
+    Transaction? transaction,
   }) {
     final query = Query.fromCallbacks(where: where);
     final options = <String, dynamic>{
@@ -239,6 +255,7 @@ abstract class Model<T> extends ModelInterface {
       options: options,
       sequelize: sequelizeInstance,
       model: sequelizeModel,
+      transaction: transaction,
     );
   }
 
@@ -249,6 +266,7 @@ abstract class Model<T> extends ModelInterface {
     bool? cascade,
     bool? restartIdentity,
     bool? force,
+    Transaction? transaction,
   }) {
     final options = <String, dynamic>{
       if (cascade != null) 'cascade': cascade,
@@ -260,6 +278,7 @@ abstract class Model<T> extends ModelInterface {
       options: options,
       sequelize: sequelizeInstance,
       model: sequelizeModel,
+      transaction: transaction,
     );
   }
 
@@ -269,6 +288,7 @@ abstract class Model<T> extends ModelInterface {
     covariant dynamic where,
     int? limit,
     bool? individualHooks,
+    Transaction? transaction,
   }) {
     final query = Query.fromCallbacks(where: where);
     final options = <String, dynamic>{
@@ -281,6 +301,7 @@ abstract class Model<T> extends ModelInterface {
       options: options,
       sequelize: sequelizeInstance,
       model: sequelizeModel,
+      transaction: transaction,
     );
   }
 }

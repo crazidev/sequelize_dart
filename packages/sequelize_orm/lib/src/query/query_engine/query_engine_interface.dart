@@ -1,5 +1,6 @@
 import 'package:sequelize_orm/src/model/model_instance_data.dart';
 import 'package:sequelize_orm/src/query/query/query.dart';
+import 'package:sequelize_orm/src/transaction/transaction.dart';
 
 /// Abstract interface for query engines
 /// This interface defines the contract that all query engines must implement
@@ -11,6 +12,7 @@ abstract class QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Find one record matching the query
@@ -19,6 +21,7 @@ abstract class QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Create a new record
@@ -28,6 +31,7 @@ abstract class QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Create multiple records (bulk create)
@@ -37,6 +41,7 @@ abstract class QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Update records
@@ -46,6 +51,7 @@ abstract class QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Count records matching the query
@@ -54,6 +60,7 @@ abstract class QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Find the maximum value of a column
@@ -63,6 +70,7 @@ abstract class QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Find the minimum value of a column
@@ -72,6 +80,7 @@ abstract class QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Sum values of a column
@@ -81,6 +90,7 @@ abstract class QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Increment numeric column values
@@ -90,6 +100,7 @@ abstract class QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Decrement numeric column values
@@ -99,6 +110,7 @@ abstract class QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Save an instance (INSERT for new records, UPDATE for existing)
@@ -109,6 +121,7 @@ abstract class QueryEngineInterface {
     required Map<String, dynamic> primaryKeyValues,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// BelongsTo association getter (instance.getX)
@@ -119,6 +132,7 @@ abstract class QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// BelongsTo association setter (instance.setX)
@@ -131,6 +145,7 @@ abstract class QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// BelongsTo association creator (instance.createX)
@@ -142,6 +157,7 @@ abstract class QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Destroy records matching the query
@@ -151,6 +167,7 @@ abstract class QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Truncate the table associated with the model
@@ -159,6 +176,7 @@ abstract class QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Restore soft-deleted records matching the query
@@ -168,6 +186,7 @@ abstract class QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Destroy a single instance
@@ -177,6 +196,7 @@ abstract class QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   });
 
   /// Restore a single soft-deleted instance
@@ -186,5 +206,66 @@ abstract class QueryEngineInterface {
     required Map<String, dynamic> primaryKeyValues,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
+  });
+
+  /// Generic association getter
+  Future<dynamic> associationGet({
+    required String sourceModel,
+    required Map<String, dynamic> primaryKeyValues,
+    required String associationName,
+    Map<String, dynamic>? options,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
+  });
+
+  /// Generic association setter
+  Future<void> associationSet({
+    required String sourceModel,
+    required Map<String, dynamic> primaryKeyValues,
+    required String associationName,
+    required dynamic targetOrKey,
+    bool? save,
+    Map<String, dynamic>? options,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
+  });
+
+  /// Generic association adder (for hasMany/belongsToMany)
+  Future<void> associationAdd({
+    required String sourceModel,
+    required Map<String, dynamic> primaryKeyValues,
+    required String associationName,
+    required dynamic targetOrKey,
+    Map<String, dynamic>? options,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
+  });
+
+  /// Generic association remover (for hasMany/belongsToMany)
+  Future<void> associationRemove({
+    required String sourceModel,
+    required Map<String, dynamic> primaryKeyValues,
+    required String associationName,
+    required dynamic targetOrKey,
+    Map<String, dynamic>? options,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
+  });
+
+  /// Generic association creator
+  Future<ModelInstanceData> associationCreate({
+    required String sourceModel,
+    required Map<String, dynamic> primaryKeyValues,
+    required String associationName,
+    required Map<String, dynamic> data,
+    Map<String, dynamic>? options,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
   });
 }

@@ -127,17 +127,15 @@ class Sequelize extends SequelizeInterface {
       model.define(model.modelName, this);
       _models[model.modelName] = model;
 
-      _bridge
-          .call('defineModel', {
-            'name': model.modelName,
-            'attributes': model.$getAttributesJson(),
-            'options': model.getOptionsJson(),
-          })
-          .catchError((error) {
-            print(
-              '[Sequelize] Failed to define model "${model.modelName}": $error',
-            );
-          });
+      _bridge.call('defineModel', {
+        'name': model.modelName,
+        'attributes': model.$getAttributesJson(),
+        'options': model.getOptionsJson(),
+      }).catchError((error) {
+        print(
+          '[Sequelize] Failed to define model "${model.modelName}": $error',
+        );
+      });
     }
   }
 
@@ -153,15 +151,13 @@ class Sequelize extends SequelizeInterface {
       );
     }
 
-    _bridge
-        .call('defineModel', {
-          'name': name,
-          'attributes': attributes,
-          'options': options,
-        })
-        .catchError((error) {
-          print('[Sequelize] Failed to define model "$name": $error');
-        });
+    _bridge.call('defineModel', {
+      'name': name,
+      'attributes': attributes,
+      'options': options,
+    }).catchError((error) {
+      print('[Sequelize] Failed to define model "$name": $error');
+    });
   }
 
   /// Get the bridge client (for QueryEngine and Model)
@@ -176,6 +172,40 @@ class Sequelize extends SequelizeInterface {
       'force': force,
       'alter': alter,
     });
+  }
+
+  @override
+  Future<T> transaction<T>(
+    Future<T> Function(Transaction transaction) callback,
+  ) async {
+    final response = await _bridge.call('startTransaction', {});
+    final transactionId = response['transactionId'] as String;
+    final transaction = Transaction(transactionId, _bridge);
+
+    try {
+      final result = await transaction.scope(() => callback(transaction));
+      if (!transaction.isFinished) {
+        await transaction.commit();
+      }
+      return result;
+    } catch (e) {
+      if (!transaction.isFinished) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          // Ignore rollback errors if we're already failing
+          if (_debug) log('[Sequelize] Rollback failed: $rollbackError');
+        }
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Transaction> startUnmanagedTransaction() async {
+    final response = await _bridge.call('startTransaction', {});
+    final transactionId = response['transactionId'] as String;
+    return Transaction(transactionId, _bridge);
   }
 
   @override

@@ -1,4 +1,5 @@
 import { checkConnection, checkModelDefinition } from '../utils/checkUtils';
+import { convertQueryOptions } from '../utils/queryConverter';
 import { getModels, getSequelize } from '../utils/state';
 
 type BelongsToSetParams = {
@@ -32,7 +33,12 @@ export async function handleBelongsToSet(
   checkModelDefinition(source, params.sourceModel);
 
   const where = compactWhere(params.primaryKeyValues);
-  const instance = await source.findOne({ where });
+  const options = convertQueryOptions(params.options || {});
+  if (params.save !== undefined && params.save !== null) {
+    options.save = params.save;
+  }
+
+  const instance = await source.findOne({ where, transaction: options.transaction });
   if (!instance) {
     throw new Error(
       `Cannot set belongsTo association: instance of "${params.sourceModel}" not found for provided primary key values`,
@@ -45,11 +51,6 @@ export async function handleBelongsToSet(
     throw new Error(
       `Association setter "${methodName}" not found on model "${params.sourceModel}"`,
     );
-  }
-
-  const options = { ...(params.options || {}) };
-  if (params.save !== undefined && params.save !== null) {
-    options.save = params.save;
   }
 
   await fn.call(instance, params.targetOrKey, options);

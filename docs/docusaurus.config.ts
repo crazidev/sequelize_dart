@@ -1,5 +1,5 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
+import { themes as prismThemes } from 'prism-react-renderer';
+import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
@@ -73,7 +73,7 @@ const config: Config = {
           label: 'Documentation',
         },
         {
-          href: 'https://github.com/your-org/sequelize-dart',
+          href: 'https://github.com/crazidev/sequelize_orm_dart',
           label: 'GitHub',
           position: 'right',
         },
@@ -108,7 +108,7 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/your-org/sequelize-dart',
+              href: 'https://github.com/crazidev/sequelize_orm_dart',
             },
           ],
         },

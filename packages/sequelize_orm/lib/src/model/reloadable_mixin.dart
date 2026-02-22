@@ -1,4 +1,5 @@
 import 'package:sequelize_orm/src/query/query/query.dart';
+import 'package:sequelize_orm/src/transaction/transaction.dart';
 
 /// Mixin that provides reload functionality for model value classes.
 ///
@@ -12,8 +13,8 @@ import 'package:sequelize_orm/src/query/query/query.dart';
 ///   Map<String, dynamic>? getPrimaryKeyMap() => {'id': id};
 ///
 ///   @override
-///   Future<$UserValues?> findByPrimaryKey(Map<String, dynamic> pk) async {
-///     return $User().findOne(where: (c) => c.id.eq(pk['id']));
+///   Future<$UserValues?> findByPrimaryKey(Map<String, dynamic> pk, {Transaction? transaction}) async {
+///     return $User().findOne(where: (c) => c.id.eq(pk['id']), transaction: transaction);
 ///   }
 ///
 ///   @override
@@ -42,6 +43,7 @@ mixin ReloadableMixin<T extends ReloadableMixin<T>> {
   Future<T?> findByPrimaryKey(
     Map<String, dynamic> primaryKey, {
     Query? originalQuery,
+    Transaction? transaction,
   });
 
   /// Copies all fields from [source] to this instance.
@@ -55,13 +57,17 @@ mixin ReloadableMixin<T extends ReloadableMixin<T>> {
   /// Returns this instance with updated fields, or null if the record was deleted.
   ///
   /// Throws [StateError] if the instance has no primary key values.
-  Future<T?> reload() async {
+  Future<T?> reload({Transaction? transaction}) async {
     final pk = getPrimaryKeyMap();
     if (pk == null || pk.isEmpty) {
       throw StateError('Cannot reload: instance has no primary key values');
     }
 
-    final result = await findByPrimaryKey(pk, originalQuery: originalQuery);
+    final result = await findByPrimaryKey(
+      pk,
+      originalQuery: originalQuery,
+      transaction: transaction,
+    );
     if (result == null) {
       return null;
     }

@@ -4,6 +4,7 @@ import 'package:sequelize_orm/src/model/model_instance_data.dart';
 import 'package:sequelize_orm/src/query/query/query.dart';
 import 'package:sequelize_orm/src/query/query_engine/query_engine_interface.dart';
 import 'package:sequelize_orm/src/sequelize/sequelize.dart';
+import 'package:sequelize_orm/src/transaction/transaction.dart';
 
 /// Deeply converts a value from JS types (JsLinkedHashMap) to Dart types.
 /// This is needed for dart2js where dartify() returns JsLinkedHashMap.
@@ -48,17 +49,35 @@ class QueryEngine extends QueryEngineInterface {
     return bridge;
   }
 
+  Transaction? _resolveTransaction(Transaction? transaction) {
+    final tx = transaction ?? Transaction.current;
+    if (tx != null && tx.isFinished) {
+      throw SequelizeException(
+        'Transaction cannot be used because it has already been committed or rolled back.',
+        context: 'QueryEngine',
+      );
+    }
+    return tx;
+  }
+
   @override
   Future<List<ModelInstanceData>> findAll({
     required String modelName,
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final options = query?.toJson() ?? {};
+      final tx = _resolveTransaction(transaction);
+      if (tx != null) {
+        options['transactionId'] = tx.transactionId;
+      }
+
       final result = await getBridge(sequelize).call('findAll', {
         'model': modelName,
-        'options': query?.toJson(),
+        'options': options,
       });
 
       if (result is List) {
@@ -84,11 +103,18 @@ class QueryEngine extends QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final options = query?.toJson() ?? {};
+      final tx = _resolveTransaction(transaction);
+      if (tx != null) {
+        options['transactionId'] = tx.transactionId;
+      }
+
       final result = await getBridge(sequelize).call('findOne', {
         'model': modelName,
-        'options': query?.toJson() ?? {},
+        'options': options,
       });
 
       if (result == null) return null;
@@ -111,12 +137,19 @@ class QueryEngine extends QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final options = query?.toJson() ?? {};
+      final tx = _resolveTransaction(transaction);
+      if (tx != null) {
+        options['transactionId'] = tx.transactionId;
+      }
+
       final result = await getBridge(sequelize).call('create', {
         'model': modelName,
         'data': data,
-        'options': query?.toJson(),
+        'options': options,
       });
 
       // Handle both single result and array result
@@ -143,12 +176,19 @@ class QueryEngine extends QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final options = query?.toJson() ?? {};
+      final tx = _resolveTransaction(transaction);
+      if (tx != null) {
+        options['transactionId'] = tx.transactionId;
+      }
+
       final result = await getBridge(sequelize).call('create', {
         'model': modelName,
         'data': data,
-        'options': query?.toJson(),
+        'options': options,
       });
 
       if (result is List) {
@@ -174,12 +214,19 @@ class QueryEngine extends QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final options = query?.toJson() ?? {};
+      final tx = _resolveTransaction(transaction);
+      if (tx != null) {
+        options['transactionId'] = tx.transactionId;
+      }
+
       final result = await getBridge(sequelize).call('update', {
         'model': modelName,
         'data': data,
-        'query': query?.toJson(),
+        'query': options,
       });
 
       if (result is int) return result;
@@ -205,11 +252,18 @@ class QueryEngine extends QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final options = query?.toJson() ?? {};
+      final tx = _resolveTransaction(transaction);
+      if (tx != null) {
+        options['transactionId'] = tx.transactionId;
+      }
+
       final result = await getBridge(sequelize).call('count', {
         'model': modelName,
-        'options': query?.toJson(),
+        'options': options,
       });
 
       if (result is int) return result;
@@ -236,12 +290,19 @@ class QueryEngine extends QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final options = query?.toJson() ?? {};
+      final tx = _resolveTransaction(transaction);
+      if (tx != null) {
+        options['transactionId'] = tx.transactionId;
+      }
+
       final result = await getBridge(sequelize).call('max', {
         'model': modelName,
         'column': column,
-        'options': query?.toJson(),
+        'options': options,
       });
 
       if (result == null) return null;
@@ -268,12 +329,19 @@ class QueryEngine extends QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final options = query?.toJson() ?? {};
+      final tx = _resolveTransaction(transaction);
+      if (tx != null) {
+        options['transactionId'] = tx.transactionId;
+      }
+
       final result = await getBridge(sequelize).call('min', {
         'model': modelName,
         'column': column,
-        'options': query?.toJson(),
+        'options': options,
       });
 
       if (result == null) return null;
@@ -300,12 +368,19 @@ class QueryEngine extends QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final options = query?.toJson() ?? {};
+      final tx = _resolveTransaction(transaction);
+      if (tx != null) {
+        options['transactionId'] = tx.transactionId;
+      }
+
       final result = await getBridge(sequelize).call('sum', {
         'model': modelName,
         'column': column,
-        'options': query?.toJson(),
+        'options': options,
       });
 
       if (result == null) return null;
@@ -332,6 +407,7 @@ class QueryEngine extends QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     return _executeNumericOperation(
       modelName: modelName,
@@ -339,6 +415,7 @@ class QueryEngine extends QueryEngineInterface {
       query: query,
       sequelize: sequelize,
       operation: 'increment',
+      transaction: transaction,
     );
   }
 
@@ -349,6 +426,7 @@ class QueryEngine extends QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     return _executeNumericOperation(
       modelName: modelName,
@@ -356,6 +434,7 @@ class QueryEngine extends QueryEngineInterface {
       query: query,
       sequelize: sequelize,
       operation: 'decrement',
+      transaction: transaction,
     );
   }
 
@@ -365,12 +444,19 @@ class QueryEngine extends QueryEngineInterface {
     Query? query,
     dynamic sequelize,
     required String operation,
+    Transaction? transaction,
   }) async {
     try {
+      final options = query?.toJson() ?? {};
+      final tx = _resolveTransaction(transaction);
+      if (tx != null) {
+        options['transactionId'] = tx.transactionId;
+      }
+
       final result = await getBridge(sequelize).call(operation, {
         'model': modelName,
         'fields': fields,
-        'query': query?.toJson(),
+        'query': options,
       });
 
       if (result is List) {
@@ -396,13 +482,16 @@ class QueryEngine extends QueryEngineInterface {
     required Map<String, dynamic> primaryKeyValues,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final tx = _resolveTransaction(transaction);
       final result = await getBridge(sequelize).call('save', {
         'model': modelName,
         'currentData': currentData,
         'previousData': previousData,
         'primaryKeyValues': primaryKeyValues,
+        'options': {'transactionId': tx?.transactionId},
       });
 
       if (result is Map) {
@@ -435,13 +524,18 @@ class QueryEngine extends QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final tx = _resolveTransaction(transaction);
       final result = await getBridge(sequelize).call('belongsToGet', {
         'sourceModel': sourceModel,
         'primaryKeyValues': primaryKeyValues,
         'associationName': associationName,
-        'options': options,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
       });
       if (result == null) return null;
       return _toModelInstanceData(result);
@@ -466,15 +560,20 @@ class QueryEngine extends QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final tx = _resolveTransaction(transaction);
       await getBridge(sequelize).call('belongsToSet', {
         'sourceModel': sourceModel,
         'primaryKeyValues': primaryKeyValues,
         'associationName': associationName,
         'targetOrKey': targetOrKey,
         'save': save,
-        'options': options,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
       });
     } catch (e) {
       if (e is SequelizeException) {
@@ -496,14 +595,19 @@ class QueryEngine extends QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final tx = _resolveTransaction(transaction);
       final result = await getBridge(sequelize).call('belongsToCreate', {
         'sourceModel': sourceModel,
         'primaryKeyValues': primaryKeyValues,
         'associationName': associationName,
         'data': data,
-        'options': options,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
       });
       return _toModelInstanceData(result);
     } catch (e) {
@@ -525,11 +629,16 @@ class QueryEngine extends QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final tx = _resolveTransaction(transaction);
       final result = await getBridge(sequelize).call('destroy', {
         'model': modelName,
-        'options': options,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
       });
 
       if (result is int) return result;
@@ -555,11 +664,16 @@ class QueryEngine extends QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final tx = _resolveTransaction(transaction);
       await getBridge(sequelize).call('truncate', {
         'model': modelName,
-        'options': options,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
       });
     } catch (e) {
       if (e is SequelizeException) {
@@ -578,11 +692,16 @@ class QueryEngine extends QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final tx = _resolveTransaction(transaction);
       await getBridge(sequelize).call('restore', {
         'model': modelName,
-        'options': options,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
       });
     } catch (e) {
       if (e is SequelizeException) {
@@ -602,12 +721,17 @@ class QueryEngine extends QueryEngineInterface {
     Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final tx = _resolveTransaction(transaction);
       await getBridge(sequelize).call('instanceDestroy', {
         'model': modelName,
         'primaryKeyValues': primaryKeyValues,
-        'options': options,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
       });
     } catch (e) {
       if (e is SequelizeException) {
@@ -628,11 +752,16 @@ class QueryEngine extends QueryEngineInterface {
     required Map<String, dynamic> primaryKeyValues,
     dynamic sequelize,
     dynamic model,
+    Transaction? transaction,
   }) async {
     try {
+      final tx = _resolveTransaction(transaction);
       await getBridge(sequelize).call('instanceRestore', {
         'model': modelName,
         'primaryKeyValues': primaryKeyValues,
+        'options': {
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
       });
     } catch (e) {
       if (e is SequelizeException) {
@@ -643,6 +772,187 @@ class QueryEngine extends QueryEngineInterface {
       throw SequelizeException(
         e.toString(),
         context: 'Exception: failed to execute instanceRestore()',
+      );
+    }
+  }
+
+  @override
+  Future<dynamic> associationGet({
+    required String sourceModel,
+    required Map<String, dynamic> primaryKeyValues,
+    required String associationName,
+    Map<String, dynamic>? options,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
+  }) async {
+    try {
+      final tx = _resolveTransaction(transaction);
+      final result = await getBridge(sequelize).call('associationGet', {
+        'sourceModel': sourceModel,
+        'primaryKeyValues': primaryKeyValues,
+        'associationName': associationName,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
+      });
+      if (result == null) return null;
+      if (result is List) return result.map(_toModelInstanceData).toList();
+      return _toModelInstanceData(result);
+    } catch (e) {
+      if (e is SequelizeException) {
+        throw e
+            .copyWithContext('Exception: failed to execute associationGet()');
+      }
+      throw SequelizeException(
+        e.toString(),
+        context: 'Exception: failed to execute associationGet()',
+      );
+    }
+  }
+
+  @override
+  Future<void> associationSet({
+    required String sourceModel,
+    required Map<String, dynamic> primaryKeyValues,
+    required String associationName,
+    required dynamic targetOrKey,
+    bool? save,
+    Map<String, dynamic>? options,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
+  }) async {
+    try {
+      final tx = _resolveTransaction(transaction);
+      await getBridge(sequelize).call('associationSet', {
+        'sourceModel': sourceModel,
+        'primaryKeyValues': primaryKeyValues,
+        'associationName': associationName,
+        'targetOrKey': targetOrKey,
+        'save': save,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
+      });
+    } catch (e) {
+      if (e is SequelizeException) {
+        throw e
+            .copyWithContext('Exception: failed to execute associationSet()');
+      }
+      throw SequelizeException(
+        e.toString(),
+        context: 'Exception: failed to execute associationSet()',
+      );
+    }
+  }
+
+  @override
+  Future<void> associationAdd({
+    required String sourceModel,
+    required Map<String, dynamic> primaryKeyValues,
+    required String associationName,
+    required dynamic targetOrKey,
+    Map<String, dynamic>? options,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
+  }) async {
+    try {
+      final tx = _resolveTransaction(transaction);
+      await getBridge(sequelize).call('associationAdd', {
+        'sourceModel': sourceModel,
+        'primaryKeyValues': primaryKeyValues,
+        'associationName': associationName,
+        'targetOrKey': targetOrKey,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
+      });
+    } catch (e) {
+      if (e is SequelizeException) {
+        throw e
+            .copyWithContext('Exception: failed to execute associationAdd()');
+      }
+      throw SequelizeException(
+        e.toString(),
+        context: 'Exception: failed to execute associationAdd()',
+      );
+    }
+  }
+
+  @override
+  Future<void> associationRemove({
+    required String sourceModel,
+    required Map<String, dynamic> primaryKeyValues,
+    required String associationName,
+    required dynamic targetOrKey,
+    Map<String, dynamic>? options,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
+  }) async {
+    try {
+      final tx = _resolveTransaction(transaction);
+      await getBridge(sequelize).call('associationRemove', {
+        'sourceModel': sourceModel,
+        'primaryKeyValues': primaryKeyValues,
+        'associationName': associationName,
+        'targetOrKey': targetOrKey,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
+      });
+    } catch (e) {
+      if (e is SequelizeException) {
+        throw e.copyWithContext(
+          'Exception: failed to execute associationRemove()',
+        );
+      }
+      throw SequelizeException(
+        e.toString(),
+        context: 'Exception: failed to execute associationRemove()',
+      );
+    }
+  }
+
+  @override
+  Future<ModelInstanceData> associationCreate({
+    required String sourceModel,
+    required Map<String, dynamic> primaryKeyValues,
+    required String associationName,
+    required Map<String, dynamic> data,
+    Map<String, dynamic>? options,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
+  }) async {
+    try {
+      final tx = _resolveTransaction(transaction);
+      final result = await getBridge(sequelize).call('associationCreate', {
+        'sourceModel': sourceModel,
+        'primaryKeyValues': primaryKeyValues,
+        'associationName': associationName,
+        'data': data,
+        'options': {
+          if (options != null) ...options,
+          if (tx != null) 'transactionId': tx.transactionId,
+        },
+      });
+      return _toModelInstanceData(result);
+    } catch (e) {
+      if (e is SequelizeException) {
+        throw e.copyWithContext(
+          'Exception: failed to execute associationCreate()',
+        );
+      }
+      throw SequelizeException(
+        e.toString(),
+        context: 'Exception: failed to execute associationCreate()',
       );
     }
   }

@@ -28,11 +28,11 @@ export 'src/query/association/association_reference.dart';
 export 'src/query/association/include_builder.dart';
 export 'src/query/association/include_helper.dart';
 export 'src/query/association/include_options.dart';
-export 'src/query/operators/operators.dart';
-export 'src/query/operators/operators_interface.dart';
 // Query exports
 export 'src/query/destroy_options.dart';
 export 'src/query/instance_destroy_options.dart';
+export 'src/query/operators/operators.dart';
+export 'src/query/operators/operators_interface.dart';
 export 'src/query/query/query.dart';
 export 'src/query/query_engine/query_engine.dart';
 export 'src/query/restore_options.dart';
@@ -44,6 +44,8 @@ export 'src/seeding/sequelize_seed.dart';
 export 'src/seeding/sequelize_seeding.dart';
 // Sequelize exports
 export 'src/sequelize/sequelize.dart';
+// Transaction exports
+export 'src/transaction/transaction.dart';
 // Type exports
 export 'src/types/sequelize_big_int.dart';
 // Utility exports

@@ -1,3 +1,5 @@
+// ignore_for_file: file_names
+
 /// Helper function to measure query execution time
 /// Usage: await measureQuery('Query name', () => yourQuery);
 Future<T> measureQuery<T>(

@@ -1,4 +1,5 @@
 import { checkConnection, checkModelDefinition } from '../utils/checkUtils';
+import { convertQueryOptions } from '../utils/queryConverter';
 import { getModels, getSequelize } from '../utils/state';
 import { toModelResponse, ModelResponse } from '../utils/modelResponse';
 
@@ -32,7 +33,9 @@ export async function handleBelongsToCreate(
   checkModelDefinition(source, params.sourceModel);
 
   const where = compactWhere(params.primaryKeyValues);
-  const instance = await source.findOne({ where });
+  const options = convertQueryOptions(params.options || {});
+
+  const instance = await source.findOne({ where, transaction: options.transaction });
   if (!instance) {
     throw new Error(
       `Cannot create belongsTo association: instance of "${params.sourceModel}" not found for provided primary key values`,
@@ -47,7 +50,7 @@ export async function handleBelongsToCreate(
     );
   }
 
-  const result = await fn.call(instance, params.data || {}, params.options || {});
+  const result = await fn.call(instance, params.data || {}, options);
   return toModelResponse(result);
 }
 

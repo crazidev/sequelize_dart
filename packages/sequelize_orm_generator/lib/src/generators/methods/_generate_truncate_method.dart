@@ -9,6 +9,7 @@ void _generateTruncateMethod(
   buffer.writeln('    bool? cascade,');
   buffer.writeln('    bool? restartIdentity,');
   buffer.writeln('    bool? force,');
+  buffer.writeln('    Transaction? transaction,');
   buffer.writeln('  }) {');
   buffer.writeln('    final options = <String, dynamic>{');
   buffer.writeln('      if (cascade != null) \'cascade\': cascade,');
@@ -22,6 +23,7 @@ void _generateTruncateMethod(
   buffer.writeln('      options: options,');
   buffer.writeln('      sequelize: sequelizeInstance,');
   buffer.writeln('      model: sequelizeModel,');
+  buffer.writeln('      transaction: transaction,');
   buffer.writeln('    );');
   buffer.writeln('  }');
   buffer.writeln();

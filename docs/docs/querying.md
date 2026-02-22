@@ -17,3 +17,5 @@ Use the sidebar or the links below to navigate the querying documentation.
 - **[JSON Querying](./querying/json)**: Defining JSON columns, navigating keys and arrays, containment checks, and combining conditions.
 - **[Sorting & Pagination](./querying/sorting-pagination)**: Ordering results and handling pagination.
 - **[Aggregations & Utilities](./querying/aggregations)**: Count, sum, and other database utilities.
+- **[Enums](./querying/enums)**: Type-safe enum column querying with prefix shortcuts and grouped access.
+- **[Transactions](./querying/transactions)**: Managed and unmanaged transactions, automatic inheritance via Dart Zones, and nested transaction patterns.

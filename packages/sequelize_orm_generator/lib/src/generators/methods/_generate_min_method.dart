@@ -17,6 +17,7 @@ void _generateMinMethod(
   buffer.writeln(
     '      QueryOperator Function($columnsClassName $whereCallbackName)? where,',
   );
+  buffer.writeln('      Transaction? transaction,');
   buffer.writeln('    }');
   buffer.writeln('  ) {');
   buffer.writeln('    final columns = $columnsClassName();');
@@ -31,6 +32,7 @@ void _generateMinMethod(
   buffer.writeln('      query: query,');
   buffer.writeln('      sequelize: sequelizeInstance,');
   buffer.writeln('      model: sequelizeModel,');
+  buffer.writeln('      transaction: transaction,');
   buffer.writeln('    );');
   buffer.writeln('  }');
   buffer.writeln();

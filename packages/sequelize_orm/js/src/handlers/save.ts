@@ -1,4 +1,5 @@
 import { checkConnection, checkModelDefinition } from '../utils/checkUtils';
+import { convertQueryOptions } from '../utils/queryConverter';
 import { printLogs } from '../utils/printLogs';
 import { getModels, getSequelize } from '../utils/state';
 import { Model } from '@sequelize/core';
@@ -22,6 +23,7 @@ export async function handleSave(params: SaveParams): Promise<Record<string, any
   const currentData = params.currentData;
   const previousData = params.previousData;
   const primaryKeyValues = params.primaryKeyValues;
+  const options = convertQueryOptions(params.options || {});
 
   // Get the set of valid attribute names for this model.
   // This filters out association keys (e.g. 'user', 'postDetails') that would
@@ -55,7 +57,7 @@ export async function handleSave(params: SaveParams): Promise<Record<string, any
 
   if (isNewRecord) {
     // Create new record using Sequelize's create
-    const instance = await ModelClass.create(filteredCurrent, params.options || {});
+    const instance = await ModelClass.create(filteredCurrent, options);
     return {
       data: (instance && instance.toJSON()) || {},
       isNewRecord: true,
@@ -85,11 +87,7 @@ export async function handleSave(params: SaveParams): Promise<Record<string, any
     }
 
     // Save the instance
-    // Sequelize's save() will:
-    // - Compare dataValues to _previousDataValues to determine changed fields
-    // - Only update changed fields in the database
-    // - Perform UPDATE since isNewRecord is false
-    const savedInstance = await instance.save(params.options || {});
+    const savedInstance = await instance.save(options);
     return {
       data: savedInstance.toJSON(),
       isNewRecord: false,

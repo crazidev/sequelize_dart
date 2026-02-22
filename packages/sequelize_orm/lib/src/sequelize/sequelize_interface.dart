@@ -45,6 +45,45 @@ abstract class SequelizeInterface {
   /// If [alter] is true, tables will be altered to match the model definition.
   Future<void> sync({bool force = false, bool alter = false});
 
+  /// Starts a managed transaction.
+  ///
+  /// The transaction will be automatically committed if the callback completes successfully,
+  /// or rolled back if an error occurs.
+  ///
+  /// The transaction is automatically accessible via [Transaction.current] within the callback
+  /// and its descendants, enabling automatic transaction inheritance.
+  ///
+  /// Example:
+  /// ```dart
+  /// final user = await sequelize.transaction((t) async {
+  ///   // Transaction t is automatically used here
+  ///   return await User.create({'name': 'John'});
+  /// });
+  /// ```
+  Future<T> transaction<T>(
+    Future<T> Function(Transaction transaction) callback,
+  );
+
+  /// Starts an unmanaged transaction.
+  ///
+  /// You must manually call `commit()` or `rollback()` on the returned [Transaction] object.
+  ///
+  /// Unmanaged transactions do **not** support automatic inheritance via [Transaction.current].
+  /// You must pass the transaction explicitly to all model methods.
+  ///
+  /// Example:
+  /// ```dart
+  /// final transaction = await sequelize.startUnmanagedTransaction();
+  /// try {
+  ///   await User.create({'name': 'John'}, transaction: transaction);
+  ///   await transaction.commit();
+  /// } catch (e) {
+  ///   await transaction.rollback();
+  ///   rethrow;
+  /// }
+  /// ```
+  Future<Transaction> startUnmanagedTransaction();
+
   Future<void> close();
 
   /// Whether debug logging is enabled.

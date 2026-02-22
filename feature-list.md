@@ -9,7 +9,7 @@
 - ✅ PostgreSQL
 - ✅ MySQL
 - ✅ MariaDB
-- ✅ SQLite — full support including JSON path querying
+- ⚠️ SQLite — Dart API only and JS bridge wired, missing native sqlite3 drivers
 - ⚠️ MSSQL — Dart API only, JS bridge not wired
 - ⚠️ DB2 — Dart API only, JS bridge not wired
 - ❌ DB2 for IBM i
@@ -391,7 +391,7 @@ Runtime bridge status:
 - ✅ `JSON`
 - ✅ `JSONB`
 - ✅ `BLOB` — with tiny, medium, long variants
-- ❌ `ENUM`
+- ✅ `ENUM`
 - ❌ `ARRAY` — PostgreSQL
 - ❌ `RANGE` — PostgreSQL
 - ❌ `GEOMETRY`
@@ -609,8 +609,8 @@ Runtime bridge status:
 - ✅ `contains()` operator — PostgreSQL JSONB containment (`@>`)
 - ✅ Cross-dialect JSON support — PostgreSQL (native), MySQL/MariaDB (native), SQLite (monkey-patched `->` / `->>`)
 - ✅ `normalizeJsonTypes` — auto-converts `JSON`↔`JSONB` based on connected dialect
-- ❌ JSON casting syntax (`jsonAttribute.age::integer`)
-- ❌ JSON array index access (`jsonColumn.passwords[0]`) — infrastructure exists via `.at()` but not tested
+- ✅ JSON casting syntax (`jsonAttribute.age::integer`)
+- ✅ JSON array index access (`jsonColumn.passwords[0]`) — infrastructure exists via `.at()` but not tested
 - ❌ `JSON_NULL` / `SQL_NULL` constants
 - ❌ JSON-specific operators (`Op.anyKeyExists`, `Op.allKeysExist` on JSON columns)
 

@@ -219,7 +219,10 @@ class SequelizeException implements Exception {
 
     // 2. Print Main Exception Header (Special case for context wrapper)
     final errorName = name ?? runtimeType.toString();
-    if (errorName != 'SequelizeException' || context == null) {
+    final isBaseException =
+        errorName == 'SequelizeException' || errorName == 'SequelizeBaseError';
+
+    if (!isBaseException || context == null || !context!.contains(message)) {
       buffer.write(AnsiColor.brightRed.wrap('$errorName: '));
       buffer.writeln(AnsiColor.yellow.wrap(message));
     }

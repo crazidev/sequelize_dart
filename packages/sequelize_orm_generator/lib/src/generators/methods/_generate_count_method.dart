@@ -13,6 +13,7 @@ void _generateCountMethod(
   buffer.writeln(
     '    QueryOperator Function($columnsClassName $whereCallbackName)? where,',
   );
+  buffer.writeln('    Transaction? transaction,');
   buffer.writeln('  }) {');
   buffer.writeln('    const columns = $columnsClassName();');
   buffer.writeln('    final query = Query.fromCallbacks(');
@@ -24,6 +25,7 @@ void _generateCountMethod(
   buffer.writeln('      query: query,');
   buffer.writeln('      sequelize: sequelizeInstance,');
   buffer.writeln('      model: sequelizeModel,');
+  buffer.writeln('      transaction: transaction,');
   buffer.writeln('    );');
   buffer.writeln('  }');
   buffer.writeln();

@@ -27,6 +27,7 @@ void _generateUpdateMethod(
   buffer.writeln(
     '    required QueryOperator Function($columnsClassName $whereCallbackName) where,',
   );
+  buffer.writeln('    Transaction? transaction,');
   buffer.writeln('  }) {');
 
   // Build data map from named parameters
@@ -65,6 +66,7 @@ void _generateUpdateMethod(
   buffer.writeln('      query: query,');
   buffer.writeln('      sequelize: sequelizeInstance,');
   buffer.writeln('      model: sequelizeModel,');
+  buffer.writeln('      transaction: transaction,');
   buffer.writeln('    );');
   buffer.writeln('  }');
   buffer.writeln();

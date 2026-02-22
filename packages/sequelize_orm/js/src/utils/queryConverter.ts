@@ -1,5 +1,5 @@
 import { Op, sql, Sequelize } from '@sequelize/core';
-import { getOptions } from './state';
+import { getOptions, getTransaction } from './state';
 
 export function convertSqlExpression(expr: any): any {
   if (!expr || typeof expr !== 'object') {
@@ -393,6 +393,26 @@ export function convertQueryOptions(options: any): any {
   // Pass through individualHooks option
   if (options.individualHooks !== undefined && options.individualHooks !== null) {
     result.individualHooks = options.individualHooks;
+  }
+
+  // Pass through truncate-specific options
+  if (options.cascade !== undefined && options.cascade !== null) {
+    result.cascade = options.cascade;
+  }
+  if (options.restartIdentity !== undefined && options.restartIdentity !== null) {
+    result.restartIdentity = options.restartIdentity;
+  }
+  if (options.withoutForeignKeyChecks !== undefined && options.withoutForeignKeyChecks !== null) {
+    result.withoutForeignKeyChecks = options.withoutForeignKeyChecks;
+  }
+
+  // Handle transactionId
+  if (options.transactionId) {
+    const transaction = getTransaction(options.transactionId);
+    if (!transaction) {
+      throw new Error(`Transaction not found: ${options.transactionId}`);
+    }
+    result.transaction = transaction;
   }
 
   if (getOptions().hoistIncludeOptions) {

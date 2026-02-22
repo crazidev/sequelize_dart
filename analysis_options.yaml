@@ -80,6 +80,8 @@ plugins:
     path: packages/sequelize_orm_analyzer
     diagnostics:
       table_must_be_abstract: true
+      table_should_have_primary_key: true
+      uncommitted_transaction: true
       suggest_association_foreign_key: true
       suggest_association_alias: true
       missing_foreign_key_column: true

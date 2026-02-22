@@ -59,6 +59,8 @@ const sidebars: SidebarsConfig = {
         'querying/filtering',
         'querying/sorting-pagination',
         'querying/aggregations',
+        'querying/enums',
+        'querying/transactions',
       ],
     },
     'seeding-and-cli',

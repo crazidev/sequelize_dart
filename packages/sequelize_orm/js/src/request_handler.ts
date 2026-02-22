@@ -28,6 +28,8 @@ import { handleInstanceDestroy } from './handlers/instanceDestroy';
 import { handleInstanceRestore } from './handlers/instanceRestore';
 import { handleSequelizeTruncate } from './handlers/sequelizeTruncate';
 import { handleSequelizeDestroyAll } from './handlers/sequelizeDestroyAll';
+import { handleStartTransaction, handleCommitTransaction, handleRollbackTransaction } from './handlers/transaction';
+import { handleAssociationGet, handleAssociationSet, handleAssociationAdd, handleAssociationRemove, handleAssociationCreate } from './handlers/association';
 
 export type JsonRpcRequest = {
   id: unknown;
@@ -165,6 +167,38 @@ export async function processRequest(
 
       case 'close':
         result = await handleClose();
+        break;
+
+      case 'startTransaction':
+        result = await handleStartTransaction();
+        break;
+
+      case 'commitTransaction':
+        result = await handleCommitTransaction(params);
+        break;
+
+      case 'rollbackTransaction':
+        result = await handleRollbackTransaction(params);
+        break;
+
+      case 'associationGet':
+        result = await handleAssociationGet(params);
+        break;
+
+      case 'associationSet':
+        result = await handleAssociationSet(params);
+        break;
+
+      case 'associationAdd':
+        result = await handleAssociationAdd(params);
+        break;
+
+      case 'associationRemove':
+        result = await handleAssociationRemove(params);
+        break;
+
+      case 'associationCreate':
+        result = await handleAssociationCreate(params);
         break;
 
       default:

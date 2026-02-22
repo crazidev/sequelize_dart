@@ -38,7 +38,7 @@ void _generateInstanceMethods(
       buffer.write('num? ${_toCamelCase(field.name)}, ');
     }
     buffer.writeln(
-      'QueryOperator Function($columnsClassName c)? where}) async {',
+      'QueryOperator Function($columnsClassName c)? where, Transaction? transaction}) async {',
     );
 
     // Build fields map inline
@@ -61,7 +61,7 @@ void _generateInstanceMethods(
       final camelName = _toCamelCase(field.name);
       buffer.write('$camelName: $camelName, ');
     }
-    buffer.writeln('where: _mergeWhere(where));');
+    buffer.writeln('where: _mergeWhere(where), transaction: transaction);');
 
     buffer.writeln('    final updated = result.firstOrNull;');
     buffer.writeln('    if (updated == null) return null;');
@@ -77,7 +77,7 @@ void _generateInstanceMethods(
       buffer.write('num? ${_toCamelCase(field.name)}, ');
     }
     buffer.writeln(
-      'QueryOperator Function($columnsClassName c)? where}) async {',
+      'QueryOperator Function($columnsClassName c)? where, Transaction? transaction}) async {',
     );
 
     // Build fields map inline
@@ -100,7 +100,7 @@ void _generateInstanceMethods(
       final camelName = _toCamelCase(field.name);
       buffer.write('$camelName: $camelName, ');
     }
-    buffer.writeln('where: _mergeWhere(where));');
+    buffer.writeln('where: _mergeWhere(where), transaction: transaction);');
 
     buffer.writeln('    final updated = result.firstOrNull;');
     buffer.writeln('    if (updated == null) return null;');
@@ -118,7 +118,9 @@ void _generateInstanceMethods(
     buffer.writeln(
       '  /// Returns the number of affected rows (0 if no changes, 1 if updated/created)',
     );
-    buffer.writeln('  Future<int> save({List<String>? fields}) async {');
+    buffer.writeln(
+      '  Future<int> save({List<String>? fields, Transaction? transaction}) async {',
+    );
     buffer.writeln('    // Get current data from instance (before any reload)');
     buffer.writeln('    // This preserves user modifications');
     buffer.writeln('    final currentData = toJson();');
@@ -140,7 +142,7 @@ void _generateInstanceMethods(
     buffer.writeln(
       '    if (pkValues.isNotEmpty && previousDataValues == null) {',
     );
-    buffer.writeln('      await reload();');
+    buffer.writeln('      await reload(transaction: transaction);');
     buffer.writeln('    }');
     buffer.writeln();
     buffer.writeln('    // Get previous data values (null if new record)');
@@ -201,6 +203,7 @@ void _generateInstanceMethods(
     buffer.writeln('      primaryKeyValues: pkValues,');
     buffer.writeln('      sequelize: $generatedClassName().sequelizeInstance,');
     buffer.writeln('      model: $generatedClassName().sequelizeModel,');
+    buffer.writeln('      transaction: transaction,');
     buffer.writeln('    );');
     buffer.writeln();
     buffer.writeln('    // Update instance fields from result');
@@ -221,7 +224,9 @@ void _generateInstanceMethods(
     buffer.writeln(
       '  /// Returns the number of affected rows (0 if not found, 1 if updated)',
     );
-    buffer.writeln('  Future<int> update(Map<String, dynamic> data) async {');
+    buffer.writeln(
+      '  Future<int> update(Map<String, dynamic> data, {Transaction? transaction}) async {',
+    );
     buffer.writeln('    if (data.isEmpty) {');
     buffer.writeln(
       '      throw ArgumentError(\'Data cannot be empty for update\');',
@@ -271,12 +276,13 @@ void _generateInstanceMethods(
       }
     }
     buffer.writeln('      where: pkWhere,');
+    buffer.writeln('      transaction: transaction,');
     buffer.writeln('    );');
     buffer.writeln();
     buffer.writeln('    // Update local instance fields from provided data');
     buffer.writeln('    if (affectedRows > 0) {');
     buffer.writeln('      // Reload to get all updated values from database');
-    buffer.writeln('      await reload();');
+    buffer.writeln('      await reload(transaction: transaction);');
     buffer.writeln('    }');
     buffer.writeln();
     buffer.writeln('    return affectedRows;');
@@ -288,7 +294,9 @@ void _generateInstanceMethods(
     buffer.writeln(
       '  /// For paranoid models, sets deletedAt unless force is true',
     );
-    buffer.writeln('  Future<void> destroy({bool? force}) async {');
+    buffer.writeln(
+      '  Future<void> destroy({bool? force, Transaction? transaction}) async {',
+    );
     buffer.writeln('    final pkValues = getPrimaryKeyMap();');
     buffer.writeln('    if (pkValues == null || pkValues.isEmpty) {');
     buffer.writeln(
@@ -305,6 +313,7 @@ void _generateInstanceMethods(
     buffer.writeln('      options: options,');
     buffer.writeln('      sequelize: $generatedClassName().sequelizeInstance,');
     buffer.writeln('      model: $generatedClassName().sequelizeModel,');
+    buffer.writeln('      transaction: transaction,');
     buffer.writeln('    );');
     buffer.writeln('  }');
     buffer.writeln();
@@ -313,7 +322,8 @@ void _generateInstanceMethods(
     buffer.writeln(
       '  /// Restores this soft-deleted instance (for paranoid models)',
     );
-    buffer.writeln('  Future<void> restore() async {');
+    buffer
+        .writeln('  Future<void> restore({Transaction? transaction}) async {');
     buffer.writeln('    final pkValues = getPrimaryKeyMap();');
     buffer.writeln('    if (pkValues == null || pkValues.isEmpty) {');
     buffer.writeln(
@@ -326,13 +336,201 @@ void _generateInstanceMethods(
     buffer.writeln('      primaryKeyValues: pkValues,');
     buffer.writeln('      sequelize: $generatedClassName().sequelizeInstance,');
     buffer.writeln('      model: $generatedClassName().sequelizeModel,');
+    buffer.writeln('      transaction: transaction,');
     buffer.writeln('    );');
     buffer.writeln();
     buffer.writeln(
       '    // Reload to get updated values (deletedAt should be null)',
     );
-    buffer.writeln('    await reload();');
+    buffer.writeln('    await reload(transaction: transaction);');
     buffer.writeln('  }');
     buffer.writeln();
+  }
+
+  _generateAssociationHelpers(
+    buffer,
+    valuesClassName,
+    associations,
+    generatedClassName,
+    namingConfig,
+  );
+}
+
+void _generateAssociationHelpers(
+  StringBuffer buffer,
+  String valuesClassName,
+  List<_AssociationInfo> associations,
+  String generatedClassName,
+  GeneratorNamingConfig namingConfig,
+) {
+  for (final assoc in associations) {
+    final isSingular = assoc.associationType == 'hasOne' ||
+        assoc.associationType == 'belongsTo';
+    final targetValuesClass =
+        namingConfig.getModelValuesClassName(assoc.modelClassName);
+    final rawAssocName = assoc.as ?? assoc.singularName ?? assoc.fieldName;
+    final methodNamePart = _capitalize(_toCamelCase(rawAssocName));
+
+    // getter
+    buffer.writeln('  /// Get the associated $rawAssocName');
+    if (isSingular) {
+      buffer.writeln(
+        '  Future<$targetValuesClass?> get$methodNamePart({Map<String, dynamic>? options, Transaction? transaction}) async {',
+      );
+    } else {
+      buffer.writeln(
+        '  Future<List<$targetValuesClass>> get$methodNamePart({Map<String, dynamic>? options, Transaction? transaction}) async {',
+      );
+    }
+    buffer.writeln('    final pk = getPrimaryKeyMap();');
+    buffer.writeln(
+      '    if (pk == null || pk.isEmpty) throw StateError(\'Cannot get $rawAssocName: instance has no primary key values\');',
+    );
+    buffer.writeln('    final result = await QueryEngine().associationGet(');
+    buffer.writeln('      sourceModel: $generatedClassName().modelName,');
+    buffer.writeln('      primaryKeyValues: pk,');
+    buffer.writeln("      associationName: '${assoc.as ?? assoc.fieldName}',");
+    buffer.writeln('      options: options,');
+    buffer.writeln('      sequelize: $generatedClassName().sequelizeInstance,');
+    buffer.writeln('      model: $generatedClassName().sequelizeModel,');
+    buffer.writeln('      transaction: transaction,');
+    buffer.writeln('    );');
+    if (isSingular) {
+      buffer.writeln('    if (result == null) return null;');
+      buffer.writeln(
+        '    return $targetValuesClass.fromJson((result as ModelInstanceData).data, operation: \'get$methodNamePart\');',
+      );
+    } else {
+      buffer.writeln(
+        '    return (result as List).map((e) => $targetValuesClass.fromJson((e as ModelInstanceData).data, operation: \'get$methodNamePart\')).toList();',
+      );
+    }
+    buffer.writeln('  }');
+    buffer.writeln();
+
+    // setter
+    buffer.writeln('  /// Set the associated $rawAssocName');
+    buffer.writeln(
+      '  Future<void> set$methodNamePart(dynamic targetOrKey, {bool? save, Map<String, dynamic>? options, Transaction? transaction}) async {',
+    );
+    buffer.writeln('    final pk = getPrimaryKeyMap();');
+    buffer.writeln(
+      '    if (pk == null || pk.isEmpty) throw StateError(\'Cannot set $rawAssocName: instance has no primary key values\');',
+    );
+    buffer.writeln('    await QueryEngine().associationSet(');
+    buffer.writeln('      sourceModel: $generatedClassName().modelName,');
+    buffer.writeln('      primaryKeyValues: pk,');
+    buffer.writeln("      associationName: '${assoc.as ?? assoc.fieldName}',");
+    buffer.writeln(
+      '      targetOrKey: (targetOrKey is Iterable)',
+    );
+    buffer.writeln(
+      '          ? targetOrKey.map((e) => (e is ReloadableMixin) ? e.getPrimaryKeyMap() : e).toList()',
+    );
+    buffer.writeln(
+      '          : (targetOrKey is ReloadableMixin) ? targetOrKey.getPrimaryKeyMap() : targetOrKey,',
+    );
+    buffer.writeln('      save: save,');
+    buffer.writeln('      options: options,');
+    buffer.writeln('      sequelize: $generatedClassName().sequelizeInstance,');
+    buffer.writeln('      model: $generatedClassName().sequelizeModel,');
+    buffer.writeln('      transaction: transaction,');
+    buffer.writeln('    );');
+    buffer.writeln('  }');
+    buffer.writeln();
+
+    // creator
+    buffer.writeln('  /// Create an associated $rawAssocName');
+    buffer.writeln(
+      '  Future<$targetValuesClass> create$methodNamePart(Map<String, dynamic> data, {Map<String, dynamic>? options, Transaction? transaction}) async {',
+    );
+    buffer.writeln('    final pk = getPrimaryKeyMap();');
+    buffer.writeln(
+      '    if (pk == null || pk.isEmpty) throw StateError(\'Cannot create $rawAssocName: instance has no primary key values\');',
+    );
+    buffer.writeln('    final result = await QueryEngine().associationCreate(');
+    buffer.writeln('      sourceModel: $generatedClassName().modelName,');
+    buffer.writeln('      primaryKeyValues: pk,');
+    buffer.writeln("      associationName: '${assoc.as ?? assoc.fieldName}',");
+    buffer.writeln('      data: data,');
+    buffer.writeln('      options: options,');
+    buffer.writeln('      sequelize: $generatedClassName().sequelizeInstance,');
+    buffer.writeln('      model: $generatedClassName().sequelizeModel,');
+    buffer.writeln('      transaction: transaction,');
+    buffer.writeln('    );');
+    buffer.writeln(
+      '    return $targetValuesClass.fromJson(result.data, operation: \'create$methodNamePart\');',
+    );
+    buffer.writeln('  }');
+    buffer.writeln();
+
+    if (!isSingular) {
+      final singularMethodPart =
+          _capitalize(_toCamelCase(assoc.singularName ?? rawAssocName));
+
+      // adder
+      buffer.writeln('  /// Add an associated $rawAssocName');
+      buffer.writeln(
+        '  Future<void> add$singularMethodPart(dynamic targetOrKey, {Map<String, dynamic>? options, Transaction? transaction}) async {',
+      );
+      buffer.writeln('    final pk = getPrimaryKeyMap();');
+      buffer.writeln(
+        '    if (pk == null || pk.isEmpty) throw StateError(\'Cannot add $rawAssocName: instance has no primary key values\');',
+      );
+      buffer.writeln('    await QueryEngine().associationAdd(');
+      buffer.writeln('      sourceModel: $generatedClassName().modelName,');
+      buffer.writeln('      primaryKeyValues: pk,');
+      buffer
+          .writeln("      associationName: '${assoc.as ?? assoc.fieldName}',");
+      buffer.writeln(
+        '      targetOrKey: (targetOrKey is Iterable)',
+      );
+      buffer.writeln(
+        '          ? targetOrKey.map((e) => (e is ReloadableMixin) ? e.getPrimaryKeyMap() : e).toList()',
+      );
+      buffer.writeln(
+        '          : (targetOrKey is ReloadableMixin) ? targetOrKey.getPrimaryKeyMap() : targetOrKey,',
+      );
+      buffer.writeln('      options: options,');
+      buffer
+          .writeln('      sequelize: $generatedClassName().sequelizeInstance,');
+      buffer.writeln('      model: $generatedClassName().sequelizeModel,');
+      buffer.writeln('      transaction: transaction,');
+      buffer.writeln('    );');
+      buffer.writeln('  }');
+      buffer.writeln();
+
+      // remover
+      buffer.writeln('  /// Remove an associated $rawAssocName');
+      buffer.writeln(
+        '  Future<void> remove$singularMethodPart(dynamic targetOrKey, {Map<String, dynamic>? options, Transaction? transaction}) async {',
+      );
+      buffer.writeln('    final pk = getPrimaryKeyMap();');
+      buffer.writeln(
+        '    if (pk == null || pk.isEmpty) throw StateError(\'Cannot remove $rawAssocName: instance has no primary key values\');',
+      );
+      buffer.writeln('    await QueryEngine().associationRemove(');
+      buffer.writeln('      sourceModel: $generatedClassName().modelName,');
+      buffer.writeln('      primaryKeyValues: pk,');
+      buffer
+          .writeln("      associationName: '${assoc.as ?? assoc.fieldName}',");
+      buffer.writeln(
+        '      targetOrKey: (targetOrKey is Iterable)',
+      );
+      buffer.writeln(
+        '          ? targetOrKey.map((e) => (e is ReloadableMixin) ? e.getPrimaryKeyMap() : e).toList()',
+      );
+      buffer.writeln(
+        '          : (targetOrKey is ReloadableMixin) ? targetOrKey.getPrimaryKeyMap() : targetOrKey,',
+      );
+      buffer.writeln('      options: options,');
+      buffer
+          .writeln('      sequelize: $generatedClassName().sequelizeInstance,');
+      buffer.writeln('      model: $generatedClassName().sequelizeModel,');
+      buffer.writeln('      transaction: transaction,');
+      buffer.writeln('    );');
+      buffer.writeln('  }');
+      buffer.writeln();
+    }
   }
 }

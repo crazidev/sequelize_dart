@@ -14,7 +14,7 @@ void _generateCreateMethod(
 
   // Generate create method that accepts Create class with associations
   buffer.writeln(
-    '  Future<$valuesClassName> create($createClassName createData) {',
+    '  Future<$valuesClassName> create($createClassName createData, {Transaction? transaction}) {',
   );
   buffer.writeln(
     '    // Convert Create class to JSON (includes nested associations)',
@@ -61,6 +61,7 @@ void _generateCreateMethod(
   buffer.writeln('      query: query,');
   buffer.writeln('      sequelize: sequelizeInstance,');
   buffer.writeln('      model: sequelizeModel,');
+  buffer.writeln('      transaction: transaction,');
   buffer.writeln('    ).then((result) {');
   buffer.writeln(
     '      final instance = $valuesClassName.fromJson(result.data, operation: \'create\');',

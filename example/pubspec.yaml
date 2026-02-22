@@ -19,3 +19,5 @@ dev_dependencies:
     path: ../packages/sequelize_orm_generator
   build_runner: ^2.10.4
   lints: ^6.0.0
+  sequelize_orm_analyzer:
+    path: ../packages/sequelize_orm_analyzer

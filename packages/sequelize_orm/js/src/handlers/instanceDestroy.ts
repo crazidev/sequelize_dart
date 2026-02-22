@@ -1,4 +1,5 @@
 import { checkConnection, checkModelDefinition } from '../utils/checkUtils';
+import { convertQueryOptions } from '../utils/queryConverter';
 import { getModels, getSequelize } from '../utils/state';
 
 type InstanceDestroyParams = {
@@ -25,7 +26,7 @@ export async function handleInstanceDestroy(params: InstanceDestroyParams): Prom
     isNewRecord: false,
   });
 
-  const options = params.options || {};
+  const options = convertQueryOptions(params.options || {});
 
   // Instance.destroy returns void
   await instance.destroy(options);

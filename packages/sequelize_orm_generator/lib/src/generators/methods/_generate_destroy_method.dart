@@ -16,6 +16,7 @@ void _generateDestroyMethod(
   buffer.writeln('    bool? force,');
   buffer.writeln('    int? limit,');
   buffer.writeln('    bool? individualHooks,');
+  buffer.writeln('    Transaction? transaction,');
   buffer.writeln('  }) {');
   buffer.writeln('    const columns = $columnsClassName();');
   buffer.writeln('    final query = Query.fromCallbacks(');
@@ -35,6 +36,7 @@ void _generateDestroyMethod(
   buffer.writeln('      options: options,');
   buffer.writeln('      sequelize: sequelizeInstance,');
   buffer.writeln('      model: sequelizeModel,');
+  buffer.writeln('      transaction: transaction,');
   buffer.writeln('    );');
   buffer.writeln('  }');
   buffer.writeln();

@@ -1,9 +1,11 @@
 import { checkConnection, checkModelDefinition } from '../utils/checkUtils';
+import { convertQueryOptions } from '../utils/queryConverter';
 import { getModels, getSequelize } from '../utils/state';
 
 type InstanceRestoreParams = {
   model: string;
   primaryKeyValues: Record<string, any>;
+  transactionId?: string;
 };
 
 export async function handleInstanceRestore(params: InstanceRestoreParams): Promise<void> {
@@ -22,6 +24,8 @@ export async function handleInstanceRestore(params: InstanceRestoreParams): Prom
     isNewRecord: false,
   });
 
+  const options = convertQueryOptions({ transactionId: params.transactionId });
+
   // Instance.restore returns void
-  await instance.restore();
+  await instance.restore(options);
 }

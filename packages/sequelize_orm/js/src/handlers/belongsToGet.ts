@@ -1,4 +1,5 @@
 import { checkConnection, checkModelDefinition } from '../utils/checkUtils';
+import { convertQueryOptions } from '../utils/queryConverter';
 import { getModels, getSequelize } from '../utils/state';
 import { toModelResponse, ModelResponse } from '../utils/modelResponse';
 
@@ -31,7 +32,9 @@ export async function handleBelongsToGet(
   checkModelDefinition(source, params.sourceModel);
 
   const where = compactWhere(params.primaryKeyValues);
-  const instance = await source.findOne({ where });
+  const options = convertQueryOptions(params.options || {});
+
+  const instance = await source.findOne({ where, transaction: options.transaction });
   if (!instance) return null;
 
   const methodName = `get${capitalize(params.associationName)}`;
@@ -42,7 +45,7 @@ export async function handleBelongsToGet(
     );
   }
 
-  const result = await fn.call(instance, params.options || {});
+  const result = await fn.call(instance, options);
   if (!result) return null;
   return toModelResponse(result);
 }

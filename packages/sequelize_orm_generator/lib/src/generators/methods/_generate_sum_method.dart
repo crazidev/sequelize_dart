@@ -11,12 +11,12 @@ void _generateSumMethod(
   buffer.writeln('  @override');
   buffer.writeln('  Future<num?> sum(');
   buffer.writeln(
-    '    Column Function($columnsClassName column) columnFn,',
+    '    Column Function($columnsClassName column) columnFn, {',
   );
-  buffer.writeln('    {');
   buffer.writeln(
     '      QueryOperator Function($columnsClassName $whereCallbackName)? where,',
   );
+  buffer.writeln('      Transaction? transaction,');
   buffer.writeln('    }');
   buffer.writeln('  ) {');
   buffer.writeln('    final columns = $columnsClassName();');
@@ -31,6 +31,7 @@ void _generateSumMethod(
   buffer.writeln('      query: query,');
   buffer.writeln('      sequelize: sequelizeInstance,');
   buffer.writeln('      model: sequelizeModel,');
+  buffer.writeln('      transaction: transaction,');
   buffer.writeln('    );');
   buffer.writeln('  }');
   buffer.writeln();

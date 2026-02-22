@@ -27,6 +27,7 @@ void _generateFindAllMethod(
   buffer.writeln('    int? offset,');
   buffer.writeln('    QueryAttributes? attributes,');
   buffer.writeln('    bool? paranoid,');
+  buffer.writeln('    Transaction? transaction,');
   buffer.writeln('  }) {');
   buffer.writeln('    const columns = $columnsClassName();');
   buffer.writeln('    const includeHelper = $includeHelperClassName();');
@@ -47,6 +48,7 @@ void _generateFindAllMethod(
   buffer.writeln('      query: query,');
   buffer.writeln('      sequelize: sequelizeInstance,');
   buffer.writeln('      model: sequelizeModel,');
+  buffer.writeln('      transaction: transaction,');
   buffer.writeln('    ).then((results) =>');
   buffer.writeln('      results.asMap().entries.map((entry) {');
   buffer.writeln('        final rowIndex = entry.key;');

@@ -371,7 +371,8 @@ void _generateMixinMethods(
 
   // Override reload() to also set previousDataValues after reloading
   buffer.writeln('  @override');
-  buffer.writeln('  Future<$valuesClassName?> reload() async {');
+  buffer.writeln(
+      '  Future<$valuesClassName?> reload({Transaction? transaction}) async {');
   buffer.writeln('    final pk = getPrimaryKeyMap();');
   buffer.writeln('    if (pk == null || pk.isEmpty) {');
   buffer.writeln(
@@ -380,7 +381,7 @@ void _generateMixinMethods(
   buffer.writeln('    }');
   buffer.writeln();
   buffer.writeln(
-    '    final result = await findByPrimaryKey(pk, originalQuery: originalQuery);',
+    '    final result = await findByPrimaryKey(pk, originalQuery: originalQuery, transaction: transaction);',
   );
   buffer.writeln('    if (result == null) {');
   buffer.writeln('      return null;');
@@ -403,7 +404,7 @@ void _generateMixinMethods(
   // Generate findByPrimaryKey
   buffer.writeln('  @override');
   buffer.writeln(
-    '  Future<$valuesClassName?> findByPrimaryKey(Map<String, dynamic> pk, {Query? originalQuery}) async {',
+    '  Future<$valuesClassName?> findByPrimaryKey(Map<String, dynamic> pk, {Query? originalQuery, Transaction? transaction}) async {',
   );
 
   // Build primary key where clause with explicit type
@@ -427,6 +428,7 @@ void _generateMixinMethods(
   buffer.writeln('    final q = originalQuery;');
   buffer.writeln('    return $generatedClassName().findOne(');
   buffer.writeln('      where: pkWhere,');
+  buffer.writeln('      transaction: transaction,');
   buffer.writeln(
     '      include: q?.include != null ? ($includeHelperClassName _) => q!.include! : null,',
   );
