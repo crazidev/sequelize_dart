@@ -14,10 +14,10 @@ node --version   # Should print v18.x.x or later
 
 ```yaml
 dependencies:
-  sequelize_orm: ^0.1.5
+  sequelize_orm: ^0.2.0
 
 dev_dependencies:
-  sequelize_orm_generator: ^0.1.5
+  sequelize_orm_generator: ^0.2.0
   build_runner: ^2.10.4
 ```
 

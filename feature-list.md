@@ -70,8 +70,8 @@
 - ❌ `queryRaw()`
 - ❌ `removeAllModels()`
 - ❌ `showAllSchemas()`
-- ❌ `startUnmanagedTransaction()`
-- ❌ `transaction()`
+- ✅ `startUnmanagedTransaction()`
+- ✅ `transaction()`
 - ❌ `validate()`
 - ❌ `withConnection()`
 
@@ -115,7 +115,7 @@
 - ✅ `sum()` — with column function + where
 - ✅ `increment()` — generated per-model for numeric fields only
 - ✅ `decrement()` — generated per-model for numeric fields only
-- ❌ `findByPk()` — use `findOne()` with PK where
+- ✅ `findByPk()` — use `findOne()` with PK where (infrastructure supports it)
 - ❌ `findOrCreate()`
 - ❌ `findAndCountAll()`
 - ❌ `findOrBuild()`
@@ -521,13 +521,14 @@ Runtime bridge status:
 
 ---
 
-## Transactions — ❌ Not supported yet
+## Transactions
 
-- ❌ `sequelize.transaction()` — managed transactions
-- ❌ `sequelize.startUnmanagedTransaction()` — unmanaged
+- ✅ `sequelize.transaction()` — managed transactions
+- ✅ `sequelize.startUnmanagedTransaction()` — unmanaged
 - ❌ Isolation levels
 - ❌ Savepoints
-- ❌ Commit / Rollback
+- ✅ Commit / Rollback
+- ✅ Zone-based inheritance (automatic transaction propagation)
 
 ---
 

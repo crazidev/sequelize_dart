@@ -1,3 +1,10 @@
+## 0.2.0
+
+- **FEAT**: All generated static and instance methods now accept `Transaction? transaction` — covering `findAll`, `findOne`, `create`, `update`, `destroy`, `restore`, `truncate`, `count`, `max`, `min`, `sum`, `increment`, `decrement`, `save`, `reload`, and all association helpers (`getX`, `setX`, `createX`, `addX`, `removeX`).
+- **FEAT**: Transactions are forwarded through internal `reload()` calls in `save()`, `update()`, and `restore()`, keeping reads within the same transaction boundary.
+- **FEAT**: Zone-based transaction inheritance — passing `null` allows `QueryEngine` to auto-resolve the active transaction from the current `Zone`.
+- **IMPROVEMENT**: Updated dependency to `sequelize_orm: ^0.2.0`.
+
 ## 0.1.5
 
 - **FEAT**: Added support for `ENUM` data type code generation.

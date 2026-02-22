@@ -209,8 +209,6 @@ void main() {
           reason: 'Post should have user_id set in database',
         );
 
-        final originalViews = newUser.post?.views ?? 0;
-
         // Modify post views
         newUser.post?.views = 10;
 
@@ -238,7 +236,6 @@ void main() {
         clearCapturedSql();
 
         // Modify user and save
-        final originalEmail = newUser.email;
         newUser.firstName = 'Updated';
         newUser.lastName = 'Name';
 

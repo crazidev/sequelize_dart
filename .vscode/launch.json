@@ -58,7 +58,9 @@
       "type": "dart",
       "request": "launch",
       "program": "${workspaceFolder}/tools/run.dart",
-      "args": ["test"],
+      "args": [
+        "test"
+      ],
       "cwd": "${workspaceFolder}",
       "console": "debugConsole"
     }
