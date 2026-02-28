@@ -157,6 +157,33 @@ Access tasks via: `Cmd+Shift+P` → "Tasks: Run Task"
 dart test
 ```
 
+### Bridge Benchmark
+
+Run the built-in bridge latency benchmark to measure round-trip time between
+Dart and the Node bridge:
+
+```bash
+dart run tools/run.dart benchmark-bridge
+```
+
+Use database and iteration flags as needed:
+
+```bash
+# PostgreSQL (default)
+dart run tools/run.dart benchmark-bridge --postgres --iterations=100
+
+# MySQL / MariaDB / SQLite
+dart run tools/run.dart benchmark-bridge --mysql --iterations=200
+dart run tools/run.dart benchmark-bridge --mariadb --iterations=200
+dart run tools/run.dart benchmark-bridge --sqlite --iterations=200
+```
+
+For all available options:
+
+```bash
+dart run tools/run.dart benchmark-bridge --help
+```
+
 ## Seeding (experimental)
 
 ### Folder layout
