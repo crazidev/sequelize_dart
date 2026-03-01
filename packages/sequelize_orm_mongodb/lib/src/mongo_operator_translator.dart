@@ -31,7 +31,10 @@ class MongoOperatorTranslator {
     final translated = list
         .whereType<Map>()
         .map((item) => translateWhere(Map<String, dynamic>.from(item)))
+        .where((item) => item.isNotEmpty)
         .toList();
+
+    if (translated.isEmpty) return {};
 
     if (key == r'$not') {
       return {r'$nor': translated};
@@ -249,12 +252,13 @@ class MongoOperatorTranslator {
   }
 
   Map<String, dynamic> _combineWithAnd(List<Map<String, dynamic>> clauses) {
-    if (clauses.isEmpty) {
+    final nonEmpty = clauses.where((c) => c.isNotEmpty).toList();
+    if (nonEmpty.isEmpty) {
       return <String, dynamic>{};
     }
-    if (clauses.length == 1) {
-      return clauses.first;
+    if (nonEmpty.length == 1) {
+      return nonEmpty.first;
     }
-    return {r'$and': clauses};
+    return {r'$and': nonEmpty};
   }
 }
