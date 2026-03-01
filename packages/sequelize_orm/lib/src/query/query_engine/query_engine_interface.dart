@@ -269,3 +269,11 @@ abstract class QueryEngineInterface {
     Transaction? transaction,
   });
 }
+
+/// Optional lifecycle hooks that query engines can implement.
+///
+/// Core sequelize runtime invokes these hooks during `initialize()` and `close()`.
+abstract class QueryEngineLifecycle {
+  Future<void> onInitialize();
+  Future<void> onClose();
+}

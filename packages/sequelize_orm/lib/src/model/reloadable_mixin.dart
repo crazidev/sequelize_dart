@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:sequelize_orm/src/query/query/query.dart';
 import 'package:sequelize_orm/src/transaction/transaction.dart';
 
@@ -49,6 +51,9 @@ mixin ReloadableMixin<T extends ReloadableMixin<T>> {
   /// Copies all fields from [source] to this instance.
   void copyFieldsFrom(T source);
 
+  /// Convert instance to a JSON-safe map.
+  Map<String, dynamic> toJson();
+
   /// Reloads this instance from the database.
   ///
   /// Uses the primary key to fetch the latest data. If [originalQuery] is set,
@@ -77,5 +82,15 @@ mixin ReloadableMixin<T extends ReloadableMixin<T>> {
     originalQuery = result.originalQuery ?? originalQuery;
 
     return this as T;
+  }
+
+  @override
+  String toString() {
+    final json = toJson();
+    try {
+      return jsonEncode(json);
+    } catch (_) {
+      return json.toString();
+    }
   }
 }

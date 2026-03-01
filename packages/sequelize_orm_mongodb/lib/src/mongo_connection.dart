@@ -219,6 +219,9 @@ class MongoDartCollectionAdapter implements MongoCollectionAdapter {
   @override
   Future<Map<String, dynamic>> insertOne(Map<String, dynamic> document) async {
     final doc = Map<String, dynamic>.from(document);
+    // Generate Mongo ObjectId on client side when absent.
+    // This allows immediate key availability for association linking.
+    doc.putIfAbsent('_id', () => mongo.ObjectId());
     final dynamic response = await _collection.insertOne(doc);
     final dynamic id = _extractValue(response, ['id', 'insertedId', 'oid']) ??
         _extractValue(doc, ['_id', 'id']);

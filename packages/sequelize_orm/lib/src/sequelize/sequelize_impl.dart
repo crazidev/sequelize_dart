@@ -11,9 +11,12 @@ import 'package:sequelize_orm/src/sequelize/sequelize_interface.dart';
 class Sequelize extends SequelizeInterface {
   final BridgeClient _bridge = BridgeClient.instance;
   final Map<String, Model> _models = {};
+  final Map<String, Map<String, dynamic>> _associationDefinitions = {};
   Map<String, dynamic>? _connectionConfig;
   Function(String message)? _logging;
   bool _debug = false;
+  QueryEngineInterface? _queryEngine;
+  bool _usesBridgeQueryEngine = true;
 
   @override
   bool get debug => _debug;
@@ -66,14 +69,17 @@ class Sequelize extends SequelizeInterface {
 
     // If URL is provided, remove individual connection parameters
     if (connection.url != null && connection.url!.isNotEmpty) {
+      final isMongoDialect = config['dialect'] == 'mongo';
       final keysToRemove = [
         'host',
         'password',
         'user',
-        'database',
         'port',
         'schema',
       ];
+      if (!isMongoDialect) {
+        keysToRemove.add('database');
+      }
       config.removeWhere((key, value) => keysToRemove.contains(key));
     }
 
@@ -91,25 +97,37 @@ class Sequelize extends SequelizeInterface {
         'Connection config not set. Call createInstance() first.',
       );
     }
+    _associationDefinitions.clear();
 
-    await _bridge.start(connectionConfig: _connectionConfig!);
+    if (_usesBridgeQueryEngine) {
+      await _bridge.start(connectionConfig: _connectionConfig!);
+    }
 
     if (_debug) log('[Sequelize] Defining ${models.length} models...');
     for (final model in models) {
       if (_debug) log('>> Defining model: ${model.modelName}');
       model.define(model.modelName, this);
       _models[model.modelName] = model;
-
-      final response = await _bridge.call('defineModel', {
+      model.sequelizeModel = {
         'name': model.modelName,
-        'attributes': model.$getAttributesJson(),
         'options': model.getOptionsJson(),
-      });
+        'attributes': model.$getAttributesJson(),
+      };
 
-      // Store primary keys from response
-      final primaryKeys = response['primaryKeys'] as List?;
-      if (primaryKeys != null) {
-        model.primaryKeys = primaryKeys.cast<String>();
+      if (_usesBridgeQueryEngine) {
+        final response = await _bridge.call('defineModel', {
+          'name': model.modelName,
+          'attributes': model.$getAttributesJson(),
+          'options': model.getOptionsJson(),
+        });
+
+        // Store primary keys from response
+        final primaryKeys = response['primaryKeys'] as List?;
+        if (primaryKeys != null) {
+          model.primaryKeys = primaryKeys.cast<String>();
+        }
+      } else {
+        model.primaryKeys = _derivePrimaryKeys(model);
       }
     }
     // print('[Sequelize] All models defined.');
@@ -119,6 +137,11 @@ class Sequelize extends SequelizeInterface {
       // if (_debug) log('>> Setting up associations for model: ${model.name}');
       await model.associateModel(debug: _debug);
     }
+
+    final engine = resolveQueryEngine();
+    if (engine is QueryEngineLifecycle) {
+      await (engine as QueryEngineLifecycle).onInitialize();
+    }
   }
 
   @override
@@ -126,16 +149,24 @@ class Sequelize extends SequelizeInterface {
     for (final model in models) {
       model.define(model.modelName, this);
       _models[model.modelName] = model;
-
-      _bridge.call('defineModel', {
+      model.sequelizeModel = {
         'name': model.modelName,
-        'attributes': model.$getAttributesJson(),
         'options': model.getOptionsJson(),
-      }).catchError((error) {
-        print(
-          '[Sequelize] Failed to define model "${model.modelName}": $error',
-        );
-      });
+        'attributes': model.$getAttributesJson(),
+      };
+      model.primaryKeys = _derivePrimaryKeys(model);
+
+      if (_usesBridgeQueryEngine) {
+        _bridge.call('defineModel', {
+          'name': model.modelName,
+          'attributes': model.$getAttributesJson(),
+          'options': model.getOptionsJson(),
+        }).catchError((error) {
+          print(
+            '[Sequelize] Failed to define model "${model.modelName}": $error',
+          );
+        });
+      }
     }
   }
 
@@ -145,6 +176,10 @@ class Sequelize extends SequelizeInterface {
     Map<String, Map<String, dynamic>> attributes,
     Map<String, dynamic> options,
   ) {
+    if (!_usesBridgeQueryEngine) {
+      return;
+    }
+
     if (!_bridge.isConnected) {
       throw Exception(
         'Bridge not connected. Ensure createInstance() has completed.',
@@ -166,8 +201,19 @@ class Sequelize extends SequelizeInterface {
   /// Get a registered model by name
   Model? getModel(String name) => _models[name];
 
+  List<String> _derivePrimaryKeys(Model model) {
+    final keys = model.$getAttributes()
+        .where((attr) => attr.primaryKey == true)
+        .map((attr) => attr.name)
+        .toList(growable: false);
+    return keys;
+  }
+
   @override
   Future<void> sync({bool force = false, bool alter = false}) async {
+    if (!_usesBridgeQueryEngine) {
+      return;
+    }
     await _bridge.call('sync', {
       'force': force,
       'alter': alter,
@@ -210,8 +256,76 @@ class Sequelize extends SequelizeInterface {
 
   @override
   Future<void> close() async {
-    await _bridge.close();
+    final engine = resolveQueryEngine();
+    if (engine is QueryEngineLifecycle) {
+      await (engine as QueryEngineLifecycle).onClose();
+    }
+    QueryEngineRegistry.unregisterForSequelize(this);
+    if (_usesBridgeQueryEngine && _bridge.isConnected) {
+      await _bridge.close();
+    }
   }
+
+  @override
+  void setQueryEngine(
+    QueryEngineInterface engine, {
+    bool useBridge = true,
+  }) {
+    _queryEngine = engine;
+    _usesBridgeQueryEngine = useBridge;
+    QueryEngineRegistry.registerForSequelize(this, engine);
+  }
+
+  @override
+  QueryEngineInterface resolveQueryEngine() {
+    return _queryEngine ?? QueryEngineRegistry.defaultEngine;
+  }
+
+  @override
+  bool get usesBridgeQueryEngine => _usesBridgeQueryEngine;
+
+  @override
+  void registerAssociationDefinition({
+    required String sourceModel,
+    required String associationName,
+    required String targetModel,
+    required String associationType,
+    String? foreignKey,
+    String? sourceKey,
+    String? targetKey,
+  }) {
+    _associationDefinitions['$sourceModel.$associationName'] = {
+      'sourceModel': sourceModel,
+      'associationName': associationName,
+      'targetModel': targetModel,
+      'associationType': associationType,
+      if (foreignKey != null) 'foreignKey': foreignKey,
+      if (sourceKey != null) 'sourceKey': sourceKey,
+      if (targetKey != null) 'targetKey': targetKey,
+    };
+  }
+
+  @override
+  Map<String, dynamic>? getAssociationDefinition({
+    required String sourceModel,
+    required String associationName,
+  }) {
+    final map = _associationDefinitions['$sourceModel.$associationName'];
+    if (map == null) {
+      return null;
+    }
+    return Map<String, dynamic>.from(map);
+  }
+
+  @override
+  List<String> getModelPrimaryKeys(String modelName) {
+    return List<String>.from(_models[modelName]?.primaryKeys ?? const []);
+  }
+
+  @override
+  Map<String, dynamic>? get connectionConfig => _connectionConfig == null
+      ? null
+      : Map<String, dynamic>.from(_connectionConfig!);
 
   /// Truncate all models registered in this instance.
   /// This is done by calling Model.truncate on each model.

@@ -13,6 +13,26 @@ void main() {
       required String sourceModel,
       required String associationName,
     }) {
+      if (sourceModel == 'users' && associationName == 'posts') {
+        return const MongoAssociationDefinition(
+          sourceModel: 'users',
+          associationName: 'posts',
+          targetCollection: 'posts',
+          associationType: MongoAssociationType.hasMany,
+          localField: '_id',
+          foreignField: 'userId',
+        );
+      }
+      if (sourceModel == 'posts' && associationName == 'user') {
+        return const MongoAssociationDefinition(
+          sourceModel: 'posts',
+          associationName: 'user',
+          targetCollection: 'users',
+          associationType: MongoAssociationType.belongsTo,
+          localField: 'userId',
+          foreignField: '_id',
+        );
+      }
       if (sourceModel == 'users' && associationName == 'profile') {
         return const MongoAssociationDefinition(
           sourceModel: 'users',
@@ -180,5 +200,108 @@ void main() {
         '_id': 'p1',
       });
     });
+
+    test('create materializes nested hasMany associations as linked records',
+        () async {
+      final users = database.collectionAsFake('users');
+      final posts = database.collectionAsFake('posts');
+      users.insertOneResult = {'_id': 'u1', 'email': 'alice@example.com'};
+
+      final result = await engine.create(
+        modelName: 'users',
+        data: const {
+          'email': 'alice@example.com',
+          'posts': [
+            {'title': 'Post A'},
+            {'title': 'Post B'},
+          ],
+        },
+      );
+
+      expect(users.lastInsertOneDocument, {'email': 'alice@example.com'});
+      expect(posts.lastInsertOneDocument, isNotNull);
+      expect(posts.lastInsertOneDocument!['userId'], 'u1');
+      expect(result.data['posts'], isA<List<Map<String, dynamic>>>());
+      expect(result.data['posts'].length, 2);
+    });
+
+    test('create materializes belongsTo association and stores foreign key',
+        () async {
+      final posts = database.collectionAsFake('posts');
+      final users = database.collectionAsFake('users');
+      posts.insertOneResult = {'_id': 'p1', 'title': 'Post with user'};
+      users.insertOneResult = {'_id': 'u9', 'email': 'linked@example.com'};
+
+      final result = await engine.create(
+        modelName: 'posts',
+        data: const {
+          'title': 'Post with user',
+          'user': {'email': 'linked@example.com'},
+        },
+      );
+
+      expect(posts.lastInsertOneDocument, {'title': 'Post with user'});
+      expect(users.lastInsertOneDocument, {'email': 'linked@example.com'});
+      expect(posts.lastUpdateOneWhere, {'_id': 'p1'});
+      expect(posts.lastUpdateOneUpdate, {
+        r'$set': {'userId': 'u9'},
+      });
+      expect(result.data['userId'], 'u9');
+      expect(result.data['user'], isA<Map<String, dynamic>>());
+    });
+
+    test('findAll logs structured mongo query payload', () async {
+      final users = database.collectionAsFake('users');
+      users.findResult = [
+        {'_id': 1, 'status': 'active'},
+      ];
+      final logger = _CaptureLogger();
+
+      await engine.findAll(
+        modelName: 'users',
+        query: Query(
+          where: ComparisonOperator(
+            column: 'status',
+            value: {r'$eq': 'active'},
+          ),
+        ),
+        sequelize: logger,
+      );
+
+      expect(logger.messages, isNotEmpty);
+      final log = logger.messages.last;
+      expect(log, predicate((value) => value.toString().startsWith('[mongo:findAll] ')));
+      expect(log, contains('"collection":"users"'));
+      expect(log, contains(r'"where":{"status":{"$eq":"active"}}'));
+    });
+
+    test('count with group logs aggregate pipeline', () async {
+      final users = database.collectionAsFake('users');
+      users.aggregateResult = [
+        {'result': 2},
+      ];
+      final logger = _CaptureLogger();
+
+      final count = await engine.count(
+        modelName: 'users',
+        query: Query(group: ['status']),
+        sequelize: logger,
+      );
+
+      expect(count, 2);
+      expect(logger.messages, isNotEmpty);
+      final log = logger.messages.last;
+      expect(log, predicate((value) => value.toString().startsWith('[mongo:count.aggregate] ')));
+      expect(log, contains('"pipeline"'));
+      expect(log, contains(r'"$group"'));
+    });
   });
+}
+
+class _CaptureLogger {
+  final List<String> messages = <String>[];
+
+  void log(dynamic message) {
+    messages.add(message.toString());
+  }
 }

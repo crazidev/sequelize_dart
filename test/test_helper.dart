@@ -4,12 +4,15 @@ import 'package:sequelize_orm/sequelize_orm.dart';
 import 'package:sequelize_orm_example/db/models/post.model.dart';
 import 'package:sequelize_orm_example/db/models/post_details.model.dart';
 import 'package:sequelize_orm_example/db/models/users.model.dart';
+import 'package:sequelize_orm_mongodb/sequelize_orm_mongodb.dart';
 import 'package:test/test.dart';
 
 /// Connection strings for test databases
 const postgresUrl = 'postgresql://postgres:postgres@localhost:5432/postgres';
 const mysqlUrl = 'mysql://root@localhost:3306/sequelize_orm';
 const mariadbUrl = 'mariadb://root@localhost:3307/sequelize_orm';
+const defaultMongoUrl = 'mongodb://localhost:27017';
+const defaultMongoDatabase = 'sequelize_dart';
 
 /// SQLite database file path for tests (auto-cleaned on teardown)
 const sqliteStorage = 'test_sequelize.db';
@@ -24,7 +27,7 @@ late Sequelize sequelize;
 /// Available after [initTestEnvironment] is called, but the getter itself
 /// can be used before that (it only reads the env var).
 ///
-/// Supported values: `postgres` (default), `mysql`, `mariadb`, `sqlite`.
+/// Supported values: `postgres` (default), `mysql`, `mariadb`, `sqlite`, `mongo`.
 ///
 /// Usage:
 /// ```sh
@@ -45,6 +48,9 @@ bool get isPostgres => dbType == 'postgres';
 
 /// Whether the active dialect is MySQL or MariaDB.
 bool get isMysqlFamily => dbType == 'mysql' || dbType == 'mariadb';
+
+/// Whether the active dialect is MongoDB.
+bool get isMongo => dbType == 'mongo';
 
 /// Initialize the test environment
 /// Call this in setUpAll() in your test files
@@ -71,6 +77,14 @@ Future<void> initTestEnvironment() async {
       connection = SqliteConnection(storage: sqliteStorage);
       normalizeJsonTypes = false;
       break;
+    case 'mongo':
+      connection = MongoConnectionOptions(
+        url: Platform.environment['DB_MONGO_URL'] ?? defaultMongoUrl,
+        database:
+            Platform.environment['DB_MONGO_DATABASE'] ?? defaultMongoDatabase,
+      );
+      normalizeJsonTypes = false;
+      break;
     case 'postgres':
     default:
       connection = PostgresConnection(url: postgresUrl);
@@ -92,6 +106,10 @@ Future<void> initTestEnvironment() async {
       evict: 1000,
     ),
   );
+
+  if (isMongo) {
+    sequelize.useMongoQueryEngine();
+  }
 
   // Initialize with all models
   await sequelize.initialize(

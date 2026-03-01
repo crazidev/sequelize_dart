@@ -3,25 +3,46 @@ part of '../run.dart';
 /// Run tests (forwards to tools/test.dart)
 Future<void> cmdTest(Directory root, List<String> args) async {
   if (args.contains('--help') || args.contains('-h')) {
-    print('Usage: dart tools/test.dart [flags] [test_files]');
+    print('Usage: dart run tools/run.dart test [flags] [test_files]');
     print('Flags:');
     print('  --postgres  Run tests using PostgreSQL (default)');
     print('  --mysql     Run tests using MySQL');
     print('  --mariadb   Run tests using MariaDB');
+    print('  --mongo     Run tests using MongoDB');
+    print('  --mongo-url=<url>       MongoDB connection URL');
+    print('  --mongo-database=<name> MongoDB database name');
     print('  --all       Run tests for all supported databases');
     return;
   }
 
-  final testFiles = args.where((arg) => !arg.startsWith('--')).toList();
-  final flags = args.where((arg) => arg.startsWith('--')).toList();
+  String? mongoUrl;
+  String? mongoDatabase;
+  final flags = <String>[];
+  final testFiles = <String>[];
+  for (final arg in args) {
+    if (arg.startsWith('--mongo-url=')) {
+      mongoUrl = arg.substring('--mongo-url='.length).trim();
+      continue;
+    }
+    if (arg.startsWith('--mongo-database=')) {
+      mongoDatabase = arg.substring('--mongo-database='.length).trim();
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      flags.add(arg);
+      continue;
+    }
+    testFiles.add(arg);
+  }
 
   final databases = <String>[];
   if (flags.contains('--all')) {
-    databases.addAll(['postgres', 'mysql', 'mariadb']);
+    databases.addAll(['postgres', 'mysql', 'mariadb', 'mongo']);
   } else {
     if (flags.contains('--postgres')) databases.add('postgres');
     if (flags.contains('--mysql')) databases.add('mysql');
     if (flags.contains('--mariadb')) databases.add('mariadb');
+    if (flags.contains('--mongo')) databases.add('mongo');
   }
 
   if (databases.isEmpty && flags.isEmpty && testFiles.isEmpty) {
@@ -52,11 +73,20 @@ Future<void> cmdTest(Directory root, List<String> args) async {
       print('Running: $file');
 
       final testArgs = ['test', '--concurrency=1', file];
+      final env = <String, String>{'DB_TYPE': db};
+      if (db == 'mongo') {
+        if (mongoUrl != null && mongoUrl.isNotEmpty) {
+          env['DB_MONGO_URL'] = mongoUrl;
+        }
+        if (mongoDatabase != null && mongoDatabase.isNotEmpty) {
+          env['DB_MONGO_DATABASE'] = mongoDatabase;
+        }
+      }
 
       final result = await Process.run(
         'dart',
         testArgs,
-        environment: {'DB_TYPE': db},
+        environment: env,
         stdoutEncoding: utf8,
         stderrEncoding: utf8,
       );

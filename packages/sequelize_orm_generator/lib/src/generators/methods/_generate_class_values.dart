@@ -146,6 +146,9 @@ void _generateClassValues(
   buffer.writeln('    };');
   buffer.writeln('  }');
   buffer.writeln();
+  buffer.writeln('  @override');
+  buffer.writeln('  String toString() => toJson().toString();');
+  buffer.writeln();
 
   // Generate where() method (also satisfies getPrimaryKeyMap from mixin)
   _generateWhereMethod(buffer, className, generatedClassName);

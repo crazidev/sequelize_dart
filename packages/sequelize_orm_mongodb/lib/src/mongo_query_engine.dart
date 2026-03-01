@@ -1,5 +1,7 @@
 // ignore_for_file: avoid_dynamic_calls, implementation_imports
 
+import 'dart:convert';
+
 import 'package:sequelize_orm/sequelize_orm.dart';
 import 'package:sequelize_orm/src/query/query_engine/query_engine_interface.dart';
 import 'package:sequelize_orm_mongodb/src/mongo_adapter.dart';
@@ -9,7 +11,8 @@ import 'package:sequelize_orm_mongodb/src/mongo_exceptions.dart';
 import 'package:sequelize_orm_mongodb/src/mongo_lookup_builder.dart';
 import 'package:sequelize_orm_mongodb/src/mongo_operator_translator.dart';
 
-class MongoQueryEngine extends QueryEngineInterface {
+class MongoQueryEngine extends QueryEngineInterface
+    implements QueryEngineLifecycle {
   MongoQueryEngine({
     required MongoDatabaseAdapter database,
     MongoOperatorTranslator? operatorTranslator,
@@ -33,6 +36,20 @@ class MongoQueryEngine extends QueryEngineInterface {
   final MongoAssociationResolver? _associationResolver;
   final MongoLookupBuilder? _lookupBuilder;
   final String defaultParanoidField;
+
+  @override
+  Future<void> onInitialize() async {
+    if (!_database.isConnected) {
+      await _database.connect();
+    }
+  }
+
+  @override
+  Future<void> onClose() async {
+    if (_database.isConnected) {
+      await _database.close();
+    }
+  }
 
   MongoCollectionAdapter _collection(String modelName) {
     return _database.collection(modelName);
@@ -58,6 +75,7 @@ class MongoQueryEngine extends QueryEngineInterface {
               modelName: modelName,
               collection: collection,
               plan: plan,
+              sequelize: sequelize,
             )
           : await collection.find(
               where: plan.where,
@@ -66,6 +84,20 @@ class MongoQueryEngine extends QueryEngineInterface {
               skip: plan.offset,
               projection: plan.projection,
             );
+      if (plan.includes.isEmpty) {
+        _logMongoQuery(
+          operation: 'findAll',
+          sequelize: sequelize,
+          payload: {
+            'collection': modelName,
+            'where': plan.where,
+            'sort': plan.sort,
+            'limit': plan.limit,
+            'skip': plan.offset,
+            'projection': plan.projection,
+          },
+        );
+      }
 
       return docs.map((doc) => ModelInstanceData(data: doc)).toList();
     } catch (error, stackTrace) {
@@ -98,6 +130,7 @@ class MongoQueryEngine extends QueryEngineInterface {
           modelName: modelName,
           collection: collection,
           plan: plan.copyWith(limit: 1),
+          sequelize: sequelize,
         );
         if (docs.isNotEmpty) {
           doc = docs.first;
@@ -107,6 +140,16 @@ class MongoQueryEngine extends QueryEngineInterface {
           where: plan.where,
           sort: plan.sort,
           projection: plan.projection,
+        );
+        _logMongoQuery(
+          operation: 'findOne',
+          sequelize: sequelize,
+          payload: {
+            'collection': modelName,
+            'where': plan.where,
+            'sort': plan.sort,
+            'projection': plan.projection,
+          },
         );
       }
 
@@ -133,8 +176,28 @@ class MongoQueryEngine extends QueryEngineInterface {
     Transaction? transaction,
   }) async {
     try {
-      final inserted = await _collection(modelName).insertOne(
-        Map<String, dynamic>.from(data),
+      final includes = _extractIncludes(query?.toJson()['include']);
+      final effectiveIncludes = includes.isNotEmpty
+          ? includes
+          : _inferIncludesFromData(
+              modelName: modelName,
+              data: data,
+            );
+      final inserted = await _createWithAssociations(
+        modelName: modelName,
+        data: data,
+        includes: effectiveIncludes,
+        sequelize: sequelize,
+        model: model,
+      );
+      _logMongoQuery(
+        operation: 'create',
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'data': data,
+          'includes': effectiveIncludes,
+        },
       );
       return ModelInstanceData(data: inserted);
     } catch (error, stackTrace) {
@@ -144,6 +207,267 @@ class MongoQueryEngine extends QueryEngineInterface {
         context: 'Exception: failed to execute create()',
       );
     }
+  }
+
+  Future<Map<String, dynamic>> _createWithAssociations({
+    required String modelName,
+    required Map<String, dynamic> data,
+    required List<Map<String, dynamic>> includes,
+    required dynamic sequelize,
+    required dynamic model,
+  }) async {
+    final sourcePayload = Map<String, dynamic>.from(data);
+    await _assignAutoIncrementPrimaryKeyIfNeeded(
+      modelName: modelName,
+      payload: sourcePayload,
+      sequelize: sequelize,
+      model: model,
+    );
+    final associationPayloads = <String, dynamic>{};
+
+    for (final include in includes) {
+      final associationName = include['association']?.toString();
+      if (associationName == null || associationName.isEmpty) {
+        continue;
+      }
+      if (sourcePayload.containsKey(associationName)) {
+        associationPayloads[associationName] = sourcePayload.remove(
+          associationName,
+        );
+      }
+    }
+
+    final inserted = await _collection(modelName).insertOne(sourcePayload);
+    if (associationPayloads.isEmpty) {
+      return inserted;
+    }
+
+    final hydrated = Map<String, dynamic>.from(inserted);
+    for (final include in includes) {
+      final associationName = include['association']?.toString();
+      if (associationName == null || associationName.isEmpty) {
+        continue;
+      }
+      if (!associationPayloads.containsKey(associationName)) {
+        continue;
+      }
+
+      final associationValue = associationPayloads[associationName];
+      if (associationValue == null) {
+        continue;
+      }
+
+      final association = _resolveAssociation(
+        sourceModel: modelName,
+        associationName: associationName,
+      );
+      final nestedIncludes = _extractIncludes(include['include']);
+      final targetModel = _resolveModelFor(modelName: association.targetCollection, sequelize: sequelize);
+
+      switch (association.associationType) {
+        case MongoAssociationType.hasMany:
+          final listPayload = associationValue is List
+              ? associationValue
+              : [associationValue];
+          final createdChildren = <Map<String, dynamic>>[];
+          final sourceKey = _sourceAssociationKey(
+            association: association,
+            primaryKeyValues: hydrated,
+          );
+          for (final item in listPayload) {
+            if (item is! Map) {
+              continue;
+            }
+            final childPayload = Map<String, dynamic>.from(item)
+              ..[association.foreignField] = sourceKey;
+            final created = await _createWithAssociations(
+              modelName: association.targetCollection,
+              data: childPayload,
+              includes: nestedIncludes,
+              sequelize: sequelize,
+              model: targetModel,
+            );
+            createdChildren.add(created);
+          }
+          hydrated[associationName] = createdChildren;
+          break;
+        case MongoAssociationType.hasOne:
+          if (associationValue is! Map) {
+            break;
+          }
+          final sourceKey = _sourceAssociationKey(
+            association: association,
+            primaryKeyValues: hydrated,
+          );
+          final childPayload = Map<String, dynamic>.from(associationValue)
+            ..[association.foreignField] = sourceKey;
+          final created = await _createWithAssociations(
+            modelName: association.targetCollection,
+            data: childPayload,
+            includes: nestedIncludes,
+            sequelize: sequelize,
+            model: targetModel,
+          );
+          hydrated[associationName] = created;
+          break;
+        case MongoAssociationType.belongsTo:
+          if (associationValue is! Map) {
+            final targetKey = _extractTargetKey(
+              associationValue,
+              preferredField: association.foreignField,
+            );
+            await _collection(modelName).updateOne(
+              where: _primaryWhereFromDocument(hydrated),
+              update: {
+                r'$set': {association.localField: targetKey},
+              },
+            );
+            hydrated[association.localField] = targetKey;
+            break;
+          }
+          final created = await _createWithAssociations(
+            modelName: association.targetCollection,
+            data: Map<String, dynamic>.from(associationValue),
+            includes: nestedIncludes,
+            sequelize: sequelize,
+            model: targetModel,
+          );
+          final targetKey = _extractTargetKey(
+            created,
+            preferredField: association.foreignField,
+          );
+          await _collection(modelName).updateOne(
+            where: _primaryWhereFromDocument(hydrated),
+            update: {
+              r'$set': {association.localField: targetKey},
+            },
+          );
+          hydrated[association.localField] = targetKey;
+          hydrated[associationName] = created;
+          break;
+      }
+    }
+
+    return hydrated;
+  }
+
+  dynamic _resolveModelFor({
+    required String modelName,
+    required dynamic sequelize,
+  }) {
+    if (sequelize == null) {
+      return null;
+    }
+    try {
+      final dynamic modelInstance = sequelize.getModel(modelName);
+      if (modelInstance == null) {
+        return null;
+      }
+      return {
+        'name': modelName,
+        'attributes': modelInstance.$getAttributesJson(),
+        'options': modelInstance.getOptionsJson(),
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _assignAutoIncrementPrimaryKeyIfNeeded({
+    required String modelName,
+    required Map<String, dynamic> payload,
+    required dynamic sequelize,
+    required dynamic model,
+  }) async {
+    final metadata = _modelMetadataFor(
+      modelName: modelName,
+      sequelize: sequelize,
+      model: model,
+    );
+    if (metadata == null) {
+      return;
+    }
+    final attributesRaw = metadata['attributes'];
+    if (attributesRaw is! Map) {
+      return;
+    }
+    final attributes = Map<String, dynamic>.from(attributesRaw);
+
+    MapEntry<String, dynamic>? pkEntry;
+    for (final entry in attributes.entries) {
+      final attrDefRaw = entry.value;
+      if (attrDefRaw is! Map) {
+        continue;
+      }
+      final attrDef = Map<String, dynamic>.from(attrDefRaw);
+      if (attrDef['primaryKey'] == true) {
+        pkEntry = MapEntry(entry.key.toString(), attrDef);
+        break;
+      }
+    }
+    if (pkEntry == null) {
+      return;
+    }
+
+    final pkName = pkEntry.key;
+    final pkDefinition = Map<String, dynamic>.from(pkEntry.value as Map);
+    if (payload.containsKey(pkName) && payload[pkName] != null) {
+      return;
+    }
+
+    final isAutoIncrement = pkDefinition['autoIncrement'] == true;
+    final typeName = pkDefinition['type']?.toString().toUpperCase() ?? '';
+    final isIntegerLike = typeName.contains('INT');
+    if (!isAutoIncrement || !isIntegerLike) {
+      return;
+    }
+
+    final latest = await _collection(modelName).findOne(
+      sort: {pkName: -1},
+      projection: {pkName: 1},
+    );
+    final latestValue = latest?[pkName];
+    var nextValue = 1;
+    if (latestValue is int) {
+      nextValue = latestValue + 1;
+    } else if (latestValue is num) {
+      nextValue = latestValue.toInt() + 1;
+    } else if (latestValue is String) {
+      final parsed = int.tryParse(latestValue);
+      if (parsed != null) {
+        nextValue = parsed + 1;
+      }
+    }
+    payload[pkName] = nextValue;
+  }
+
+  Map<String, dynamic>? _modelMetadataFor({
+    required String modelName,
+    required dynamic sequelize,
+    required dynamic model,
+  }) {
+    if (model is Map && model['attributes'] is Map) {
+      return Map<String, dynamic>.from(model);
+    }
+    final resolved = _resolveModelFor(modelName: modelName, sequelize: sequelize);
+    if (resolved is Map) {
+      return Map<String, dynamic>.from(resolved);
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _primaryWhereFromDocument(Map<String, dynamic> doc) {
+    if (doc.containsKey('_id')) {
+      return {'_id': doc['_id']};
+    }
+    if (doc.containsKey('id')) {
+      return {'id': doc['id']};
+    }
+    if (doc.isNotEmpty) {
+      final firstEntry = doc.entries.first;
+      return {firstEntry.key: firstEntry.value};
+    }
+    return <String, dynamic>{};
   }
 
   @override
@@ -158,6 +482,15 @@ class MongoQueryEngine extends QueryEngineInterface {
     try {
       final inserted = await _collection(modelName).insertMany(
         data.map((item) => Map<String, dynamic>.from(item)).toList(),
+      );
+      _logMongoQuery(
+        operation: 'bulkCreate',
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'count': data.length,
+          'documents': data,
+        },
       );
       return inserted.map((doc) => ModelInstanceData(data: doc)).toList();
     } catch (error, stackTrace) {
@@ -183,12 +516,25 @@ class MongoQueryEngine extends QueryEngineInterface {
         query: query,
         model: model,
       );
-      return _collection(modelName).updateMany(
+      final affected = await _collection(modelName).updateMany(
         where: plan.where,
         update: {
           r'$set': data,
         },
       );
+      _logMongoQuery(
+        operation: 'update',
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'where': plan.where,
+          'update': {
+            r'$set': data,
+          },
+          'affected': affected,
+        },
+      );
+      return affected;
     } catch (error, stackTrace) {
       throw _wrapError(
         error: error,
@@ -217,13 +563,31 @@ class MongoQueryEngine extends QueryEngineInterface {
           where: plan.where,
           group: plan.group,
         );
+        _logMongoQuery(
+          operation: 'count.aggregate',
+          sequelize: sequelize,
+          payload: {
+            'collection': modelName,
+            'pipeline': pipeline,
+          },
+        );
         final docs = await collection.aggregate(pipeline);
         if (docs.isEmpty) {
           return 0;
         }
         return _numValue(docs.first['result']).toInt();
       }
-      return collection.count(plan.where);
+      final result = await collection.count(plan.where);
+      _logMongoQuery(
+        operation: 'count',
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'where': plan.where,
+          'result': result,
+        },
+      );
+      return result;
     } catch (error, stackTrace) {
       throw _wrapError(
         error: error,
@@ -246,8 +610,10 @@ class MongoQueryEngine extends QueryEngineInterface {
       modelName: modelName,
       column: column,
       query: query,
+      sequelize: sequelize,
       model: model,
       accumulator: r'$max',
+      operation: 'max',
       context: 'Exception: failed to execute max()',
     );
   }
@@ -265,8 +631,10 @@ class MongoQueryEngine extends QueryEngineInterface {
       modelName: modelName,
       column: column,
       query: query,
+      sequelize: sequelize,
       model: model,
       accumulator: r'$min',
+      operation: 'min',
       context: 'Exception: failed to execute min()',
     );
   }
@@ -284,8 +652,10 @@ class MongoQueryEngine extends QueryEngineInterface {
       modelName: modelName,
       column: column,
       query: query,
+      sequelize: sequelize,
       model: model,
       accumulator: r'$sum',
+      operation: 'sum',
       context: 'Exception: failed to execute sum()',
     );
   }
@@ -303,8 +673,10 @@ class MongoQueryEngine extends QueryEngineInterface {
       modelName: modelName,
       fields: fields,
       query: query,
+      sequelize: sequelize,
       model: model,
       sign: 1,
+      operation: 'increment',
       context: 'Exception: failed to execute increment()',
     );
   }
@@ -322,8 +694,10 @@ class MongoQueryEngine extends QueryEngineInterface {
       modelName: modelName,
       fields: fields,
       query: query,
+      sequelize: sequelize,
       model: model,
       sign: -1,
+      operation: 'decrement',
       context: 'Exception: failed to execute decrement()',
     );
   }
@@ -344,6 +718,16 @@ class MongoQueryEngine extends QueryEngineInterface {
         where: Map<String, dynamic>.from(primaryKeyValues),
         replacement: replacement,
         upsert: true,
+      );
+      _logMongoQuery(
+        operation: 'save',
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'where': primaryKeyValues,
+          'replacement': replacement,
+          'upsert': true,
+        },
       );
       return ModelInstanceData(data: saved);
     } catch (error, stackTrace) {
@@ -399,6 +783,19 @@ class MongoQueryEngine extends QueryEngineInterface {
       if (target == null) {
         return null;
       }
+      _logMongoQuery(
+        operation: 'belongsToGet',
+        sequelize: sequelize,
+        payload: {
+          'sourceModel': sourceModel,
+          'association': associationName,
+          'sourceWhere': primaryKeyValues,
+          'targetCollection': association.targetCollection,
+          'targetWhere': {
+            association.foreignField: foreignKeyValue,
+          },
+        },
+      );
 
       return ModelInstanceData(data: target);
     } catch (error, stackTrace) {
@@ -436,6 +833,18 @@ class MongoQueryEngine extends QueryEngineInterface {
         where: Map<String, dynamic>.from(primaryKeyValues),
         update: {
           r'$set': {
+            association.localField: targetKey,
+          },
+        },
+      );
+      _logMongoQuery(
+        operation: 'belongsToSet',
+        sequelize: sequelize,
+        payload: {
+          'sourceModel': sourceModel,
+          'association': associationName,
+          'where': primaryKeyValues,
+          'update': {
             association.localField: targetKey,
           },
         },
@@ -481,6 +890,18 @@ class MongoQueryEngine extends QueryEngineInterface {
           },
         },
       );
+      _logMongoQuery(
+        operation: 'belongsToCreate',
+        sequelize: sequelize,
+        payload: {
+          'sourceModel': sourceModel,
+          'association': associationName,
+          'targetCollection': association.targetCollection,
+          'data': data,
+          'sourceWhere': primaryKeyValues,
+          'set': {association.localField: targetKey},
+        },
+      );
 
       return ModelInstanceData(data: created);
     } catch (error, stackTrace) {
@@ -514,7 +935,7 @@ class MongoQueryEngine extends QueryEngineInterface {
             deletedField: {r'$eq': null},
           },
         );
-        return collection.updateMany(
+        final affected = await collection.updateMany(
           where: scopedWhere,
           update: {
             r'$set': {
@@ -522,8 +943,30 @@ class MongoQueryEngine extends QueryEngineInterface {
             },
           },
         );
+        _logMongoQuery(
+          operation: 'destroy.softDelete',
+          sequelize: sequelize,
+          payload: {
+            'collection': modelName,
+            'where': scopedWhere,
+            'affected': affected,
+            'deletedField': deletedField,
+          },
+        );
+        return affected;
       }
-      return collection.deleteMany(where: where);
+      final affected = await collection.deleteMany(where: where);
+      _logMongoQuery(
+        operation: 'destroy',
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'where': where,
+          'affected': affected,
+          'force': force,
+        },
+      );
+      return affected;
     } catch (error, stackTrace) {
       throw _wrapError(
         error: error,
@@ -543,6 +986,13 @@ class MongoQueryEngine extends QueryEngineInterface {
   }) async {
     try {
       await _collection(modelName).deleteMany(where: <String, dynamic>{});
+      _logMongoQuery(
+        operation: 'truncate',
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+        },
+      );
     } catch (error, stackTrace) {
       throw _wrapError(
         error: error,
@@ -577,6 +1027,15 @@ class MongoQueryEngine extends QueryEngineInterface {
           },
         },
       );
+      _logMongoQuery(
+        operation: 'restore',
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'where': where,
+          'deletedField': deletedField,
+        },
+      );
     } catch (error, stackTrace) {
       throw _wrapError(
         error: error,
@@ -608,9 +1067,27 @@ class MongoQueryEngine extends QueryEngineInterface {
             },
           },
         );
+        _logMongoQuery(
+          operation: 'instanceDestroy.softDelete',
+          sequelize: sequelize,
+          payload: {
+            'collection': modelName,
+            'where': primaryKeyValues,
+            'deletedField': deletedField,
+          },
+        );
       } else {
         await _collection(modelName).deleteOne(
           where: Map<String, dynamic>.from(primaryKeyValues),
+        );
+        _logMongoQuery(
+          operation: 'instanceDestroy',
+          sequelize: sequelize,
+          payload: {
+            'collection': modelName,
+            'where': primaryKeyValues,
+            'force': force,
+          },
         );
       }
     } catch (error, stackTrace) {
@@ -638,6 +1115,15 @@ class MongoQueryEngine extends QueryEngineInterface {
           r'$unset': {
             deletedField: '',
           },
+        },
+      );
+      _logMongoQuery(
+        operation: 'instanceRestore',
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'where': primaryKeyValues,
+          'deletedField': deletedField,
         },
       );
     } catch (error, stackTrace) {
@@ -686,6 +1172,16 @@ class MongoQueryEngine extends QueryEngineInterface {
               association.foreignField: sourceKey,
             },
           );
+          _logMongoQuery(
+            operation: 'associationGet.hasOne',
+            sequelize: sequelize,
+            payload: {
+              'sourceModel': sourceModel,
+              'association': associationName,
+              'targetCollection': association.targetCollection,
+              'where': {association.foreignField: sourceKey},
+            },
+          );
           return result == null ? null : ModelInstanceData(data: result);
         case MongoAssociationType.hasMany:
           final sourceKey = _sourceAssociationKey(
@@ -695,6 +1191,16 @@ class MongoQueryEngine extends QueryEngineInterface {
           final result = await _collection(association.targetCollection).find(
             where: {
               association.foreignField: sourceKey,
+            },
+          );
+          _logMongoQuery(
+            operation: 'associationGet.hasMany',
+            sequelize: sequelize,
+            payload: {
+              'sourceModel': sourceModel,
+              'association': associationName,
+              'targetCollection': association.targetCollection,
+              'where': {association.foreignField: sourceKey},
             },
           );
           return result.map((doc) => ModelInstanceData(data: doc)).toList();
@@ -804,6 +1310,17 @@ class MongoQueryEngine extends QueryEngineInterface {
           },
         );
       }
+      _logMongoQuery(
+        operation: 'associationAdd',
+        sequelize: sequelize,
+        payload: {
+          'sourceModel': sourceModel,
+          'association': associationName,
+          'targetCollection': association.targetCollection,
+          'targetKeys': targetKeys,
+          'set': {association.foreignField: sourceKey},
+        },
+      );
     } catch (error, stackTrace) {
       throw _wrapError(
         error: error,
@@ -838,6 +1355,16 @@ class MongoQueryEngine extends QueryEngineInterface {
             },
           },
         );
+        _logMongoQuery(
+          operation: 'associationRemove.belongsTo',
+          sequelize: sequelize,
+          payload: {
+            'sourceModel': sourceModel,
+            'association': associationName,
+            'where': primaryKeyValues,
+            'unset': association.localField,
+          },
+        );
         return;
       }
 
@@ -858,6 +1385,17 @@ class MongoQueryEngine extends QueryEngineInterface {
           },
         );
       }
+      _logMongoQuery(
+        operation: 'associationRemove',
+        sequelize: sequelize,
+        payload: {
+          'sourceModel': sourceModel,
+          'association': associationName,
+          'targetCollection': association.targetCollection,
+          'targetKeys': targetKeys,
+          'unset': association.foreignField,
+        },
+      );
     } catch (error, stackTrace) {
       throw _wrapError(
         error: error,
@@ -905,6 +1443,16 @@ class MongoQueryEngine extends QueryEngineInterface {
       final created = await _collection(association.targetCollection).insertOne(
         payload,
       );
+      _logMongoQuery(
+        operation: 'associationCreate',
+        sequelize: sequelize,
+        payload: {
+          'sourceModel': sourceModel,
+          'association': associationName,
+          'targetCollection': association.targetCollection,
+          'payload': payload,
+        },
+      );
       return ModelInstanceData(data: created);
     } catch (error, stackTrace) {
       throw _wrapError(
@@ -919,8 +1467,10 @@ class MongoQueryEngine extends QueryEngineInterface {
     required String modelName,
     required String column,
     required Query? query,
+    required dynamic sequelize,
     required dynamic model,
     required String accumulator,
+    required String operation,
     required String context,
   }) async {
     try {
@@ -935,6 +1485,16 @@ class MongoQueryEngine extends QueryEngineInterface {
         group: plan.group,
       );
       final docs = await _collection(modelName).aggregate(pipeline);
+      _logMongoQuery(
+        operation: operation,
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'column': column,
+          'accumulator': accumulator,
+          'pipeline': pipeline,
+        },
+      );
       if (docs.isEmpty) {
         return null;
       }
@@ -956,8 +1516,10 @@ class MongoQueryEngine extends QueryEngineInterface {
     required String modelName,
     required Map<String, dynamic> fields,
     required Query? query,
+    required dynamic sequelize,
     required dynamic model,
     required int sign,
+    required String operation,
     required String context,
   }) async {
     try {
@@ -975,9 +1537,19 @@ class MongoQueryEngine extends QueryEngineInterface {
           r'$inc': inc,
         },
       );
+      _logMongoQuery(
+        operation: operation,
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'where': plan.where,
+          'inc': inc,
+        },
+      );
       return findAll(
         modelName: modelName,
         query: query,
+        sequelize: sequelize,
         model: model,
       );
     } catch (error, stackTrace) {
@@ -993,6 +1565,7 @@ class MongoQueryEngine extends QueryEngineInterface {
     required String modelName,
     required MongoCollectionAdapter collection,
     required _MongoQueryPlan plan,
+    required dynamic sequelize,
   }) async {
     if (_lookupBuilder == null) {
       throw MongoUnsupportedFeatureException(
@@ -1012,7 +1585,138 @@ class MongoQueryEngine extends QueryEngineInterface {
       limit: plan.limit,
       projection: plan.projection,
     );
-    return collection.aggregate(pipeline);
+    _logMongoQuery(
+      operation: 'aggregate.find',
+      sequelize: sequelize,
+      payload: {
+        'collection': modelName,
+        'pipeline': pipeline,
+      },
+    );
+    final docs = await collection.aggregate(pipeline);
+    return _normalizeIncludeDocuments(
+      sourceModel: modelName,
+      docs: docs,
+      includes: plan.includes,
+    );
+  }
+
+  List<Map<String, dynamic>> _normalizeIncludeDocuments({
+    required String sourceModel,
+    required List<Map<String, dynamic>> docs,
+    required List<Map<String, dynamic>> includes,
+  }) {
+    if (includes.isEmpty || _associationResolver == null) {
+      return docs;
+    }
+
+    return docs
+        .map(
+          (doc) => _normalizeIncludeDocument(
+            sourceModel: sourceModel,
+            doc: Map<String, dynamic>.from(doc),
+            includes: includes,
+          ),
+        )
+        .toList();
+  }
+
+  Map<String, dynamic> _normalizeIncludeDocument({
+    required String sourceModel,
+    required Map<String, dynamic> doc,
+    required List<Map<String, dynamic>> includes,
+  }) {
+    final normalized = Map<String, dynamic>.from(doc);
+    final resolver = _associationResolver;
+    if (resolver == null) {
+      return normalized;
+    }
+
+    for (final include in includes) {
+      final associationName = include['association']?.toString();
+      if (associationName == null || associationName.isEmpty) {
+        continue;
+      }
+
+      final MongoAssociationDefinition? definition;
+      try {
+        definition = resolver(
+          sourceModel: sourceModel,
+          associationName: associationName,
+        );
+      } catch (_) {
+        continue;
+      }
+      if (definition == null) {
+        continue;
+      }
+
+      final nestedIncludes = _extractIncludes(include['include']);
+      final key = normalized.containsKey(definition.as)
+          ? definition.as
+          : associationName;
+      final rawValue = normalized[key];
+      normalized[key] = _normalizeAssociationValue(
+        definition: definition,
+        rawValue: rawValue,
+        nestedIncludes: nestedIncludes,
+      );
+    }
+
+    return normalized;
+  }
+
+  dynamic _normalizeAssociationValue({
+    required MongoAssociationDefinition definition,
+    required dynamic rawValue,
+    required List<Map<String, dynamic>> nestedIncludes,
+  }) {
+    switch (definition.associationType) {
+      case MongoAssociationType.hasMany:
+        if (rawValue is List) {
+          return rawValue.map((item) {
+            if (item is! Map) {
+              return item;
+            }
+            if (nestedIncludes.isEmpty) {
+              return item;
+            }
+            return _normalizeIncludeDocument(
+              sourceModel: definition.targetCollection,
+              doc: Map<String, dynamic>.from(item),
+              includes: nestedIncludes,
+            );
+          }).toList();
+        }
+        if (rawValue is Map) {
+          final item = nestedIncludes.isEmpty
+              ? Map<String, dynamic>.from(rawValue)
+              : _normalizeIncludeDocument(
+                  sourceModel: definition.targetCollection,
+                  doc: Map<String, dynamic>.from(rawValue),
+                  includes: nestedIncludes,
+                );
+          return [item];
+        }
+        return rawValue ?? <dynamic>[];
+      case MongoAssociationType.hasOne:
+      case MongoAssociationType.belongsTo:
+        dynamic single = rawValue;
+        if (rawValue is List) {
+          single = rawValue.isEmpty ? null : rawValue.first;
+        }
+        if (single is! Map) {
+          return single;
+        }
+        if (nestedIncludes.isEmpty) {
+          return Map<String, dynamic>.from(single);
+        }
+        return _normalizeIncludeDocument(
+          sourceModel: definition.targetCollection,
+          doc: Map<String, dynamic>.from(single),
+          includes: nestedIncludes,
+        );
+    }
   }
 
   _MongoQueryPlan _buildQueryPlan({
@@ -1056,6 +1760,35 @@ class MongoQueryEngine extends QueryEngineInterface {
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
+  }
+
+  List<Map<String, dynamic>> _inferIncludesFromData({
+    required String modelName,
+    required Map<String, dynamic> data,
+  }) {
+    if (_associationResolver == null) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    final includes = <Map<String, dynamic>>[];
+    for (final entry in data.entries) {
+      final value = entry.value;
+      final looksLikeAssociationPayload =
+          value is Map || (value is List && value.isNotEmpty);
+      if (!looksLikeAssociationPayload) {
+        continue;
+      }
+      final associationName = entry.key;
+      final definition = _associationResolver(
+        sourceModel: modelName,
+        associationName: associationName,
+      );
+      if (definition == null) {
+        continue;
+      }
+      includes.add({'association': associationName});
+    }
+    return includes;
   }
 
   Map<String, dynamic> _translateOptionsWhere(Map<String, dynamic>? options) {
@@ -1140,13 +1873,29 @@ class MongoQueryEngine extends QueryEngineInterface {
     required Map<String, dynamic> primaryKeyValues,
   }) {
     if (primaryKeyValues.containsKey(association.localField)) {
-      return primaryKeyValues[association.localField];
+      final value = primaryKeyValues[association.localField];
+      if (value != null) {
+        return value;
+      }
     }
     if (primaryKeyValues.containsKey('_id')) {
-      return primaryKeyValues['_id'];
+      final value = primaryKeyValues['_id'];
+      if (value != null) {
+        return value;
+      }
+    }
+    if (primaryKeyValues.containsKey('id')) {
+      final value = primaryKeyValues['id'];
+      if (value != null) {
+        return value;
+      }
     }
     if (primaryKeyValues.isNotEmpty) {
-      return primaryKeyValues.values.first;
+      for (final value in primaryKeyValues.values) {
+        if (value != null) {
+          return value;
+        }
+      }
     }
     return null;
   }
@@ -1249,6 +1998,46 @@ class MongoQueryEngine extends QueryEngineInterface {
       context: context,
       stack: stackTrace.toString(),
     );
+  }
+
+  void _logMongoQuery({
+    required String operation,
+    required Map<String, dynamic> payload,
+    dynamic sequelize,
+  }) {
+    final serialized = jsonEncode(_jsonSafe(payload));
+    final message = '[mongo:$operation] $serialized';
+    try {
+      if (sequelize is Sequelize) {
+        sequelize.log(message);
+        return;
+      }
+      final dynamic candidate = sequelize;
+      candidate?.log(message);
+    } catch (_) {
+      // Never fail query execution due to logging callback issues.
+    }
+  }
+
+  dynamic _jsonSafe(dynamic value) {
+    if (value == null ||
+        value is String ||
+        value is num ||
+        value is bool) {
+      return value;
+    }
+    if (value is DateTime) {
+      return value.toIso8601String();
+    }
+    if (value is List) {
+      return value.map(_jsonSafe).toList();
+    }
+    if (value is Map) {
+      return value.map(
+        (key, nested) => MapEntry(key.toString(), _jsonSafe(nested)),
+      );
+    }
+    return value.toString();
   }
 }
 
