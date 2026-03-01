@@ -1,0 +1,285 @@
+// ignore_for_file: avoid_dynamic_calls
+
+import 'package:mongo_dart/mongo_dart.dart' as mongo;
+import 'package:sequelize_orm_mongodb/src/mongo_adapter.dart';
+import 'package:sequelize_orm_mongodb/src/mongo_exceptions.dart';
+
+class MongoConnectionConfig {
+  final String url;
+  final String database;
+
+  const MongoConnectionConfig({
+    required this.url,
+    required this.database,
+  });
+}
+
+class MongoConnection {
+  final MongoConnectionConfig config;
+  final MongoDatabaseAdapter _adapter;
+
+  MongoConnection({
+    required this.config,
+    MongoDatabaseAdapter? adapter,
+  }) : _adapter = adapter ?? MongoDartDatabaseAdapter(config: config);
+
+  Future<void> open() => _adapter.connect();
+
+  Future<void> close() => _adapter.close();
+
+  bool get isConnected => _adapter.isConnected;
+
+  MongoCollectionAdapter collection(String name) => _adapter.collection(name);
+
+  MongoDatabaseAdapter get adapter => _adapter;
+}
+
+class MongoDartDatabaseAdapter implements MongoDatabaseAdapter {
+  final MongoConnectionConfig config;
+  mongo.Db? _db;
+  bool _connected = false;
+
+  MongoDartDatabaseAdapter({
+    required this.config,
+  });
+
+  @override
+  Future<void> connect() async {
+    if (_connected) {
+      return;
+    }
+    try {
+      _db = mongo.Db(_connectionUri(config));
+      await _db!.open();
+      _connected = true;
+    } catch (error, stackTrace) {
+      throw MongoConnectionException(
+        'Failed to connect to MongoDB: $error',
+        context: 'MongoConnection.connect',
+        stack: stackTrace.toString(),
+      );
+    }
+  }
+
+  @override
+  Future<void> close() async {
+    if (_db == null || !_connected) {
+      return;
+    }
+    await _db!.close();
+    _connected = false;
+  }
+
+  @override
+  bool get isConnected => _connected;
+
+  @override
+  MongoCollectionAdapter collection(String name) {
+    if (_db == null || !_connected) {
+      throw MongoConnectionException(
+        'MongoDB connection is not open.',
+        context: 'MongoConnection.collection',
+      );
+    }
+    return MongoDartCollectionAdapter(_db!.collection(name));
+  }
+
+  String _connectionUri(MongoConnectionConfig cfg) {
+    try {
+      final uri = Uri.parse(cfg.url);
+      final hasDatabasePath = uri.pathSegments
+          .where((segment) => segment.trim().isNotEmpty)
+          .isNotEmpty;
+      if (hasDatabasePath) {
+        return cfg.url;
+      }
+      return uri.replace(path: '/${cfg.database}').toString();
+    } catch (_) {
+      if (cfg.url.endsWith('/')) {
+        return '${cfg.url}${cfg.database}';
+      }
+      return '${cfg.url}/${cfg.database}';
+    }
+  }
+}
+
+class MongoDartCollectionAdapter implements MongoCollectionAdapter {
+  final dynamic _collection;
+
+  MongoDartCollectionAdapter(mongo.DbCollection collection)
+      : _collection = collection;
+
+  @override
+  Future<List<Map<String, dynamic>>> aggregate(
+    List<Map<String, dynamic>> pipeline,
+  ) async {
+    final dynamic stream = _collection.aggregateToStream(pipeline);
+    final dynamic docs = await stream.toList();
+    return _asDocList(docs);
+  }
+
+  @override
+  Future<int> count(Map<String, dynamic> where) async {
+    final docs = await aggregate([
+      {r'$match': where},
+      {r'$count': 'count'},
+    ]);
+    if (docs.isEmpty) {
+      return 0;
+    }
+    return _asInt(docs.first['count']);
+  }
+
+  @override
+  Future<int> deleteMany({
+    required Map<String, dynamic> where,
+  }) async {
+    final dynamic response = await _collection.deleteMany(where);
+    return _extractCount(response, ['nRemoved', 'deletedCount', 'n']);
+  }
+
+  @override
+  Future<int> deleteOne({
+    required Map<String, dynamic> where,
+  }) async {
+    final dynamic response = await _collection.deleteOne(where);
+    return _extractCount(response, ['nRemoved', 'deletedCount', 'n']);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> find({
+    Map<String, dynamic>? where,
+    Map<String, int>? sort,
+    int? limit,
+    int? skip,
+    Map<String, dynamic>? projection,
+  }) async {
+    final shouldUsePipeline = (sort != null && sort.isNotEmpty) ||
+        (limit != null) ||
+        (skip != null) ||
+        (projection != null && projection.isNotEmpty);
+    if (shouldUsePipeline) {
+      return aggregate([
+        if (where != null && where.isNotEmpty) {r'$match': where},
+        if (sort != null && sort.isNotEmpty) {r'$sort': sort},
+        if (skip != null && skip > 0) {r'$skip': skip},
+        if (limit != null && limit >= 0) {r'$limit': limit},
+        if (projection != null && projection.isNotEmpty)
+          {r'$project': projection},
+      ]);
+    }
+
+    final dynamic cursor = _collection.find(where ?? <String, dynamic>{});
+    final dynamic docs = await cursor.toList();
+    return _asDocList(docs);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> findOne({
+    Map<String, dynamic>? where,
+    Map<String, int>? sort,
+    Map<String, dynamic>? projection,
+  }) async {
+    if ((sort != null && sort.isNotEmpty) ||
+        (projection != null && projection.isNotEmpty)) {
+      final docs = await aggregate([
+        if (where != null && where.isNotEmpty) {r'$match': where},
+        if (sort != null && sort.isNotEmpty) {r'$sort': sort},
+        {r'$limit': 1},
+        if (projection != null && projection.isNotEmpty)
+          {r'$project': projection},
+      ]);
+      return docs.isEmpty ? null : docs.first;
+    }
+
+    final dynamic doc = await _collection.findOne(where ?? <String, dynamic>{});
+    if (doc == null) {
+      return null;
+    }
+    return Map<String, dynamic>.from(doc as Map);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> insertMany(
+    List<Map<String, dynamic>> documents,
+  ) async {
+    await _collection.insertMany(documents);
+    return documents
+        .map((doc) => Map<String, dynamic>.from(doc))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<Map<String, dynamic>> insertOne(Map<String, dynamic> document) async {
+    final doc = Map<String, dynamic>.from(document);
+    final dynamic response = await _collection.insertOne(doc);
+    final dynamic id = response?['id'] ?? response?['insertedId'];
+    if (id != null && !doc.containsKey('_id')) {
+      doc['_id'] = id;
+    }
+    return doc;
+  }
+
+  @override
+  Future<Map<String, dynamic>> replaceOne({
+    required Map<String, dynamic> where,
+    required Map<String, dynamic> replacement,
+    bool upsert = false,
+  }) async {
+    await _collection.replaceOne(where, replacement, upsert: upsert);
+    final reloaded = await findOne(where: where);
+    return reloaded ?? Map<String, dynamic>.from(replacement);
+  }
+
+  @override
+  Future<int> updateMany({
+    required Map<String, dynamic> where,
+    required Map<String, dynamic> update,
+  }) async {
+    final dynamic response = await _collection.updateMany(where, update);
+    return _extractCount(response, ['nModified', 'modifiedCount', 'n']);
+  }
+
+  @override
+  Future<int> updateOne({
+    required Map<String, dynamic> where,
+    required Map<String, dynamic> update,
+  }) async {
+    final dynamic response = await _collection.updateOne(where, update);
+    return _extractCount(response, ['nModified', 'modifiedCount', 'n']);
+  }
+
+  int _asInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    return 0;
+  }
+
+  List<Map<String, dynamic>> _asDocList(dynamic docs) {
+    if (docs is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+    return docs
+        .whereType<Map>()
+        .map((doc) => Map<String, dynamic>.from(doc))
+        .toList(growable: false);
+  }
+
+  int _extractCount(dynamic response, List<String> keys) {
+    if (response is Map) {
+      for (final key in keys) {
+        if (response.containsKey(key)) {
+          return _asInt(response[key]);
+        }
+      }
+    }
+    if (response is int) {
+      return response;
+    }
+    return 0;
+  }
+}
