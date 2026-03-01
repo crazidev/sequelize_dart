@@ -5,6 +5,7 @@
 //   dart run tools/run.dart --help
 //
 // Commands (each can be run individually):
+//   benchmark-bridge Measure round-trip latency between Dart and the bridge
 //   build          Compile Dart to JS (optional: --input=, --output=)
 //   setup-bridge   Install and build bridge server bundle
 //   format         Format Dart and JS/JSON/MD with dart format + Prettier
@@ -21,6 +22,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+part 'cmds/benchmark_bridge_cmd.dart';
 part 'cmds/build_all_cmd.dart';
 part 'cmds/build_cmd.dart';
 part 'cmds/format_cmd.dart';
@@ -50,6 +52,9 @@ void main(List<String> args) async {
 
   try {
     switch (command) {
+      case 'benchmark-bridge':
+        await cmdBenchmarkBridge(root, rest);
+        break;
       case 'build':
         await cmdBuild(root, rest);
         break;
@@ -161,6 +166,9 @@ Sequelize ORM – cross-platform tools (Windows, macOS, Linux)
 Usage: dart run tools/run.dart <command> [options]
 
 Commands:
+  benchmark-bridge  Measure round-trip latency between Dart and the bridge
+                    Options: --postgres (default), --mysql, --mariadb, --sqlite
+                             --iterations=N (default: 100), --verbose
   build            Compile Dart to JS (default: example/lib/main.dart → index.js)
                     Options: --input=FILE, --output=NAME
   setup-bridge     Install and build bridge server (bun | pnpm | npm)

@@ -43,6 +43,8 @@ export type JsonRpcResponse = {
   error?: any;
   notification?: string;
   sql?: string;
+  /** Wall-clock milliseconds spent inside the Node.js request handler (JS + DB). */
+  _serverMs?: number;
 };
 
 export type ResponseCallback = (response: JsonRpcResponse) => void;
@@ -56,6 +58,7 @@ export async function processRequest(
   sendResponse: ResponseCallback,
 ): Promise<void> {
   const { id, method, params } = request;
+  const _startMs = Date.now();
 
   try {
     let result: any;
@@ -205,9 +208,9 @@ export async function processRequest(
         throw new Error(`Unknown method: ${method}`);
     }
 
-    sendResponse({ id, result });
+    sendResponse({ id, result, _serverMs: Date.now() - _startMs });
   } catch (error: any) {
-    sendResponse({ id, error: formatError(error) });
+    sendResponse({ id, error: formatError(error), _serverMs: Date.now() - _startMs });
   }
 }
 

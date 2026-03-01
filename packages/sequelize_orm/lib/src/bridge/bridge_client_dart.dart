@@ -6,6 +6,7 @@ import 'dart:isolate';
 import 'package:path/path.dart' as p;
 import 'package:sequelize_orm/src/bridge/bridge_client_interface.dart';
 import 'package:sequelize_orm/src/bridge/bridge_exception.dart';
+import 'package:sequelize_orm/src/bridge/bridge_latency.dart';
 import 'package:sequelize_orm/src/bridge/sequelize_exceptions.dart';
 
 /// Client for communicating with the Node.js Sequelize bridge server.
@@ -23,6 +24,17 @@ class BridgeClient implements BridgeClientInterface {
 
   /// Callback for SQL logging
   Function(String sql)? _loggingCallback;
+
+  /// Optional callback invoked after every bridge call with latency details.
+  /// Use this in tests or benchmark tools.
+  ///
+  /// Example:
+  /// ```dart
+  /// BridgeClient.instance.latencyCallback = (info) {
+  ///   print(info); // BridgeLatencyInfo(findAll: 12ms total, 8ms server, 4ms overhead)
+  /// };
+  /// ```
+  void Function(BridgeLatencyInfo info)? latencyCallback;
 
   BridgeClient._();
 
@@ -293,6 +305,9 @@ class BridgeClient implements BridgeClientInterface {
       if (id != null && _pendingRequests.containsKey(id)) {
         final completer = _pendingRequests.remove(id)!;
 
+        // Stash the server-side elapsed time so call() can pick it up.
+        _serverMsById[id as int] = response['_serverMs'] as int?;
+
         if (response.containsKey('error')) {
           final error = response['error'];
           if (error is Map) {
@@ -314,6 +329,9 @@ class BridgeClient implements BridgeClientInterface {
     }
   }
 
+  // Per-pending-request server-time storage (populated by _handleResponse).
+  final Map<int, int?> _serverMsById = {};
+
   @override
   Future<dynamic> call(String method, Map<String, dynamic> params) async {
     if (_isClosed) {
@@ -330,15 +348,36 @@ class BridgeClient implements BridgeClientInterface {
     final completer = Completer<dynamic>();
     _pendingRequests[id] = completer;
 
+    final stopwatch = Stopwatch()..start();
     _process!.stdin.writeln(request);
 
-    return completer.future.timeout(
+    final result = await completer.future.timeout(
       const Duration(seconds: 30),
       onTimeout: () {
         _pendingRequests.remove(id);
+        _serverMsById.remove(id);
         throw Exception('Request timeout: $method');
       },
     );
+    stopwatch.stop();
+
+    // Report latency to the registered callback (if any).
+    final cb = latencyCallback;
+    if (cb != null) {
+      final serverMs = _serverMsById.remove(id);
+      cb(
+        BridgeLatencyInfo(
+          method: method,
+          roundTrip: stopwatch.elapsed,
+          serverTime:
+              serverMs != null ? Duration(milliseconds: serverMs) : null,
+        ),
+      );
+    } else {
+      _serverMsById.remove(id);
+    }
+
+    return result;
   }
 
   @override

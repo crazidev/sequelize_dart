@@ -12,6 +12,7 @@ dependencies:
     path: ../packages/sequelize_orm
   dotenv: ^4.2.0
   meta: ^1.17.0
+  mongo_dart: ^0.10.8
 
 
 dev_dependencies:
