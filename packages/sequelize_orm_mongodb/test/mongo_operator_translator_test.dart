@@ -127,5 +127,14 @@ void main() {
         throwsA(isA<MongoUnsupportedFeatureException>()),
       );
     });
+
+    test('passes through mongo-only \$where clause', () {
+      final translated = translator.translateWhere({
+        r'$where': 'this.score >= 90',
+      });
+      expect(translated, {
+        r'$where': 'this.score >= 90',
+      });
+    });
   });
 }

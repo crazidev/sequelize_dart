@@ -23,9 +23,13 @@ class MongoSequelizeIntegration {
     MongoLookupBuilder? lookupBuilder,
     String defaultParanoidField = 'deletedAt',
   }) {
+    final resolvedConfig = config ??
+        (database == null
+            ? _configFromSequelize(sequelize)
+            : _configDefaultsFromSequelize(sequelize));
     final resolvedDatabase = database ??
         MongoDartDatabaseAdapter(
-          config: config ?? _configFromSequelize(sequelize),
+          config: resolvedConfig,
         );
     final resolver =
         associationResolver ?? _buildAssociationResolver(sequelize);
@@ -35,6 +39,8 @@ class MongoSequelizeIntegration {
       operatorTranslator: operatorTranslator,
       lookupBuilder: lookupBuilder,
       defaultParanoidField: defaultParanoidField,
+      defaultValidationLevel: resolvedConfig.mongoValidationLevel,
+      defaultValidationAction: resolvedConfig.mongoValidationAction,
     );
 
     sequelize.setQueryEngine(engine, useBridge: false);
@@ -53,6 +59,20 @@ class MongoSequelizeIntegration {
     return MongoConnectionConfig(
       url: url,
       database: database,
+      mongoValidationLevel: cfg?['mongoValidationLevel']?.toString(),
+      mongoValidationAction: cfg?['mongoValidationAction']?.toString(),
+    );
+  }
+
+  static MongoConnectionConfig _configDefaultsFromSequelize(
+    Sequelize sequelize,
+  ) {
+    final cfg = sequelize.connectionConfig;
+    return MongoConnectionConfig(
+      url: cfg?['url']?.toString() ?? '',
+      database: cfg?['database']?.toString() ?? '',
+      mongoValidationLevel: cfg?['mongoValidationLevel']?.toString(),
+      mongoValidationAction: cfg?['mongoValidationAction']?.toString(),
     );
   }
 

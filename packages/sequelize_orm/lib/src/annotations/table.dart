@@ -190,6 +190,18 @@ class Table {
   /// Default: false
   final VersionOption? version;
 
+  /// MongoDB schema validation level override for this model.
+  ///
+  /// Supported values include `strict`, `moderate`, and `off`.
+  /// This setting is used only by the MongoDB query engine.
+  final String? mongoValidationLevel;
+
+  /// MongoDB schema validation action override for this model.
+  ///
+  /// Supported values include `error` and `warn`.
+  /// This setting is used only by the MongoDB query engine.
+  final String? mongoValidationAction;
+
   const Table({
     this.tableName,
     this.omitNull,
@@ -212,6 +224,8 @@ class Table {
     this.collate,
     this.initialAutoIncrement,
     this.version,
+    this.mongoValidationLevel,
+    this.mongoValidationAction,
   });
 
   Map<String, dynamic> toJson() {
@@ -283,6 +297,12 @@ class Table {
     }
     if (version != null) {
       json['version'] = version!.toJson();
+    }
+    if (mongoValidationLevel != null) {
+      json['mongoValidationLevel'] = mongoValidationLevel;
+    }
+    if (mongoValidationAction != null) {
+      json['mongoValidationAction'] = mongoValidationAction;
     }
 
     return json;

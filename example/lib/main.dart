@@ -36,7 +36,7 @@ Future<void> main() async {
     models: Db.allModels(),
   );
 
-  // await sequelize.sync(alter: true);
+  await sequelize.sync();
 
   await sequelize.seed(
     seeders: Db.allSeeders(),

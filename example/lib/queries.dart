@@ -6,20 +6,24 @@ import 'package:sequelize_orm_example/db/db.dart';
 /// main.dart after the database connection is established
 Future<void> runQueries() async {
   final users = await Db.users.findOne(
-    where: (c) => or([
-      c.firstName.eq('Seed 20'),
-      c.metadata.key('isAdmin').eq(true),
+    where: (c) => and([
+      // c.id.eq(1),
+      // c.metadata.key('isAdmin').eq(true),
     ]),
-    include: (includeUsers) => [
-      includeUsers.post(
-        where: (c) => c.views.eq(20),
-        required: true,
-      ),
-    ],
+    // include: (includeUsers) => [
+    //   includeUsers.post(
+    //     include: (i) => [
+    //       i.postDetails(),
+    //     ],
+    //   ),
+    // ],
   );
 
   users?.lastName = 'Updated Last Name';
+  users?.post?.views = 100;
+  users?.post?.title = 'Updated Title';
   await users?.save();
+  await users?.post?.save();
 
   print('==================== USERS ====================');
   print(users.toString());

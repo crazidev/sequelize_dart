@@ -54,6 +54,16 @@ Map<String, dynamic> _extractTableAnnotation(ConstantReader annotation) {
         .peek('initialAutoIncrement')
         ?.stringValue;
   }
+  if (annotation.peek('mongoValidationLevel')?.isNull == false) {
+    result['mongoValidationLevel'] = annotation
+        .peek('mongoValidationLevel')
+        ?.stringValue;
+  }
+  if (annotation.peek('mongoValidationAction')?.isNull == false) {
+    result['mongoValidationAction'] = annotation
+        .peek('mongoValidationAction')
+        ?.stringValue;
+  }
 
   // Complex types - extract their values
   final nameAnnotation = annotation.peek('name');

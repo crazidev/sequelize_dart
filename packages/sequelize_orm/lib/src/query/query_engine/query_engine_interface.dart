@@ -277,3 +277,13 @@ abstract class QueryEngineLifecycle {
   Future<void> onInitialize();
   Future<void> onClose();
 }
+
+/// Optional sync hooks for query engines that do not use the JS bridge.
+abstract class QueryEngineSyncLifecycle {
+  Future<void> syncModels({
+    required bool force,
+    required bool alter,
+    required dynamic sequelize,
+    required List<dynamic> models,
+  });
+}

@@ -41,7 +41,7 @@ class MongoDialectCapabilities {
     supportsILike: true,
     supportsJoin: true,
     supportsTruncate: true,
-    supportsSync: false,
+    supportsSync: true,
     supportsGroup: true,
     supportsBetween: true,
     supportsColComparison: true,

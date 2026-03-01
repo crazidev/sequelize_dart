@@ -212,6 +212,15 @@ class Sequelize extends SequelizeInterface {
   @override
   Future<void> sync({bool force = false, bool alter = false}) async {
     if (!_usesBridgeQueryEngine) {
+      final engine = resolveQueryEngine();
+      if (engine is QueryEngineSyncLifecycle) {
+        await (engine as QueryEngineSyncLifecycle).syncModels(
+          force: force,
+          alter: alter,
+          sequelize: this,
+          models: _models.values.toList(growable: false),
+        );
+      }
       return;
     }
     await _bridge.call('sync', {
