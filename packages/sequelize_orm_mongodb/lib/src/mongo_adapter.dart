@@ -6,6 +6,29 @@ abstract class MongoDatabaseAdapter {
   bool get isConnected;
 
   MongoCollectionAdapter collection(String name);
+
+  Future<bool> collectionExists(String name);
+
+  Future<void> createCollectionWithValidation({
+    required String name,
+    Map<String, dynamic>? validator,
+    String? validationLevel,
+    String? validationAction,
+  });
+
+  Future<void> modifyCollectionValidation({
+    required String name,
+    Map<String, dynamic>? validator,
+    String? validationLevel,
+    String? validationAction,
+  });
+
+  Future<void> dropCollectionIfExists(String name);
+
+  Future<void> ensureUniqueIndex({
+    required String collectionName,
+    required List<String> fields,
+  });
 }
 
 abstract class MongoCollectionAdapter {

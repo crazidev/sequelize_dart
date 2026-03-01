@@ -7,10 +7,14 @@ import 'package:sequelize_orm_mongodb/src/mongo_exceptions.dart';
 class MongoConnectionConfig {
   final String url;
   final String database;
+  final String? mongoValidationLevel;
+  final String? mongoValidationAction;
 
   const MongoConnectionConfig({
     required this.url,
     required this.database,
+    this.mongoValidationLevel,
+    this.mongoValidationAction,
   });
 }
 
@@ -84,6 +88,136 @@ class MongoDartDatabaseAdapter implements MongoDatabaseAdapter {
     return MongoDartCollectionAdapter(_db!.collection(name));
   }
 
+  @override
+  Future<bool> collectionExists(String name) async {
+    try {
+      final response = await _runDbCommand({
+        'listCollections': 1,
+        'filter': {'name': name},
+        'nameOnly': true,
+      });
+      final cursor = response['cursor'];
+      if (cursor is Map) {
+        final firstBatch = cursor['firstBatch'];
+        if (firstBatch is List) {
+          return firstBatch.isNotEmpty;
+        }
+      }
+
+      final dynamic names = await (_db as dynamic).getCollectionNames();
+      if (names is List) {
+        return names.map((entry) => entry.toString()).contains(name);
+      }
+      return false;
+    } catch (error, stackTrace) {
+      throw MongoConnectionException(
+        'Failed to check collection existence for "$name": $error',
+        context: 'MongoConnection.collectionExists',
+        stack: stackTrace.toString(),
+      );
+    }
+  }
+
+  @override
+  Future<void> createCollectionWithValidation({
+    required String name,
+    Map<String, dynamic>? validator,
+    String? validationLevel,
+    String? validationAction,
+  }) async {
+    try {
+      final command = <String, dynamic>{'create': name};
+      if (validator != null && validator.isNotEmpty) {
+        command['validator'] = validator;
+      }
+      if (validationLevel != null && validationLevel.isNotEmpty) {
+        command['validationLevel'] = validationLevel;
+      }
+      if (validationAction != null && validationAction.isNotEmpty) {
+        command['validationAction'] = validationAction;
+      }
+      await _runDbCommand(command);
+    } catch (error, stackTrace) {
+      throw MongoConnectionException(
+        'Failed to create collection "$name": $error',
+        context: 'MongoConnection.createCollectionWithValidation',
+        stack: stackTrace.toString(),
+      );
+    }
+  }
+
+  @override
+  Future<void> modifyCollectionValidation({
+    required String name,
+    Map<String, dynamic>? validator,
+    String? validationLevel,
+    String? validationAction,
+  }) async {
+    try {
+      final command = <String, dynamic>{'collMod': name};
+      if (validator != null && validator.isNotEmpty) {
+        command['validator'] = validator;
+      }
+      if (validationLevel != null && validationLevel.isNotEmpty) {
+        command['validationLevel'] = validationLevel;
+      }
+      if (validationAction != null && validationAction.isNotEmpty) {
+        command['validationAction'] = validationAction;
+      }
+      await _runDbCommand(command);
+    } catch (error, stackTrace) {
+      throw MongoConnectionException(
+        'Failed to modify schema validation for "$name": $error',
+        context: 'MongoConnection.modifyCollectionValidation',
+        stack: stackTrace.toString(),
+      );
+    }
+  }
+
+  @override
+  Future<void> dropCollectionIfExists(String name) async {
+    try {
+      if (!await collectionExists(name)) {
+        return;
+      }
+      await _runDbCommand({'drop': name});
+    } catch (error, stackTrace) {
+      throw MongoConnectionException(
+        'Failed to drop collection "$name": $error',
+        context: 'MongoConnection.dropCollectionIfExists',
+        stack: stackTrace.toString(),
+      );
+    }
+  }
+
+  @override
+  Future<void> ensureUniqueIndex({
+    required String collectionName,
+    required List<String> fields,
+  }) async {
+    if (fields.isEmpty) return;
+    try {
+      final indexKey = {for (final f in fields) f: 1};
+      final indexName = '${fields.join('_')}_unique';
+      await _runDbCommand({
+        'createIndexes': collectionName,
+        'indexes': [
+          {
+            'key': indexKey,
+            'name': indexName,
+            'unique': true,
+          },
+        ],
+      });
+    } catch (error, stackTrace) {
+      throw MongoConnectionException(
+        'Failed to create unique index on "$collectionName" for fields $fields: $error',
+        context: 'MongoConnection.ensureUniqueIndex',
+        stack: stackTrace.toString(),
+      );
+    }
+  }
+
   String _connectionUri(MongoConnectionConfig cfg) {
     try {
       final uri = Uri.parse(cfg.url);
@@ -100,6 +234,64 @@ class MongoDartDatabaseAdapter implements MongoDatabaseAdapter {
       }
       return '${cfg.url}/${cfg.database}';
     }
+  }
+
+  Future<Map<String, dynamic>> _runDbCommand(Map<String, dynamic> command) async {
+    if (_db == null || !_connected) {
+      throw MongoConnectionException(
+        'MongoDB connection is not open.',
+        context: 'MongoConnection._runDbCommand',
+      );
+    }
+    final normalizedCommand = _normalizeCommand(command);
+    final dynamic response = await (_db as dynamic).runCommand(normalizedCommand);
+    if (response is Map) {
+      final map = Map<String, dynamic>.from(response);
+      final ok = map['ok'];
+      if ((ok is num && ok == 1) || ok == true || ok == '1') {
+        return map;
+      }
+      throw MongoConnectionException(
+        'Mongo command failed: $command, response: $map',
+        context: 'MongoConnection._runDbCommand',
+      );
+    }
+    return <String, dynamic>{};
+  }
+
+  Map<String, Object> _normalizeCommand(Map<String, dynamic> command) {
+    final normalized = <String, Object>{};
+    command.forEach((key, value) {
+      final normalizedValue = _normalizeCommandValue(value);
+      if (normalizedValue != null) {
+        normalized[key] = normalizedValue;
+      }
+    });
+    return normalized;
+  }
+
+  Object? _normalizeCommandValue(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is Map) {
+      final map = <String, Object>{};
+      value.forEach((k, v) {
+        final normalizedValue = _normalizeCommandValue(v);
+        if (normalizedValue != null) {
+          map[k.toString()] = normalizedValue;
+        }
+      });
+      return map;
+    }
+    if (value is List) {
+      return value
+          .map(_normalizeCommandValue)
+          .where((item) => item != null)
+          .cast<Object>()
+          .toList(growable: false);
+    }
+    return value as Object;
   }
 }
 

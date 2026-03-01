@@ -107,6 +107,23 @@ void main() {
       });
     });
 
+    test('findAll supports mongoWhere operator helper', () async {
+      final users = database.collectionAsFake('users');
+      users.findResult = [
+        {'_id': 10, 'score': 99},
+      ];
+
+      final result = await engine.findAll(
+        modelName: 'users',
+        query: Query(where: mongoWhere('this.score >= 90')),
+      );
+
+      expect(result, hasLength(1));
+      expect(users.lastFindWhere, {
+        r'$where': 'this.score >= 90',
+      });
+    });
+
     test('destroy performs paranoid soft delete when force is false', () async {
       final users = database.collectionAsFake('users');
       users.updateManyResult = 3;
@@ -294,6 +311,521 @@ void main() {
       expect(log, predicate((value) => value.toString().startsWith('[mongo:count.aggregate] ')));
       expect(log, contains('"pipeline"'));
       expect(log, contains(r'"$group"'));
+    });
+
+    test('save filters non-attribute association keys from replacement',
+        () async {
+      final users = database.collectionAsFake('users');
+
+      await engine.save(
+        modelName: 'users',
+        currentData: const {
+          'id': 1,
+          'email': 'alice@example.com',
+          'last_name': 'Updated Last Name',
+          'post': {'id': 55, 'title': 'Should not persist in users doc'},
+        },
+        previousData: const {
+          'id': 1,
+          'email': 'alice@example.com',
+          'post': {'id': 54},
+        },
+        primaryKeyValues: const {'id': 1},
+        model: const {
+          'attributes': {
+            'id': {'primaryKey': true},
+            'email': {'type': 'VARCHAR'},
+            'last_name': {'type': 'VARCHAR'},
+          },
+        },
+      );
+
+      expect(users.lastReplaceOneWhere, {'id': 1});
+      expect(users.lastReplaceOneReplacement, isNotNull);
+      expect(users.lastReplaceOneReplacement!['id'], 1);
+      expect(users.lastReplaceOneReplacement!['email'], 'alice@example.com');
+      expect(
+        users.lastReplaceOneReplacement!['last_name'],
+        'Updated Last Name',
+      );
+      expect(users.lastReplaceOneReplacement, isNot(contains('post')));
+    });
+
+    test('syncModels alter updates collection validation via collMod', () async {
+      database.existingCollections.add('users');
+      final model = {
+        'name': 'users',
+        'attributes': {
+          'age': {
+            'type': 'INTEGER',
+            'allowNull': false,
+            'validate': {'min': 18},
+          },
+          'email': {
+            'type': 'STRING',
+            'allowNull': true,
+            'validate': {
+              'len': [3, 255],
+            },
+          },
+          'first_name': {
+            'type': 'STRING',
+            'allowNull': false,
+            'validate': {'min': 4},
+          },
+          'status': {
+            'type': 'ENUM',
+            'values': ['active', 'inactive', 'pending'],
+          },
+        },
+        'options': {
+          'mongoValidationLevel': 'moderate',
+          'mongoValidationAction': 'warn',
+        },
+      };
+
+      await engine.syncModels(
+        force: false,
+        alter: true,
+        sequelize: null,
+        models: [model],
+      );
+
+      expect(database.lastModifyCollectionCommand, isNotNull);
+      final command = database.lastModifyCollectionCommand!;
+      expect(command['name'], 'users');
+      expect(command['validationLevel'], 'moderate');
+      expect(command['validationAction'], 'warn');
+      final validator = command['validator'] as Map<String, dynamic>;
+      final schema = validator[r'$jsonSchema'] as Map<String, dynamic>;
+      expect(schema['required'], contains('age'));
+      final properties = schema['properties'] as Map<String, dynamic>;
+      expect(properties['age']['minimum'], 18);
+      expect(properties['email']['maxLength'], 255);
+      expect(properties['first_name']['minLength'], 4);
+      expect(properties['first_name'].containsKey('minimum'), isFalse);
+      // status has no explicit allowNull:false so it is nullable → null appended
+      expect(properties['status']['enum'],
+          containsAllInOrder(['active', 'inactive', 'pending', null]));
+    });
+
+    test('_attributeSchemaFor: pattern from named validators', () async {
+      database.existingCollections.add('users');
+      final model = {
+        'name': 'users',
+        'attributes': {
+          'username': {
+            'type': 'STRING',
+            'allowNull': false,
+            'validate': {'isAlpha': true},
+          },
+          'email': {
+            'type': 'STRING',
+            'allowNull': false,
+            'validate': {'isEmail': true},
+          },
+          'slug': {
+            'type': 'STRING',
+            'allowNull': false,
+            'validate': {'isAlphanumeric': true},
+          },
+          'amount': {
+            'type': 'STRING',
+            'allowNull': false,
+            'validate': {'isNumeric': true},
+          },
+          'ip': {
+            'type': 'STRING',
+            'allowNull': false,
+            'validate': {'isIPv4': true},
+          },
+          'uid': {
+            'type': 'UUID',
+            'allowNull': false,
+            'validate': {'isUUID': 4},
+          },
+          'explicit': {
+            'type': 'STRING',
+            'allowNull': false,
+            'validate': {'is': r'^[a-z]+$'},
+          },
+        },
+      };
+
+      await engine.syncModels(
+        force: false,
+        alter: true,
+        sequelize: null,
+        models: [model],
+      );
+
+      final command = database.lastModifyCollectionCommand!;
+      final schema =
+          (command['validator'] as Map)[r'$jsonSchema'] as Map<String, dynamic>;
+      final props = schema['properties'] as Map<String, dynamic>;
+
+      expect(props['username']['pattern'], r'^[a-zA-Z]+$');
+      expect(props['email']['pattern'],
+          r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
+      expect(props['slug']['pattern'], r'^[a-zA-Z0-9]+$');
+      expect(props['amount']['pattern'], r'^[0-9]+(\.[0-9]+)?$');
+      expect(
+          (props['ip']['pattern'] as String).startsWith(r'^((25[0-5]'), isTrue);
+      // UUID v4 pattern contains '4' in the version nibble slot
+      expect(props['uid']['pattern'], contains('-4'));
+      expect(props['explicit']['pattern'], r'^[a-z]+$');
+    });
+
+    test('_attributeSchemaFor: notEmpty maps to minLength 1', () async {
+      database.existingCollections.add('users');
+      final model = {
+        'name': 'users',
+        'attributes': {
+          'bio': {
+            'type': 'TEXT',
+            'allowNull': false,
+            'validate': {'notEmpty': true},
+          },
+          'name': {
+            'type': 'STRING',
+            'allowNull': false,
+            'validate': {
+              'notEmpty': true,
+              'len': [3, 100],
+            },
+          },
+        },
+      };
+
+      await engine.syncModels(
+        force: false,
+        alter: true,
+        sequelize: null,
+        models: [model],
+      );
+
+      final command = database.lastModifyCollectionCommand!;
+      final schema =
+          (command['validator'] as Map)[r'$jsonSchema'] as Map<String, dynamic>;
+      final props = schema['properties'] as Map<String, dynamic>;
+
+      expect(props['bio']['minLength'], 1);
+      // len already sets minLength to 3 which is ≥ 1; notEmpty must not shrink it
+      expect(props['name']['minLength'], 3);
+      expect(props['name']['maxLength'], 100);
+    });
+
+    test('_attributeSchemaFor: typed JSON array uses bsonType array + items',
+        () async {
+      database.existingCollections.add('posts');
+      final model = {
+        'name': 'posts',
+        'attributes': {
+          'tags': {
+            'type': 'JSON',
+            'dartType': 'List<String>',
+            'allowNull': false,
+          },
+          'scores': {
+            'type': 'JSONB',
+            'dartType': 'List<int>',
+            'allowNull': false,
+          },
+          'meta': {
+            'type': 'JSON',
+            'dartType': 'Map<String, dynamic>',
+            'allowNull': false,
+          },
+          'counts': {
+            'type': 'JSON',
+            'dartType': 'List<String>',
+            'allowNull': false,
+            'validate': {
+              'len': [1, 10],
+            },
+          },
+        },
+      };
+
+      await engine.syncModels(
+        force: false,
+        alter: true,
+        sequelize: null,
+        models: [model],
+      );
+
+      final command = database.lastModifyCollectionCommand!;
+      final schema =
+          (command['validator'] as Map)[r'$jsonSchema'] as Map<String, dynamic>;
+      final props = schema['properties'] as Map<String, dynamic>;
+
+      // tags → bsonType: 'array', items: {bsonType: 'string'}
+      expect(props['tags']['bsonType'], 'array');
+      expect(props['tags']['items']['bsonType'], 'string');
+
+      // scores → bsonType: 'array', items: {bsonType: ['int','long']}
+      expect(props['scores']['bsonType'], 'array');
+      expect(props['scores']['items']['bsonType'], containsAll(['int', 'long']));
+
+      // meta → bsonType: 'object' (Map dartType)
+      expect(props['meta']['bsonType'], 'object');
+      expect(props['meta'].containsKey('items'), isFalse);
+
+      // counts → minItems/maxItems from len
+      expect(props['counts']['minItems'], 1);
+      expect(props['counts']['maxItems'], 10);
+    });
+
+    test(
+        '_attributeSchemaFor: BIGINT maps to string bsonType (SequelizeBigInt serialises as string)',
+        () async {
+      database.existingCollections.add('users');
+      final model = {
+        'name': 'users',
+        'attributes': {
+          'phone_number': {'type': 'BIGINT', 'allowNull': true},
+          'id': {'type': 'BIGINT', 'allowNull': false},
+          'age': {'type': 'INTEGER', 'allowNull': false},
+        },
+      };
+
+      await engine.syncModels(
+        force: false,
+        alter: true,
+        sequelize: null,
+        models: [model],
+      );
+
+      final command = database.lastModifyCollectionCommand!;
+      final schema =
+          (command['validator'] as Map)[r'$jsonSchema'] as Map<String, dynamic>;
+      final props = schema['properties'] as Map<String, dynamic>;
+
+      // Nullable BIGINT → ['string', 'null']
+      expect(props['phone_number']['bsonType'],
+          containsAll(['string', 'null']));
+      // Non-null BIGINT → 'string'
+      expect(props['id']['bsonType'], 'string');
+      // Regular INTEGER still maps to int/long
+      expect(props['age']['bsonType'], containsAll(['int', 'long']));
+    });
+
+    test('_attributeSchemaFor: enum non-null field omits null from enum list',
+        () async {
+      database.existingCollections.add('orders');
+      final model = {
+        'name': 'orders',
+        'attributes': {
+          'state': {
+            'type': 'ENUM',
+            'values': ['pending', 'shipped'],
+            'allowNull': false,
+          },
+          'optState': {
+            'type': 'ENUM',
+            'values': ['pending', 'shipped'],
+            'allowNull': true,
+          },
+        },
+      };
+
+      await engine.syncModels(
+        force: false,
+        alter: true,
+        sequelize: null,
+        models: [model],
+      );
+
+      final command = database.lastModifyCollectionCommand!;
+      final schema =
+          (command['validator'] as Map)[r'$jsonSchema'] as Map<String, dynamic>;
+      final props = schema['properties'] as Map<String, dynamic>;
+
+      // NOT NULL → exact values, no null appended
+      expect(props['state']['enum'], equals(['pending', 'shipped']));
+      // nullable → null appended
+      expect(
+          props['optState']['enum'], containsAllInOrder(['pending', 'shipped', null]));
+    });
+
+    test('syncModels force drops and recreates collection with validation',
+        () async {
+      database.existingCollections.add('users');
+      final model = {
+        'name': 'users',
+        'attributes': {
+          'name': {'type': 'STRING', 'allowNull': false},
+        },
+      };
+
+      await engine.syncModels(
+        force: true,
+        alter: false,
+        sequelize: null,
+        models: [model],
+      );
+
+      expect(database.lastDropCollectionName, 'users');
+      expect(database.lastCreateCollectionCommand, isNotNull);
+      expect(database.lastCreateCollectionCommand!['name'], 'users');
+    });
+
+    test('findDocumentsNotMatchingSchema uses \$nor + \$jsonSchema', () async {
+      final users = database.collectionAsFake('users');
+      users.findResult = [
+        {'_id': 1, 'status': 'invalid'},
+      ];
+
+      final rows = await engine.findDocumentsNotMatchingSchema(
+        modelName: 'users',
+        where: {
+          'status': {r'$eq': 'invalid'},
+        },
+        model: {
+          'attributes': {
+            'status': {'type': 'STRING', 'allowNull': false},
+          },
+        },
+      );
+
+      expect(rows, hasLength(1));
+      expect(users.lastFindWhere, isNotNull);
+      expect(users.lastFindWhere![r'$and'], isA<List>());
+      final andClauses = users.lastFindWhere![r'$and'] as List;
+      expect(andClauses.first, {
+        'status': {r'$eq': 'invalid'},
+      });
+      expect(andClauses.last, contains(r'$nor'));
+    });
+
+    test('deleteDocumentsNotMatchingSchema uses \$nor + \$jsonSchema', () async {
+      final users = database.collectionAsFake('users');
+      users.deleteManyResult = 4;
+
+      final deleted = await engine.deleteDocumentsNotMatchingSchema(
+        modelName: 'users',
+        model: {
+          'attributes': {
+            'status': {'type': 'STRING', 'allowNull': false},
+          },
+        },
+      );
+
+      expect(deleted, 4);
+      expect(users.lastDeleteManyWhere, isNotNull);
+      expect(users.lastDeleteManyWhere, contains(r'$nor'));
+    });
+
+    test('syncModels creates unique index on primary key when creating new collection',
+        () async {
+      final model = {
+        'name': 'users',
+        'attributes': {
+          'id': {'type': 'INTEGER', 'primaryKey': true, 'allowNull': false},
+          'name': {'type': 'STRING', 'allowNull': false},
+        },
+      };
+
+      await engine.syncModels(
+        force: false,
+        alter: false,
+        sequelize: null,
+        models: [model],
+      );
+
+      expect(database.lastCreateCollectionCommand, isNotNull);
+      expect(database.ensureUniqueIndexCalls, hasLength(1));
+      expect(database.ensureUniqueIndexCalls.first['collectionName'], 'users');
+      expect(database.ensureUniqueIndexCalls.first['fields'], equals(['id']));
+    });
+
+    test('syncModels creates unique index on primary key when force-recreating collection',
+        () async {
+      database.existingCollections.add('users');
+      final model = {
+        'name': 'users',
+        'attributes': {
+          'id': {'type': 'INTEGER', 'primaryKey': true, 'allowNull': false},
+          'name': {'type': 'STRING', 'allowNull': false},
+        },
+      };
+
+      await engine.syncModels(
+        force: true,
+        alter: false,
+        sequelize: null,
+        models: [model],
+      );
+
+      expect(database.lastDropCollectionName, 'users');
+      expect(database.lastCreateCollectionCommand, isNotNull);
+      expect(database.ensureUniqueIndexCalls, hasLength(1));
+      expect(database.ensureUniqueIndexCalls.first['collectionName'], 'users');
+      expect(database.ensureUniqueIndexCalls.first['fields'], equals(['id']));
+    });
+
+    test('syncModels ensures unique index on primary key when altering existing collection',
+        () async {
+      database.existingCollections.add('users');
+      final model = {
+        'name': 'users',
+        'attributes': {
+          'id': {'type': 'UUID', 'primaryKey': true, 'allowNull': false},
+          'email': {'type': 'STRING', 'allowNull': false},
+        },
+      };
+
+      await engine.syncModels(
+        force: false,
+        alter: true,
+        sequelize: null,
+        models: [model],
+      );
+
+      expect(database.lastModifyCollectionCommand, isNotNull);
+      expect(database.ensureUniqueIndexCalls, hasLength(1));
+      expect(database.ensureUniqueIndexCalls.first['collectionName'], 'users');
+      expect(database.ensureUniqueIndexCalls.first['fields'], equals(['id']));
+    });
+
+    test('syncModels skips unique index when no primary key field is defined',
+        () async {
+      final model = {
+        'name': 'users',
+        'attributes': {
+          'name': {'type': 'STRING', 'allowNull': false},
+          'email': {'type': 'STRING', 'allowNull': false},
+        },
+      };
+
+      await engine.syncModels(
+        force: false,
+        alter: false,
+        sequelize: null,
+        models: [model],
+      );
+
+      expect(database.ensureUniqueIndexCalls, isEmpty);
+    });
+
+    test('syncModels does not create unique index when collection exists and no alter/force',
+        () async {
+      database.existingCollections.add('users');
+      final model = {
+        'name': 'users',
+        'attributes': {
+          'id': {'type': 'INTEGER', 'primaryKey': true, 'allowNull': false},
+        },
+      };
+
+      await engine.syncModels(
+        force: false,
+        alter: false,
+        sequelize: null,
+        models: [model],
+      );
+
+      expect(database.ensureUniqueIndexCalls, isEmpty);
     });
   });
 }

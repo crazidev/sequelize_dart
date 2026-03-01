@@ -2,7 +2,12 @@ import 'package:sequelize_orm_mongodb/sequelize_orm_mongodb.dart';
 
 class FakeMongoDatabaseAdapter implements MongoDatabaseAdapter {
   final Map<String, FakeMongoCollectionAdapter> _collections = {};
+  final Set<String> existingCollections = <String>{};
   bool _isConnected = false;
+  Map<String, dynamic>? lastCreateCollectionCommand;
+  Map<String, dynamic>? lastModifyCollectionCommand;
+  String? lastDropCollectionName;
+  List<Map<String, dynamic>> ensureUniqueIndexCalls = [];
 
   @override
   Future<void> close() async {
@@ -11,6 +16,7 @@ class FakeMongoDatabaseAdapter implements MongoDatabaseAdapter {
 
   @override
   MongoCollectionAdapter collection(String name) {
+    existingCollections.add(name);
     return _collections.putIfAbsent(name, FakeMongoCollectionAdapter.new);
   }
 
@@ -21,6 +27,60 @@ class FakeMongoDatabaseAdapter implements MongoDatabaseAdapter {
 
   @override
   bool get isConnected => _isConnected;
+
+  @override
+  Future<bool> collectionExists(String name) async {
+    return existingCollections.contains(name);
+  }
+
+  @override
+  Future<void> createCollectionWithValidation({
+    required String name,
+    Map<String, dynamic>? validator,
+    String? validationLevel,
+    String? validationAction,
+  }) async {
+    existingCollections.add(name);
+    lastCreateCollectionCommand = {
+      'name': name,
+      if (validator != null) 'validator': Map<String, dynamic>.from(validator),
+      if (validationLevel != null) 'validationLevel': validationLevel,
+      if (validationAction != null) 'validationAction': validationAction,
+    };
+  }
+
+  @override
+  Future<void> modifyCollectionValidation({
+    required String name,
+    Map<String, dynamic>? validator,
+    String? validationLevel,
+    String? validationAction,
+  }) async {
+    lastModifyCollectionCommand = {
+      'name': name,
+      if (validator != null) 'validator': Map<String, dynamic>.from(validator),
+      if (validationLevel != null) 'validationLevel': validationLevel,
+      if (validationAction != null) 'validationAction': validationAction,
+    };
+  }
+
+  @override
+  Future<void> dropCollectionIfExists(String name) async {
+    existingCollections.remove(name);
+    _collections.remove(name);
+    lastDropCollectionName = name;
+  }
+
+  @override
+  Future<void> ensureUniqueIndex({
+    required String collectionName,
+    required List<String> fields,
+  }) async {
+    ensureUniqueIndexCalls.add({
+      'collectionName': collectionName,
+      'fields': List<String>.from(fields),
+    });
+  }
 
   FakeMongoCollectionAdapter collectionAsFake(String name) {
     return collection(name) as FakeMongoCollectionAdapter;

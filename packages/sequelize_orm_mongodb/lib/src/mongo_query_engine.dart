@@ -12,13 +12,15 @@ import 'package:sequelize_orm_mongodb/src/mongo_lookup_builder.dart';
 import 'package:sequelize_orm_mongodb/src/mongo_operator_translator.dart';
 
 class MongoQueryEngine extends QueryEngineInterface
-    implements QueryEngineLifecycle {
+    implements QueryEngineLifecycle, QueryEngineSyncLifecycle {
   MongoQueryEngine({
     required MongoDatabaseAdapter database,
     MongoOperatorTranslator? operatorTranslator,
     MongoLookupBuilder? lookupBuilder,
     MongoAssociationResolver? associationResolver,
     this.defaultParanoidField = 'deletedAt',
+    this.defaultValidationLevel,
+    this.defaultValidationAction,
   })  : _database = database,
         _operatorTranslator =
             operatorTranslator ?? const MongoOperatorTranslator(),
@@ -36,6 +38,8 @@ class MongoQueryEngine extends QueryEngineInterface
   final MongoAssociationResolver? _associationResolver;
   final MongoLookupBuilder? _lookupBuilder;
   final String defaultParanoidField;
+  final String? defaultValidationLevel;
+  final String? defaultValidationAction;
 
   @override
   Future<void> onInitialize() async {
@@ -49,6 +53,94 @@ class MongoQueryEngine extends QueryEngineInterface
     if (_database.isConnected) {
       await _database.close();
     }
+  }
+
+  @override
+  Future<void> syncModels({
+    required bool force,
+    required bool alter,
+    required dynamic sequelize,
+    required List<dynamic> models,
+  }) async {
+    if (!_database.isConnected) {
+      await _database.connect();
+    }
+
+    for (final model in models) {
+      final modelName = _modelNameForSync(model);
+      if (modelName == null || modelName.isEmpty) {
+        continue;
+      }
+      final metadata = _modelMetadataFor(
+        modelName: modelName,
+        sequelize: sequelize,
+        model: model,
+      );
+      final validator = _buildMongoValidatorFromMetadata(metadata);
+      final options = _modelOptionsFromMetadata(metadata);
+      final validationLevel = _resolveValidationLevel(options);
+      final validationAction = _resolveValidationAction(options);
+      final primaryKeyFields = _extractPrimaryKeyFields(metadata);
+
+      if (force) {
+        await _database.dropCollectionIfExists(modelName);
+        await _database.createCollectionWithValidation(
+          name: modelName,
+          validator: validator,
+          validationLevel: validationLevel,
+          validationAction: validationAction,
+        );
+        await _ensurePrimaryKeyIndex(modelName, primaryKeyFields);
+        continue;
+      }
+
+      final exists = await _database.collectionExists(modelName);
+      if (exists && alter) {
+        await _database.modifyCollectionValidation(
+          name: modelName,
+          validator: validator,
+          validationLevel: validationLevel,
+          validationAction: validationAction,
+        );
+        await _ensurePrimaryKeyIndex(modelName, primaryKeyFields);
+        continue;
+      }
+
+      if (!exists) {
+        await _database.createCollectionWithValidation(
+          name: modelName,
+          validator: validator,
+          validationLevel: validationLevel,
+          validationAction: validationAction,
+        );
+        await _ensurePrimaryKeyIndex(modelName, primaryKeyFields);
+      }
+    }
+  }
+
+  List<String> _extractPrimaryKeyFields(Map<String, dynamic>? metadata) {
+    if (metadata == null) return [];
+    final attributesRaw = metadata['attributes'];
+    if (attributesRaw is! Map) return [];
+    final fields = <String>[];
+    for (final entry in attributesRaw.entries) {
+      final attrDef = entry.value;
+      if (attrDef is Map && attrDef['primaryKey'] == true) {
+        fields.add(entry.key.toString());
+      }
+    }
+    return fields;
+  }
+
+  Future<void> _ensurePrimaryKeyIndex(
+    String modelName,
+    List<String> primaryKeyFields,
+  ) async {
+    if (primaryKeyFields.isEmpty) return;
+    await _database.ensureUniqueIndex(
+      collectionName: modelName,
+      fields: primaryKeyFields,
+    );
   }
 
   MongoCollectionAdapter _collection(String modelName) {
@@ -456,6 +548,468 @@ class MongoQueryEngine extends QueryEngineInterface
     return null;
   }
 
+  String? _modelNameForSync(dynamic model) {
+    if (model is Map && model['name'] != null) {
+      return model['name']?.toString();
+    }
+    if (model != null) {
+      try {
+        return model.modelName?.toString();
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _modelOptionsFromMetadata(
+    Map<String, dynamic>? metadata,
+  ) {
+    if (metadata == null) {
+      return <String, dynamic>{};
+    }
+    final options = metadata['options'];
+    if (options is Map) {
+      return Map<String, dynamic>.from(options);
+    }
+    return <String, dynamic>{};
+  }
+
+  Map<String, dynamic> _buildMongoValidatorFromMetadata(
+    Map<String, dynamic>? metadata,
+  ) {
+    if (metadata == null) {
+      return <String, dynamic>{};
+    }
+    final attributesRaw = metadata['attributes'];
+    if (attributesRaw is! Map) {
+      return <String, dynamic>{};
+    }
+    final attributes = Map<String, dynamic>.from(attributesRaw);
+    if (attributes.isEmpty) {
+      return <String, dynamic>{};
+    }
+    return {
+      r'$jsonSchema': _buildMongoJsonSchemaFromAttributes(attributes),
+    };
+  }
+
+  Map<String, dynamic> _jsonSchemaFromMetadata(
+    Map<String, dynamic>? metadata,
+  ) {
+    if (metadata == null) {
+      return <String, dynamic>{};
+    }
+    final attributesRaw = metadata['attributes'];
+    if (attributesRaw is! Map) {
+      return <String, dynamic>{};
+    }
+    final attributes = Map<String, dynamic>.from(attributesRaw);
+    if (attributes.isEmpty) {
+      return <String, dynamic>{};
+    }
+    return _buildMongoJsonSchemaFromAttributes(attributes);
+  }
+
+  Map<String, dynamic> _buildSchemaMismatchWhere(Map<String, dynamic> schema) {
+    return {
+      r'$nor': [
+        {r'$jsonSchema': schema},
+      ],
+    };
+  }
+
+  Map<String, dynamic> _buildMongoJsonSchemaFromAttributes(
+    Map<String, dynamic> attributes,
+  ) {
+    final required = <String>[];
+    final properties = <String, dynamic>{};
+    for (final entry in attributes.entries) {
+      final name = entry.key.toString();
+      final rawAttr = entry.value;
+      if (rawAttr is! Map) {
+        continue;
+      }
+      final attr = Map<String, dynamic>.from(rawAttr);
+      final allowNull = attr['allowNull'] != false;
+      if (!allowNull) {
+        required.add(name);
+      }
+      properties[name] = _attributeSchemaFor(attr);
+    }
+
+    return {
+      'bsonType': 'object',
+      if (required.isNotEmpty) 'required': required,
+      'properties': properties,
+    };
+  }
+
+  Map<String, dynamic> _attributeSchemaFor(Map<String, dynamic> attribute) {
+    final schema = <String, dynamic>{};
+    final allowNull = attribute['allowNull'] != false;
+    final typeName = attribute['type']?.toString().toUpperCase() ?? '';
+    final dartType = attribute['dartType']?.toString();
+
+    final isStringLikeType = typeName.contains('CHAR') ||
+        typeName.contains('STRING') ||
+        typeName.contains('TEXT') ||
+        typeName == 'UUID' ||
+        typeName == 'ENUM';
+
+    final isJsonType = typeName == 'JSON' || typeName == 'JSONB';
+    // A JSON/JSONB field with a List dartType hint maps to a true array.
+    final isTypedArrayType =
+        isJsonType && dartType != null && dartType.startsWith('List<');
+
+    final bsonType = _mapTypeToBsonType(
+      typeName,
+      allowNull: allowNull,
+      dartType: dartType,
+    );
+    schema['bsonType'] = bsonType;
+
+    // §5.3 items — typed JSON arrays carry a per-element bsonType (e.g. List<String>)
+    if (isTypedArrayType) {
+      final itemsBsonType = _itemsBsonTypeFromListDartType(dartType);
+      if (itemsBsonType != null) {
+        schema['items'] = <String, dynamic>{'bsonType': itemsBsonType};
+      }
+    }
+
+    // §5.5.1 enum — ENUM type values; include null when the field is nullable
+    final values = attribute['values'];
+    if (values is List && values.isNotEmpty) {
+      schema['enum'] = allowNull
+          ? <dynamic>[...values, null]
+          : values.toList(growable: false);
+    }
+
+    final validate = attribute['validate'];
+    if (validate is Map) {
+      // §5.2.1-2 / §5.3.2-3 len → minLength/maxLength (strings) or
+      // minItems/maxItems (typed arrays)
+      final lenRule = validate['len'];
+      final lenArgs = _extractValidateArgs(lenRule);
+      if (lenArgs.length == 2) {
+        final minLen = _toInt(lenArgs[0]);
+        final maxLen = _toInt(lenArgs[1]);
+        if (isTypedArrayType) {
+          if (minLen != null) schema['minItems'] = minLen;
+          if (maxLen != null) schema['maxItems'] = maxLen;
+        } else {
+          if (minLen != null) schema['minLength'] = minLen;
+          if (maxLen != null) schema['maxLength'] = maxLen;
+        }
+      }
+
+      // §5.1.2-3 / §5.2.1-2  min/max → minimum/maximum (numbers) or
+      // minLength/maxLength (strings)
+      final minRule = validate['min'];
+      final minArgs = _extractValidateArgs(minRule);
+      final minValue =
+          minArgs.isNotEmpty ? _toNum(minArgs.first) : _toNum(minRule);
+      if (minValue != null) {
+        if (isStringLikeType) {
+          schema['minLength'] = minValue.toInt();
+        } else {
+          schema['minimum'] = minValue;
+        }
+      }
+
+      final maxRule = validate['max'];
+      final maxArgs = _extractValidateArgs(maxRule);
+      final maxValue =
+          maxArgs.isNotEmpty ? _toNum(maxArgs.first) : _toNum(maxRule);
+      if (maxValue != null) {
+        if (isStringLikeType) {
+          schema['maxLength'] = maxValue.toInt();
+        } else {
+          schema['maximum'] = maxValue;
+        }
+      }
+
+      // §5.5.1 isIn → enum (nullable fields include null in the list)
+      final isInRule = validate['isIn'];
+      final isInArgs = _extractValidateArgs(isInRule);
+      if (isInArgs.isNotEmpty && isInArgs.first is List) {
+        final enumValues = List<dynamic>.from(isInArgs.first as List);
+        if (allowNull && !enumValues.contains(null)) enumValues.add(null);
+        schema['enum'] = enumValues;
+      }
+
+      // §5.2.2 notEmpty → minLength: 1 (only tighten, never loosen)
+      final notEmptyRule = validate['notEmpty'];
+      if (notEmptyRule != null && notEmptyRule != false) {
+        final existing = schema['minLength'];
+        if (existing == null || (existing is int && existing < 1)) {
+          schema['minLength'] = 1;
+        }
+      }
+
+      // §5.2.3 pattern — explicit `is` regex takes highest priority, then
+      // named format validators (isAlpha, isEmail, isUUID, …)
+      final pattern = _extractPatternFromRule(validate['is']) ??
+          _namedValidatorPattern(validate);
+      if (pattern != null && isStringLikeType) {
+        schema['pattern'] = pattern;
+      }
+    }
+
+    return schema;
+  }
+
+  dynamic _mapTypeToBsonType(
+    String typeName, {
+    required bool allowNull,
+    String? dartType,
+  }) {
+    dynamic baseType;
+    if (typeName == 'BIGINT') {
+      // SequelizeBigInt.toJson() always serialises to a String to avoid
+      // JS/MongoDB precision loss for values beyond Number.MAX_SAFE_INTEGER.
+      baseType = 'string';
+    } else if (typeName.contains('INT')) {
+      baseType = <String>['int', 'long'];
+    } else if (typeName.contains('FLOAT') ||
+        typeName.contains('DOUBLE') ||
+        typeName.contains('DECIMAL')) {
+      baseType = <String>['double', 'int', 'long', 'decimal'];
+    } else if (typeName == 'BOOLEAN') {
+      baseType = 'bool';
+    } else if (typeName == 'DATE' || typeName == 'DATEONLY') {
+      baseType = 'date';
+    } else if (typeName == 'JSON' || typeName == 'JSONB') {
+      // Refine to 'array' or 'object' when a dartType hint is available
+      if (dartType != null && dartType.startsWith('List<')) {
+        baseType = 'array';
+      } else if (dartType != null && dartType.startsWith('Map<')) {
+        baseType = 'object';
+      } else {
+        baseType = <String>['object', 'array'];
+      }
+    } else if (typeName == 'BLOB') {
+      baseType = 'binData';
+    } else {
+      baseType = 'string';
+    }
+
+    if (!allowNull) {
+      return baseType;
+    }
+    if (baseType is String) {
+      return <String>[baseType, 'null'];
+    }
+    if (baseType is List) {
+      final list = baseType.map((e) => e.toString()).toList(growable: false);
+      if (!list.contains('null')) {
+        return <String>[...list, 'null'];
+      }
+      return list;
+    }
+    return baseType;
+  }
+
+  List<dynamic> _extractValidateArgs(dynamic value) {
+    if (value is List) {
+      return value;
+    }
+    if (value is Map && value['args'] is List) {
+      return List<dynamic>.from(value['args'] as List);
+    }
+    return const <dynamic>[];
+  }
+
+  int? _toInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    if (value is String) {
+      return int.tryParse(value);
+    }
+    return null;
+  }
+
+  num? _toNum(dynamic value) {
+    if (value is num) {
+      return value;
+    }
+    if (value is String) {
+      return num.tryParse(value);
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pattern helpers (§5.2.3)
+  // ---------------------------------------------------------------------------
+
+  /// Extracts the regex pattern string from an `is` / `not` rule value.
+  /// The rule may be: a plain String, a List [pattern] or [pattern, flags],
+  /// or a Map {msg, args: pattern | [pattern, flags]}.
+  String? _extractPatternFromRule(dynamic rule) {
+    if (rule == null) return null;
+    if (rule is String) return rule;
+    if (rule is List && rule.isNotEmpty) return rule.first?.toString();
+    if (rule is Map) {
+      final args = rule['args'];
+      if (args is String) return args;
+      if (args is List && args.isNotEmpty) return args.first?.toString();
+    }
+    return null;
+  }
+
+  /// Returns a JSON Schema §5.2.3 `pattern` from known named format validators.
+  /// Priority order matches the field order in ValidateOption.toJson().
+  String? _namedValidatorPattern(Map<dynamic, dynamic> validate) {
+    if (_validatorEnabled(validate, 'isAlpha')) {
+      return r'^[a-zA-Z]+$';
+    }
+    if (_validatorEnabled(validate, 'isAlphanumeric')) {
+      return r'^[a-zA-Z0-9]+$';
+    }
+    if (_validatorEnabled(validate, 'isNumeric')) {
+      // Allows optional decimal part (e.g. "3.14").
+      return r'^[0-9]+(\.[0-9]+)?$';
+    }
+    if (_validatorEnabled(validate, 'isLowercase')) {
+      return r'^[^A-Z]*$';
+    }
+    if (_validatorEnabled(validate, 'isUppercase')) {
+      return r'^[^a-z]*$';
+    }
+    if (_validatorEnabled(validate, 'isEmail')) {
+      return r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$';
+    }
+    if (_validatorEnabled(validate, 'isUrl')) {
+      return r'^https?://[^\s/$.?#].[^\s]*$';
+    }
+    if (_validatorEnabled(validate, 'isIPv4')) {
+      return r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}'
+          r'(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$';
+    }
+    if (_validatorEnabled(validate, 'isIPv6')) {
+      // Simplified full-group IPv6 pattern.
+      return r'^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$';
+    }
+    if (_validatorEnabled(validate, 'isUUID')) {
+      return _uuidPattern(validate['isUUID']);
+    }
+    return null;
+  }
+
+  bool _validatorEnabled(Map<dynamic, dynamic> validate, String key) {
+    final v = validate[key];
+    return v != null && v != false;
+  }
+
+  /// Returns a UUID regex (§7.3 format) optionally narrowed to a version.
+  String _uuidPattern(dynamic rule) {
+    int? version;
+    if (rule is int) {
+      version = rule;
+    } else if (rule is Map) {
+      final args = rule['args'];
+      if (args is int) version = args;
+    }
+    const versionParts = <int, String>{
+      1: r'1[0-9a-fA-F]{3}',
+      3: r'3[0-9a-fA-F]{3}',
+      4: r'4[0-9a-fA-F]{3}',
+      5: r'5[0-9a-fA-F]{3}',
+    };
+    final vPart = versionParts[version] ?? r'[0-9a-fA-F]{4}';
+    return '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-$vPart'
+        r'-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Array / JSON type helpers (§5.3)
+  // ---------------------------------------------------------------------------
+
+  /// Returns the `bsonType` for the elements of a `List<X>` dartType hint.
+  dynamic _itemsBsonTypeFromListDartType(String dartType) {
+    final inner = _extractListInnerType(dartType);
+    if (inner == null) return null;
+    switch (inner) {
+      case 'String':
+        return 'string';
+      case 'int':
+        return <String>['int', 'long'];
+      case 'double':
+      case 'num':
+        return <String>['double', 'decimal'];
+      case 'bool':
+        return 'bool';
+      default:
+        // List<Map<...>> or List<dynamic> → array of objects
+        if (inner.startsWith('Map<') || inner == 'dynamic') return 'object';
+        return null;
+    }
+  }
+
+  String? _extractListInnerType(String dartType) {
+    if (!dartType.startsWith('List<') || !dartType.endsWith('>')) return null;
+    return dartType.substring(5, dartType.length - 1);
+  }
+
+  String? _resolveValidationLevel(Map<String, dynamic> options) {
+    final modelValue = options['mongoValidationLevel']?.toString().trim();
+    if (modelValue != null && modelValue.isNotEmpty) {
+      return modelValue;
+    }
+    final defaultValue = defaultValidationLevel?.trim();
+    if (defaultValue == null || defaultValue.isEmpty) {
+      return null;
+    }
+    return defaultValue;
+  }
+
+  String? _resolveValidationAction(Map<String, dynamic> options) {
+    final modelValue = options['mongoValidationAction']?.toString().trim();
+    if (modelValue != null && modelValue.isNotEmpty) {
+      return modelValue;
+    }
+    final defaultValue = defaultValidationAction?.trim();
+    if (defaultValue == null || defaultValue.isEmpty) {
+      return null;
+    }
+    return defaultValue;
+  }
+
+  Map<String, dynamic> _filterPersistableAttributes({
+    required String modelName,
+    required Map<String, dynamic> data,
+    required dynamic sequelize,
+    required dynamic model,
+  }) {
+    final metadata = _modelMetadataFor(
+      modelName: modelName,
+      sequelize: sequelize,
+      model: model,
+    );
+    if (metadata == null) {
+      return Map<String, dynamic>.from(data);
+    }
+    final attributesRaw = metadata['attributes'];
+    if (attributesRaw is! Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    final attributeKeys = attributesRaw.keys.map((e) => e.toString()).toSet();
+    if (attributeKeys.isEmpty) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    final filtered = <String, dynamic>{};
+    for (final entry in data.entries) {
+      if (attributeKeys.contains(entry.key)) {
+        filtered[entry.key] = entry.value;
+      }
+    }
+    return filtered;
+  }
+
   Map<String, dynamic> _primaryWhereFromDocument(Map<String, dynamic> doc) {
     if (doc.containsKey('_id')) {
       return {'_id': doc['_id']};
@@ -713,7 +1267,20 @@ class MongoQueryEngine extends QueryEngineInterface
     Transaction? transaction,
   }) async {
     try {
-      final replacement = Map<String, dynamic>.from(currentData);
+      final replacement = _filterPersistableAttributes(
+        modelName: modelName,
+        data: currentData,
+        sequelize: sequelize,
+        model: model,
+      );
+      final filteredPrevious = previousData == null
+          ? null
+          : _filterPersistableAttributes(
+              modelName: modelName,
+              data: previousData,
+              sequelize: sequelize,
+              model: model,
+            );
       final saved = await _collection(modelName).replaceOne(
         where: Map<String, dynamic>.from(primaryKeyValues),
         replacement: replacement,
@@ -726,6 +1293,7 @@ class MongoQueryEngine extends QueryEngineInterface
           'collection': modelName,
           'where': primaryKeyValues,
           'replacement': replacement,
+          if (filteredPrevious != null) 'previous': filteredPrevious,
           'upsert': true,
         },
       );
@@ -972,6 +1540,91 @@ class MongoQueryEngine extends QueryEngineInterface
         error: error,
         stackTrace: stackTrace,
         context: 'Exception: failed to execute destroy()',
+      );
+    }
+  }
+
+  Future<List<ModelInstanceData>> findDocumentsNotMatchingSchema({
+    required String modelName,
+    Map<String, dynamic>? where,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
+  }) async {
+    try {
+      final metadata = _modelMetadataFor(
+        modelName: modelName,
+        sequelize: sequelize,
+        model: model,
+      );
+      final schema = _jsonSchemaFromMetadata(metadata);
+      if (schema.isEmpty) {
+        return const <ModelInstanceData>[];
+      }
+      final mismatchWhere = _buildSchemaMismatchWhere(schema);
+      final merged = where == null || where.isEmpty
+          ? mismatchWhere
+          : _mergeAnd(where, mismatchWhere);
+      final translatedWhere = _operatorTranslator.translateWhere(merged);
+      final docs = await _collection(modelName).find(where: translatedWhere);
+      _logMongoQuery(
+        operation: 'findDocumentsNotMatchingSchema',
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'where': translatedWhere,
+        },
+      );
+      return docs.map((doc) => ModelInstanceData(data: doc)).toList();
+    } catch (error, stackTrace) {
+      throw _wrapError(
+        error: error,
+        stackTrace: stackTrace,
+        context: 'Exception: failed to find documents not matching schema',
+      );
+    }
+  }
+
+  Future<int> deleteDocumentsNotMatchingSchema({
+    required String modelName,
+    Map<String, dynamic>? where,
+    dynamic sequelize,
+    dynamic model,
+    Transaction? transaction,
+  }) async {
+    try {
+      final metadata = _modelMetadataFor(
+        modelName: modelName,
+        sequelize: sequelize,
+        model: model,
+      );
+      final schema = _jsonSchemaFromMetadata(metadata);
+      if (schema.isEmpty) {
+        return 0;
+      }
+      final mismatchWhere = _buildSchemaMismatchWhere(schema);
+      final merged = where == null || where.isEmpty
+          ? mismatchWhere
+          : _mergeAnd(where, mismatchWhere);
+      final translatedWhere = _operatorTranslator.translateWhere(merged);
+      final deleted = await _collection(modelName).deleteMany(
+        where: translatedWhere,
+      );
+      _logMongoQuery(
+        operation: 'deleteDocumentsNotMatchingSchema',
+        sequelize: sequelize,
+        payload: {
+          'collection': modelName,
+          'where': translatedWhere,
+          'deleted': deleted,
+        },
+      );
+      return deleted;
+    } catch (error, stackTrace) {
+      throw _wrapError(
+        error: error,
+        stackTrace: stackTrace,
+        context: 'Exception: failed to delete documents not matching schema',
       );
     }
   }
