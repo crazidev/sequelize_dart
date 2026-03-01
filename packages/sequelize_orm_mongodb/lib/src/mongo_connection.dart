@@ -113,7 +113,14 @@ class MongoDartCollectionAdapter implements MongoCollectionAdapter {
   Future<List<Map<String, dynamic>>> aggregate(
     List<Map<String, dynamic>> pipeline,
   ) async {
-    final dynamic stream = _collection.aggregateToStream(pipeline);
+    final List<Map<String, Object>> mongoPipeline = pipeline
+        .map(
+          (stage) => stage.map<String, Object>(
+            (key, value) => MapEntry(key, value as Object),
+          ),
+        )
+        .toList(growable: false);
+    final dynamic stream = _collection.aggregateToStream(mongoPipeline);
     final dynamic docs = await stream.toList();
     return _asDocList(docs);
   }
@@ -213,7 +220,8 @@ class MongoDartCollectionAdapter implements MongoCollectionAdapter {
   Future<Map<String, dynamic>> insertOne(Map<String, dynamic> document) async {
     final doc = Map<String, dynamic>.from(document);
     final dynamic response = await _collection.insertOne(doc);
-    final dynamic id = response?['id'] ?? response?['insertedId'];
+    final dynamic id = _extractValue(response, ['id', 'insertedId', 'oid']) ??
+        _extractValue(doc, ['_id', 'id']);
     if (id != null && !doc.containsKey('_id')) {
       doc['_id'] = id;
     }
@@ -270,16 +278,89 @@ class MongoDartCollectionAdapter implements MongoCollectionAdapter {
   }
 
   int _extractCount(dynamic response, List<String> keys) {
-    if (response is Map) {
+    for (final key in keys) {
+      final value = _extractValue(response, [key]);
+      if (value != null) {
+        return _asInt(value);
+      }
+    }
+
+    final directValue = _extractValue(response, const ['ok', 'isSuccess']);
+    if (directValue is bool && directValue) {
+      return 1;
+    }
+
+    return 0;
+  }
+
+  dynamic _extractValue(dynamic source, List<String> keys) {
+    if (source == null) {
+      return null;
+    }
+
+    if (source is Map) {
       for (final key in keys) {
-        if (response.containsKey(key)) {
-          return _asInt(response[key]);
+        if (source.containsKey(key)) {
+          return source[key];
         }
       }
     }
-    if (response is int) {
-      return response;
+
+    for (final key in keys) {
+      switch (key) {
+        case 'id':
+          try {
+            return source.id;
+          } catch (_) {}
+          break;
+        case 'insertedId':
+          try {
+            return source.insertedId;
+          } catch (_) {}
+          break;
+        case 'oid':
+          try {
+            return source.oid;
+          } catch (_) {}
+          break;
+        case 'n':
+          try {
+            return source.n;
+          } catch (_) {}
+          break;
+        case 'nRemoved':
+          try {
+            return source.nRemoved;
+          } catch (_) {}
+          break;
+        case 'nModified':
+          try {
+            return source.nModified;
+          } catch (_) {}
+          break;
+        case 'deletedCount':
+          try {
+            return source.deletedCount;
+          } catch (_) {}
+          break;
+        case 'modifiedCount':
+          try {
+            return source.modifiedCount;
+          } catch (_) {}
+          break;
+        case 'ok':
+          try {
+            return source.ok;
+          } catch (_) {}
+          break;
+        case 'isSuccess':
+          try {
+            return source.isSuccess;
+          } catch (_) {}
+          break;
+      }
     }
-    return 0;
+
+    return null;
   }
 }

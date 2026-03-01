@@ -16,6 +16,9 @@ final sequelize = Sequelize().createInstance(
 
 /// Main entry point - handles database setup and initialization
 Future<void> main() async {
+  // MongoDB example is available at:
+  //   dart run lib/main_mongo.dart
+
   // Create and configure Sequelize instance
 
   await sequelize.initialize(
