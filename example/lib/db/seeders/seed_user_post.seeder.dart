@@ -15,7 +15,7 @@ class SeedUserPost extends SequelizeSeeding<CreatePost> {
   @override
   List<CreatePost> get seedData => [
         ...List.generate(
-          100,
+          10,
           (index) => CreatePost(
             title: 'Seeded post $index',
             content: 'Created by SeedUserPost',

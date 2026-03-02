@@ -8,6 +8,8 @@ class FakeMongoDatabaseAdapter implements MongoDatabaseAdapter {
   Map<String, dynamic>? lastModifyCollectionCommand;
   String? lastDropCollectionName;
   List<Map<String, dynamic>> ensureUniqueIndexCalls = [];
+  final Map<String, int> _sequenceValues = <String, int>{};
+  final List<String> nextSequenceValueCalls = <String>[];
 
   @override
   Future<void> close() async {
@@ -80,6 +82,17 @@ class FakeMongoDatabaseAdapter implements MongoDatabaseAdapter {
       'collectionName': collectionName,
       'fields': List<String>.from(fields),
     });
+  }
+
+  @override
+  Future<int> nextSequenceValue({
+    required String sequenceName,
+  }) async {
+    nextSequenceValueCalls.add(sequenceName);
+    final current = _sequenceValues[sequenceName] ?? 0;
+    final next = current + 1;
+    _sequenceValues[sequenceName] = next;
+    return next;
   }
 
   FakeMongoCollectionAdapter collectionAsFake(String name) {

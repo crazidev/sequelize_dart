@@ -1,3 +1,4 @@
+import 'package:mongo_dart/mongo_dart.dart' as mongo;
 import 'package:sequelize_orm/sequelize_orm.dart';
 import 'package:sequelize_orm_mongodb/sequelize_orm_mongodb.dart';
 import 'package:test/test.dart';
@@ -122,6 +123,39 @@ void main() {
       expect(users.lastFindWhere, {
         r'$where': 'this.score >= 90',
       });
+    });
+
+    test('findOne coerces ObjectId where values from hex strings', () async {
+      final users = database.collectionAsFake('users');
+      users.findOneResult = {
+        '_id': '507f1f77bcf86cd799439011',
+        'email': 'alice@example.com',
+      };
+
+      await engine.findOne(
+        modelName: 'users',
+        query: Query(
+          where: ComparisonOperator(
+            column: '_id',
+            value: {r'$eq': '507f1f77bcf86cd799439011'},
+          ),
+        ),
+        model: {
+          'attributes': {
+            '_id': {'type': 'OBJECT_ID', 'primaryKey': true},
+            'email': {'type': 'STRING'},
+          },
+        },
+      );
+
+      final where = users.lastFindOneWhere!;
+      final idClause = where;
+      final eqValue = (idClause['_id'] as Map<String, dynamic>)[r'$eq'];
+      expect(eqValue, isA<mongo.ObjectId>());
+      expect(
+        (eqValue as mongo.ObjectId).toHexString(),
+        '507f1f77bcf86cd799439011',
+      );
     });
 
     test('destroy performs paranoid soft delete when force is false', () async {
@@ -267,6 +301,49 @@ void main() {
       expect(result.data['user'], isA<Map<String, dynamic>>());
     });
 
+    test('create uses atomic sequence for autoIncrement primary key', () async {
+      final users = database.collectionAsFake('users');
+
+      final first = await engine.create(
+        modelName: 'users',
+        data: {'name': 'First'},
+        model: {
+          'name': 'users',
+          'attributes': {
+            'id': {
+              'type': 'INTEGER',
+              'primaryKey': true,
+              'autoIncrement': true,
+              'allowNull': false,
+            },
+            'name': {'type': 'STRING'},
+          },
+        },
+      );
+
+      final second = await engine.create(
+        modelName: 'users',
+        data: {'name': 'Second'},
+        model: {
+          'name': 'users',
+          'attributes': {
+            'id': {
+              'type': 'INTEGER',
+              'primaryKey': true,
+              'autoIncrement': true,
+              'allowNull': false,
+            },
+            'name': {'type': 'STRING'},
+          },
+        },
+      );
+
+      expect(first.data['id'], 1);
+      expect(second.data['id'], 2);
+      expect(users.lastInsertOneDocument?['id'], 2);
+      expect(database.nextSequenceValueCalls, ['users.id', 'users.id']);
+    });
+
     test('findAll logs structured mongo query payload', () async {
       final users = database.collectionAsFake('users');
       users.findResult = [
@@ -287,7 +364,10 @@ void main() {
 
       expect(logger.messages, isNotEmpty);
       final log = logger.messages.last;
-      expect(log, predicate((value) => value.toString().startsWith('[mongo:findAll] ')));
+      expect(
+          log,
+          predicate(
+              (value) => value.toString().startsWith('[mongo:findAll] ')));
       expect(log, contains('"collection":"users"'));
       expect(log, contains(r'"where":{"status":{"$eq":"active"}}'));
     });
@@ -308,7 +388,10 @@ void main() {
       expect(count, 2);
       expect(logger.messages, isNotEmpty);
       final log = logger.messages.last;
-      expect(log, predicate((value) => value.toString().startsWith('[mongo:count.aggregate] ')));
+      expect(
+          log,
+          predicate((value) =>
+              value.toString().startsWith('[mongo:count.aggregate] ')));
       expect(log, contains('"pipeline"'));
       expect(log, contains(r'"$group"'));
     });
@@ -340,18 +423,21 @@ void main() {
         },
       );
 
-      expect(users.lastReplaceOneWhere, {'id': 1});
-      expect(users.lastReplaceOneReplacement, isNotNull);
-      expect(users.lastReplaceOneReplacement!['id'], 1);
-      expect(users.lastReplaceOneReplacement!['email'], 'alice@example.com');
+      expect(users.lastUpdateOneWhere, {'id': 1});
+      expect(users.lastUpdateOneUpdate, isNotNull);
+      final setPayload =
+          users.lastUpdateOneUpdate![r'$set'] as Map<String, dynamic>;
+      expect(setPayload['id'], 1);
+      expect(setPayload['email'], 'alice@example.com');
       expect(
-        users.lastReplaceOneReplacement!['last_name'],
+        setPayload['last_name'],
         'Updated Last Name',
       );
-      expect(users.lastReplaceOneReplacement, isNot(contains('post')));
+      expect(setPayload, isNot(contains('post')));
     });
 
-    test('syncModels alter updates collection validation via collMod', () async {
+    test('syncModels alter updates collection validation via collMod',
+        () async {
       database.existingCollections.add('users');
       final model = {
         'name': 'users',
@@ -565,7 +651,8 @@ void main() {
 
       // scores → bsonType: 'array', items: {bsonType: ['int','long']}
       expect(props['scores']['bsonType'], 'array');
-      expect(props['scores']['items']['bsonType'], containsAll(['int', 'long']));
+      expect(
+          props['scores']['items']['bsonType'], containsAll(['int', 'long']));
 
       // meta → bsonType: 'object' (Map dartType)
       expect(props['meta']['bsonType'], 'object');
@@ -602,8 +689,8 @@ void main() {
       final props = schema['properties'] as Map<String, dynamic>;
 
       // Nullable BIGINT → ['string', 'null']
-      expect(props['phone_number']['bsonType'],
-          containsAll(['string', 'null']));
+      expect(
+          props['phone_number']['bsonType'], containsAll(['string', 'null']));
       // Non-null BIGINT → 'string'
       expect(props['id']['bsonType'], 'string');
       // Regular INTEGER still maps to int/long
@@ -644,8 +731,8 @@ void main() {
       // NOT NULL → exact values, no null appended
       expect(props['state']['enum'], equals(['pending', 'shipped']));
       // nullable → null appended
-      expect(
-          props['optState']['enum'], containsAllInOrder(['pending', 'shipped', null]));
+      expect(props['optState']['enum'],
+          containsAllInOrder(['pending', 'shipped', null]));
     });
 
     test('syncModels force drops and recreates collection with validation',
@@ -698,7 +785,8 @@ void main() {
       expect(andClauses.last, contains(r'$nor'));
     });
 
-    test('deleteDocumentsNotMatchingSchema uses \$nor + \$jsonSchema', () async {
+    test('deleteDocumentsNotMatchingSchema uses \$nor + \$jsonSchema',
+        () async {
       final users = database.collectionAsFake('users');
       users.deleteManyResult = 4;
 
@@ -716,7 +804,8 @@ void main() {
       expect(users.lastDeleteManyWhere, contains(r'$nor'));
     });
 
-    test('syncModels creates unique index on primary key when creating new collection',
+    test(
+        'syncModels creates unique index on primary key when creating new collection',
         () async {
       final model = {
         'name': 'users',
@@ -739,7 +828,8 @@ void main() {
       expect(database.ensureUniqueIndexCalls.first['fields'], equals(['id']));
     });
 
-    test('syncModels creates unique index on primary key when force-recreating collection',
+    test(
+        'syncModels creates unique index on primary key when force-recreating collection',
         () async {
       database.existingCollections.add('users');
       final model = {
@@ -764,7 +854,8 @@ void main() {
       expect(database.ensureUniqueIndexCalls.first['fields'], equals(['id']));
     });
 
-    test('syncModels ensures unique index on primary key when altering existing collection',
+    test(
+        'syncModels ensures unique index on primary key when altering existing collection',
         () async {
       database.existingCollections.add('users');
       final model = {
@@ -788,6 +879,27 @@ void main() {
       expect(database.ensureUniqueIndexCalls.first['fields'], equals(['id']));
     });
 
+    test('syncModels skips explicit unique index for _id primary key',
+        () async {
+      final model = {
+        'name': 'users',
+        'attributes': {
+          '_id': {'type': 'OBJECT_ID', 'primaryKey': true, 'allowNull': false},
+          'email': {'type': 'STRING', 'allowNull': false},
+        },
+      };
+
+      await engine.syncModels(
+        force: false,
+        alter: false,
+        sequelize: null,
+        models: [model],
+      );
+
+      expect(database.lastCreateCollectionCommand, isNotNull);
+      expect(database.ensureUniqueIndexCalls, isEmpty);
+    });
+
     test('syncModels skips unique index when no primary key field is defined',
         () async {
       final model = {
@@ -808,7 +920,8 @@ void main() {
       expect(database.ensureUniqueIndexCalls, isEmpty);
     });
 
-    test('syncModels does not create unique index when collection exists and no alter/force',
+    test(
+        'syncModels does not create unique index when collection exists and no alter/force',
         () async {
       database.existingCollections.add('users');
       final model = {

@@ -48,6 +48,8 @@ abstract class DataType {
   static const StandardDataType DATE = StandardDataType._('DATE');
   static const StandardDataType DATEONLY = StandardDataType._('DATEONLY');
   static const StandardDataType UUID = StandardDataType._('UUID');
+  static const StandardDataType OBJECT_ID = StandardDataType._('OBJECT_ID');
+  static const StandardDataType OBJECTID = StandardDataType._('OBJECTID');
   // --- Enum Types ---
   static const EnumDataType ENUM = EnumDataType._('ENUM');
   // --- JSON Types ---

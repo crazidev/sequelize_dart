@@ -123,7 +123,7 @@ void _generateInstanceMethods(
     );
     buffer.writeln('    // Get current data from instance (before any reload)');
     buffer.writeln('    // This preserves user modifications');
-    buffer.writeln('    final currentData = toJson();');
+    buffer.writeln('    final currentData = toRawJson();');
     buffer.writeln();
     buffer.writeln('    // Get primary key values');
     buffer.writeln(
@@ -241,7 +241,7 @@ void _generateInstanceMethods(
     buffer.writeln('    _updateFields(updatedInstance);');
     buffer.writeln();
     buffer.writeln('    // Update previous data snapshot');
-    buffer.writeln('    setPreviousDataValues(toJson());');
+    buffer.writeln('    setPreviousDataValues(toRawJson());');
     buffer.writeln();
     buffer.writeln('    return 1; // save() always returns 1 if successful');
     buffer.writeln('  }');

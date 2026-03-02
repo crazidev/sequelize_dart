@@ -7,16 +7,16 @@ import 'package:sequelize_orm_example/db/db.dart';
 Future<void> runQueries() async {
   final users = await Db.users.findOne(
     where: (c) => and([
-      // c.id.eq(1),
+      c.id.eq(1),
       // c.metadata.key('isAdmin').eq(true),
     ]),
-    // include: (includeUsers) => [
-    //   includeUsers.post(
-    //     include: (i) => [
-    //       i.postDetails(),
-    //     ],
-    //   ),
-    // ],
+    include: (includeUsers) => [
+      includeUsers.post(
+        include: (i) => [
+          i.postDetails(),
+        ],
+      ),
+    ],
   );
 
   users?.lastName = 'Updated Last Name';

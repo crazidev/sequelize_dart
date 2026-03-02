@@ -68,3 +68,36 @@
 
 - Validation command used frequently:
   - `dart run tools/run.dart test --mongo --mongo-url=mongodb://localhost:27017`
+
+## 2026-03-02 - Pending Commit Snapshot
+
+- ObjectId handling and persistence safety
+  - Added Mongo ObjectId datatype support in core datatype definitions.
+  - Normalized ObjectId coercion for Mongo query/write paths so `_id` and ObjectId FK fields are written/read as BSON ObjectId where required.
+  - Added parse-helper fallback coercion so generated String fields can read ObjectId-like runtime values safely.
+
+- Mongo sync and PK behavior
+  - Skips redundant explicit unique-index creation when PK is `_id` (Mongo already has a default unique index).
+  - Replaced max+1 autoincrement behavior with atomic counter-based sequence allocation to avoid duplicate key races.
+
+- Generator/value-object serialization split
+  - Generated values classes now separate DB-key payloads (`toRawJson`) from Dart-field projections (`toJson`) for better DX and logging readability.
+  - `toString()` now renders field-name values (e.g. `firstName`) instead of DB column keys (`first_name`).
+
+- Files touched in this commit batch
+  - `packages/sequelize_orm/lib/src/annotations/datatype.dart`
+  - `packages/sequelize_orm/lib/src/utils/parse_helpers.dart`
+  - `packages/sequelize_orm/js/src/utils/dataTypeConverter.ts`
+  - `packages/sequelize_orm_generator/lib/src/generators/methods/_generate_class_values.dart`
+  - `packages/sequelize_orm_generator/lib/src/generators/methods/_generate_create_method.dart`
+  - `packages/sequelize_orm_generator/lib/src/generators/methods/_generate_find_all_method.dart`
+  - `packages/sequelize_orm_generator/lib/src/generators/methods/_generate_find_one_method.dart`
+  - `packages/sequelize_orm_generator/lib/src/generators/methods/_generate_instance_methods.dart`
+  - `packages/sequelize_orm_generator/lib/src/generators/methods/_generate_where_method.dart`
+  - `packages/sequelize_orm_mongodb/lib/src/mongo_adapter.dart`
+  - `packages/sequelize_orm_mongodb/lib/src/mongo_connection.dart`
+  - `packages/sequelize_orm_mongodb/lib/src/mongo_query_engine.dart`
+  - `packages/sequelize_orm_mongodb/test/fakes/fake_mongo_adapter.dart`
+  - `packages/sequelize_orm_mongodb/test/mongo_query_engine_test.dart`
+  - `example/lib/db/models/*.dart` and generated `*.g.dart` files updated to align with ObjectId model/serialization behavior
+  - `example/lib/main.dart`, `example/lib/queries.dart`, and seed/model examples adjusted for Mongo object-id flow

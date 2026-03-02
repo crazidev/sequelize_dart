@@ -2,8 +2,8 @@
 
 import 'dart:convert';
 
+import 'package:mongo_dart/mongo_dart.dart' as mongo;
 import 'package:sequelize_orm/sequelize_orm.dart';
-import 'package:sequelize_orm/src/query/query_engine/query_engine_interface.dart';
 import 'package:sequelize_orm_mongodb/src/mongo_adapter.dart';
 import 'package:sequelize_orm_mongodb/src/mongo_aggregation.dart';
 import 'package:sequelize_orm_mongodb/src/mongo_association.dart';
@@ -137,6 +137,10 @@ class MongoQueryEngine extends QueryEngineInterface
     List<String> primaryKeyFields,
   ) async {
     if (primaryKeyFields.isEmpty) return;
+    // MongoDB always provides a unique index on `_id`; avoid redundant creation.
+    if (primaryKeyFields.length == 1 && primaryKeyFields.first == '_id') {
+      return;
+    }
     await _database.ensureUniqueIndex(
       collectionName: modelName,
       fields: primaryKeyFields,
@@ -354,13 +358,15 @@ class MongoQueryEngine extends QueryEngineInterface
         associationName: associationName,
       );
       final nestedIncludes = _extractIncludes(include['include']);
-      final targetModel = _resolveModelFor(modelName: association.targetCollection, sequelize: sequelize);
+      final targetModel = _resolveModelFor(
+        modelName: association.targetCollection,
+        sequelize: sequelize,
+      );
 
       switch (association.associationType) {
         case MongoAssociationType.hasMany:
-          final listPayload = associationValue is List
-              ? associationValue
-              : [associationValue];
+          final listPayload =
+              associationValue is List ? associationValue : [associationValue];
           final createdChildren = <Map<String, dynamic>>[];
           final sourceKey = _sourceAssociationKey(
             association: association,
@@ -513,24 +519,9 @@ class MongoQueryEngine extends QueryEngineInterface
     if (!isAutoIncrement || !isIntegerLike) {
       return;
     }
-
-    final latest = await _collection(modelName).findOne(
-      sort: {pkName: -1},
-      projection: {pkName: 1},
+    payload[pkName] = await _database.nextSequenceValue(
+      sequenceName: '$modelName.$pkName',
     );
-    final latestValue = latest?[pkName];
-    var nextValue = 1;
-    if (latestValue is int) {
-      nextValue = latestValue + 1;
-    } else if (latestValue is num) {
-      nextValue = latestValue.toInt() + 1;
-    } else if (latestValue is String) {
-      final parsed = int.tryParse(latestValue);
-      if (parsed != null) {
-        nextValue = parsed + 1;
-      }
-    }
-    payload[pkName] = nextValue;
   }
 
   Map<String, dynamic>? _modelMetadataFor({
@@ -541,7 +532,8 @@ class MongoQueryEngine extends QueryEngineInterface
     if (model is Map && model['attributes'] is Map) {
       return Map<String, dynamic>.from(model);
     }
-    final resolved = _resolveModelFor(modelName: modelName, sequelize: sequelize);
+    final resolved =
+        _resolveModelFor(modelName: modelName, sequelize: sequelize);
     if (resolved is Map) {
       return Map<String, dynamic>.from(resolved);
     }
@@ -767,6 +759,8 @@ class MongoQueryEngine extends QueryEngineInterface
       // SequelizeBigInt.toJson() always serialises to a String to avoid
       // JS/MongoDB precision loss for values beyond Number.MAX_SAFE_INTEGER.
       baseType = 'string';
+    } else if (typeName == 'OBJECT_ID' || typeName == 'OBJECTID') {
+      baseType = 'objectId';
     } else if (typeName.contains('INT')) {
       baseType = <String>['int', 'long'];
     } else if (typeName.contains('FLOAT') ||
@@ -1273,6 +1267,10 @@ class MongoQueryEngine extends QueryEngineInterface
         sequelize: sequelize,
         model: model,
       );
+      final replacementForWrite = _coerceObjectIdDocumentForModel(
+        doc: replacement,
+        model: model,
+      );
       final filteredPrevious = previousData == null
           ? null
           : _filterPersistableAttributes(
@@ -1284,10 +1282,14 @@ class MongoQueryEngine extends QueryEngineInterface
       final where = Map<String, dynamic>.fromEntries(
         primaryKeyValues.entries.where((entry) => entry.value != null),
       );
+      final whereForWrite = _coerceObjectIdWhereForModel(
+        where: where,
+        model: model,
+      );
 
       late final Map<String, dynamic> saved;
       if (where.isEmpty) {
-        final insertPayload = Map<String, dynamic>.from(replacement);
+        final insertPayload = Map<String, dynamic>.from(replacementForWrite);
         await _assignAutoIncrementPrimaryKeyIfNeeded(
           modelName: modelName,
           payload: insertPayload,
@@ -1297,25 +1299,24 @@ class MongoQueryEngine extends QueryEngineInterface
         saved = await _collection(modelName).insertOne(insertPayload);
       } else {
         await _collection(modelName).updateOne(
-          where: where,
+          where: whereForWrite,
           update: {
-            r'$set': replacement,
+            r'$set': replacementForWrite,
           },
         );
-        saved =
-            await _collection(modelName).findOne(where: where) ??
-            <String, dynamic>{...where, ...replacement};
+        saved = await _collection(modelName).findOne(where: whereForWrite) ??
+            <String, dynamic>{...whereForWrite, ...replacementForWrite};
       }
       _logMongoQuery(
         operation: 'save',
         sequelize: sequelize,
         payload: {
           'collection': modelName,
-          'where': where,
-          if (where.isEmpty) 'data': replacement,
-          if (where.isNotEmpty) 'set': replacement,
+          'where': whereForWrite,
+          if (whereForWrite.isEmpty) 'data': replacementForWrite,
+          if (whereForWrite.isNotEmpty) 'set': replacementForWrite,
           if (filteredPrevious != null) 'previous': filteredPrevious,
-          'mode': where.isEmpty ? 'insert' : 'update',
+          'mode': whereForWrite.isEmpty ? 'insert' : 'update',
         },
       );
       return ModelInstanceData(data: saved);
@@ -1350,9 +1351,11 @@ class MongoQueryEngine extends QueryEngineInterface
         );
       }
 
-      final source = await _collection(sourceModel).findOne(
+      final sourceWhere = _coerceObjectIdWhereForModel(
         where: Map<String, dynamic>.from(primaryKeyValues),
+        model: model,
       );
+      final source = await _collection(sourceModel).findOne(where: sourceWhere);
       if (source == null) {
         return null;
       }
@@ -1366,7 +1369,14 @@ class MongoQueryEngine extends QueryEngineInterface
         association.targetCollection,
       ).findOne(
         where: {
-          association.foreignField: foreignKeyValue,
+          association.foreignField: _coerceFieldObjectIdValueByName(
+            fieldName: association.foreignField,
+            value: foreignKeyValue,
+            model: _resolveModelFor(
+              modelName: association.targetCollection,
+              sequelize: sequelize,
+            ),
+          ),
         },
       );
       if (target == null) {
@@ -1418,11 +1428,20 @@ class MongoQueryEngine extends QueryEngineInterface
         preferredField: association.foreignField,
       );
 
-      await _collection(sourceModel).updateOne(
+      final where = _coerceObjectIdWhereForModel(
         where: Map<String, dynamic>.from(primaryKeyValues),
+        model: model,
+      );
+      final targetKeyForWrite = _coerceFieldObjectIdValueByName(
+        fieldName: association.localField,
+        value: targetKey,
+        model: model,
+      );
+      await _collection(sourceModel).updateOne(
+        where: where,
         update: {
           r'$set': {
-            association.localField: targetKey,
+            association.localField: targetKeyForWrite,
           },
         },
       );
@@ -1432,9 +1451,9 @@ class MongoQueryEngine extends QueryEngineInterface
         payload: {
           'sourceModel': sourceModel,
           'association': associationName,
-          'where': primaryKeyValues,
+          'where': where,
           'update': {
-            association.localField: targetKey,
+            association.localField: targetKeyForWrite,
           },
         },
       );
@@ -1463,19 +1482,35 @@ class MongoQueryEngine extends QueryEngineInterface
         sourceModel: sourceModel,
         associationName: associationName,
       );
+      final targetModel = _resolveModelFor(
+        modelName: association.targetCollection,
+        sequelize: sequelize,
+      );
       final created = await _collection(association.targetCollection).insertOne(
-        Map<String, dynamic>.from(data),
+        _coerceObjectIdDocumentForModel(
+          doc: Map<String, dynamic>.from(data),
+          model: targetModel,
+        ),
       );
 
       final targetKey = _extractTargetKey(
         created,
         preferredField: association.foreignField,
       );
-      await _collection(sourceModel).updateOne(
+      final where = _coerceObjectIdWhereForModel(
         where: Map<String, dynamic>.from(primaryKeyValues),
+        model: model,
+      );
+      final targetKeyForWrite = _coerceFieldObjectIdValueByName(
+        fieldName: association.localField,
+        value: targetKey,
+        model: model,
+      );
+      await _collection(sourceModel).updateOne(
+        where: where,
         update: {
           r'$set': {
-            association.localField: targetKey,
+            association.localField: targetKeyForWrite,
           },
         },
       );
@@ -1487,8 +1522,8 @@ class MongoQueryEngine extends QueryEngineInterface
           'association': associationName,
           'targetCollection': association.targetCollection,
           'data': data,
-          'sourceWhere': primaryKeyValues,
-          'set': {association.localField: targetKey},
+          'sourceWhere': where,
+          'set': {association.localField: targetKeyForWrite},
         },
       );
 
@@ -1511,7 +1546,7 @@ class MongoQueryEngine extends QueryEngineInterface
     Transaction? transaction,
   }) async {
     try {
-      final where = _translateOptionsWhere(options);
+      final where = _translateOptionsWhere(options, model: model);
       final collection = _collection(modelName);
       final force = options?['force'] == true;
       final paranoid = _isParanoidModel(model);
@@ -1687,7 +1722,7 @@ class MongoQueryEngine extends QueryEngineInterface
     try {
       final deletedField = _paranoidField(model);
       final where = _mergeAnd(
-        _translateOptionsWhere(options),
+        _translateOptionsWhere(options, model: model),
         {
           deletedField: {r'$ne': null},
         },
@@ -1734,7 +1769,10 @@ class MongoQueryEngine extends QueryEngineInterface
       if (paranoid && !force) {
         final deletedField = _paranoidField(model);
         await _collection(modelName).updateOne(
-          where: Map<String, dynamic>.from(primaryKeyValues),
+          where: _coerceObjectIdWhereForModel(
+            where: Map<String, dynamic>.from(primaryKeyValues),
+            model: model,
+          ),
           update: {
             r'$set': {
               deletedField: DateTime.now().toUtc().toIso8601String(),
@@ -1752,7 +1790,10 @@ class MongoQueryEngine extends QueryEngineInterface
         );
       } else {
         await _collection(modelName).deleteOne(
-          where: Map<String, dynamic>.from(primaryKeyValues),
+          where: _coerceObjectIdWhereForModel(
+            where: Map<String, dynamic>.from(primaryKeyValues),
+            model: model,
+          ),
         );
         _logMongoQuery(
           operation: 'instanceDestroy',
@@ -1784,7 +1825,10 @@ class MongoQueryEngine extends QueryEngineInterface
     try {
       final deletedField = _paranoidField(model);
       await _collection(modelName).updateOne(
-        where: Map<String, dynamic>.from(primaryKeyValues),
+        where: _coerceObjectIdWhereForModel(
+          where: Map<String, dynamic>.from(primaryKeyValues),
+          model: model,
+        ),
         update: {
           r'$unset': {
             deletedField: '',
@@ -1971,15 +2015,29 @@ class MongoQueryEngine extends QueryEngineInterface
         primaryKeyValues: primaryKeyValues,
       );
       final targetCollection = _collection(association.targetCollection);
+      final targetModelResolved = _resolveModelFor(
+        modelName: association.targetCollection,
+        sequelize: sequelize,
+      );
+      final sourceKeyForWrite = _coerceFieldObjectIdValueByName(
+        fieldName: association.foreignField,
+        value: sourceKey,
+        model: targetModelResolved,
+      );
 
       for (final targetKey in targetKeys) {
+        final targetKeyForWrite = _coerceFieldObjectIdValueByName(
+          fieldName: '_id',
+          value: targetKey,
+          model: targetModelResolved,
+        );
         await targetCollection.updateOne(
           where: {
-            '_id': targetKey,
+            '_id': targetKeyForWrite,
           },
           update: {
             r'$set': {
-              association.foreignField: sourceKey,
+              association.foreignField: sourceKeyForWrite,
             },
           },
         );
@@ -1992,7 +2050,7 @@ class MongoQueryEngine extends QueryEngineInterface
           'association': associationName,
           'targetCollection': association.targetCollection,
           'targetKeys': targetKeys,
-          'set': {association.foreignField: sourceKey},
+          'set': {association.foreignField: sourceKeyForWrite},
         },
       );
     } catch (error, stackTrace) {
@@ -2022,7 +2080,10 @@ class MongoQueryEngine extends QueryEngineInterface
       );
       if (association.associationType == MongoAssociationType.belongsTo) {
         await _collection(sourceModel).updateOne(
-          where: Map<String, dynamic>.from(primaryKeyValues),
+          where: _coerceObjectIdWhereForModel(
+            where: Map<String, dynamic>.from(primaryKeyValues),
+            model: model,
+          ),
           update: {
             r'$unset': {
               association.localField: '',
@@ -2047,10 +2108,19 @@ class MongoQueryEngine extends QueryEngineInterface
         preferredField: '_id',
       );
       final targetCollection = _collection(association.targetCollection);
+      final targetModelResolved = _resolveModelFor(
+        modelName: association.targetCollection,
+        sequelize: sequelize,
+      );
       for (final targetKey in targetKeys) {
+        final targetKeyForWrite = _coerceFieldObjectIdValueByName(
+          fieldName: '_id',
+          value: targetKey,
+          model: targetModelResolved,
+        );
         await targetCollection.updateOne(
           where: {
-            '_id': targetKey,
+            '_id': targetKeyForWrite,
           },
           update: {
             r'$unset': {
@@ -2413,10 +2483,14 @@ class MongoQueryEngine extends QueryEngineInterface
     }
 
     final translatedWhere = _operatorTranslator.translateWhere(where);
+    final coercedWhere = _coerceObjectIdWhereForModel(
+      where: translatedWhere,
+      model: model,
+    );
     final includes = _extractIncludes(json['include']);
 
     return _MongoQueryPlan(
-      where: translatedWhere,
+      where: coercedWhere,
       includes: includes,
       sort: MongoAggregationBuilder.parseSort(json['order']),
       projection: MongoAggregationBuilder.parseProjection(json['attributes']),
@@ -2434,10 +2508,9 @@ class MongoQueryEngine extends QueryEngineInterface
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .where((item) {
-          final association = item['association']?.toString();
-          return association != null && association.isNotEmpty;
-        })
-        .toList();
+      final association = item['association']?.toString();
+      return association != null && association.isNotEmpty;
+    }).toList();
   }
 
   List<Map<String, dynamic>> _inferIncludesFromData({
@@ -2469,7 +2542,10 @@ class MongoQueryEngine extends QueryEngineInterface
     return includes;
   }
 
-  Map<String, dynamic> _translateOptionsWhere(Map<String, dynamic>? options) {
+  Map<String, dynamic> _translateOptionsWhere(
+    Map<String, dynamic>? options, {
+    dynamic model,
+  }) {
     if (options == null) {
       return <String, dynamic>{};
     }
@@ -2477,8 +2553,143 @@ class MongoQueryEngine extends QueryEngineInterface
     if (rawWhere is! Map) {
       return <String, dynamic>{};
     }
-    return _operatorTranslator
-        .translateWhere(Map<String, dynamic>.from(rawWhere));
+    final translated =
+        _operatorTranslator.translateWhere(Map<String, dynamic>.from(rawWhere));
+    return _coerceObjectIdWhereForModel(where: translated, model: model);
+  }
+
+  Map<String, dynamic> _coerceObjectIdWhereForModel({
+    required Map<String, dynamic> where,
+    required dynamic model,
+  }) {
+    if (where.isEmpty) {
+      return where;
+    }
+    final objectIdFields = _objectIdFieldsForModel(model)..add('_id');
+    return _coerceObjectIdWhereValue(where, objectIdFields)
+        as Map<String, dynamic>;
+  }
+
+  Set<String> _objectIdFieldsForModel(dynamic model) {
+    Map<String, dynamic>? attributes;
+    if (model is Map) {
+      final raw = model['attributes'];
+      if (raw is Map) {
+        attributes = raw.map(
+          (key, value) => MapEntry(
+            key.toString(),
+            value is Map
+                ? Map<String, dynamic>.from(value)
+                : <String, dynamic>{},
+          ),
+        );
+      }
+    } else if (model != null) {
+      try {
+        final dynamic raw = model.$getAttributesJson();
+        if (raw is Map) {
+          attributes = raw.map(
+            (key, value) => MapEntry(
+              key.toString(),
+              value is Map
+                  ? Map<String, dynamic>.from(value)
+                  : <String, dynamic>{},
+            ),
+          );
+        }
+      } catch (_) {}
+    }
+    if (attributes == null || attributes.isEmpty) {
+      return <String>{};
+    }
+
+    final fields = <String>{};
+    for (final entry in attributes.entries) {
+      final attr = entry.value;
+      final typeName = attr['type']?.toString().toUpperCase() ?? '';
+      if (typeName != 'OBJECT_ID' && typeName != 'OBJECTID') {
+        continue;
+      }
+      fields.add(entry.key);
+      final columnName = attr['columnName']?.toString();
+      if (columnName != null && columnName.isNotEmpty) {
+        fields.add(columnName);
+      }
+    }
+    return fields;
+  }
+
+  dynamic _coerceObjectIdWhereValue(dynamic value, Set<String> objectIdFields) {
+    if (value is List) {
+      return value
+          .map((item) => _coerceObjectIdWhereValue(item, objectIdFields))
+          .toList(growable: false);
+    }
+    if (value is! Map) {
+      return value;
+    }
+
+    final map = Map<String, dynamic>.from(value);
+    final result = <String, dynamic>{};
+    for (final entry in map.entries) {
+      final key = entry.key;
+      final nestedValue = entry.value;
+      if (key.startsWith(r'$')) {
+        result[key] = _coerceObjectIdWhereValue(nestedValue, objectIdFields);
+        continue;
+      }
+      if (!objectIdFields.contains(key)) {
+        result[key] = _coerceObjectIdWhereValue(nestedValue, objectIdFields);
+        continue;
+      }
+      result[key] = _coerceFieldObjectIdValue(nestedValue);
+    }
+    return result;
+  }
+
+  dynamic _coerceFieldObjectIdValue(dynamic value) {
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+      return map.map(
+        (key, nested) =>
+            MapEntry(key.toString(), _coerceFieldObjectIdValue(nested)),
+      );
+    }
+    if (value is List) {
+      return value.map(_coerceFieldObjectIdValue).toList(growable: false);
+    }
+    if (value is String && RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(value)) {
+      try {
+        return mongo.ObjectId.fromHexString(value);
+      } catch (_) {
+        return value;
+      }
+    }
+    return value;
+  }
+
+  Map<String, dynamic> _coerceObjectIdDocumentForModel({
+    required Map<String, dynamic> doc,
+    required dynamic model,
+  }) {
+    final objectIdFields = _objectIdFieldsForModel(model)..add('_id');
+    if (objectIdFields.isEmpty) {
+      return doc;
+    }
+    return _coerceObjectIdWhereValue(doc, objectIdFields)
+        as Map<String, dynamic>;
+  }
+
+  dynamic _coerceFieldObjectIdValueByName({
+    required String fieldName,
+    required dynamic value,
+    required dynamic model,
+  }) {
+    final objectIdFields = _objectIdFieldsForModel(model)..add('_id');
+    if (!objectIdFields.contains(fieldName)) {
+      return value;
+    }
+    return _coerceFieldObjectIdValue(value);
   }
 
   MongoAssociationDefinition _resolveAssociation({
@@ -2648,7 +2859,9 @@ class MongoQueryEngine extends QueryEngineInterface
         attributes = raw.map(
           (key, value) => MapEntry(
             key.toString(),
-            value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{},
+            value is Map
+                ? Map<String, dynamic>.from(value)
+                : <String, dynamic>{},
           ),
         );
       }
@@ -2784,10 +2997,7 @@ class MongoQueryEngine extends QueryEngineInterface
   }
 
   dynamic _jsonSafe(dynamic value) {
-    if (value == null ||
-        value is String ||
-        value is num ||
-        value is bool) {
+    if (value == null || value is String || value is num || value is bool) {
       return value;
     }
     if (value is DateTime) {

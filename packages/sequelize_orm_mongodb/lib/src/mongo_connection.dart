@@ -218,6 +218,46 @@ class MongoDartDatabaseAdapter implements MongoDatabaseAdapter {
     }
   }
 
+  @override
+  Future<int> nextSequenceValue({
+    required String sequenceName,
+  }) async {
+    try {
+      final response = await _runDbCommand({
+        'findAndModify': '_sequelize_orm_counters',
+        'query': {'_id': sequenceName},
+        'update': {
+          r'$inc': {'seq': 1},
+        },
+        'upsert': true,
+        'new': true,
+      });
+      final value = response['value'];
+      if (value is Map) {
+        final seq = value['seq'];
+        if (seq is int) {
+          return seq;
+        }
+        if (seq is num) {
+          return seq.toInt();
+        }
+      }
+      throw MongoConnectionException(
+        'Failed to resolve sequence value for "$sequenceName": $response',
+        context: 'MongoConnection.nextSequenceValue',
+      );
+    } catch (error, stackTrace) {
+      if (error is MongoConnectionException) {
+        rethrow;
+      }
+      throw MongoConnectionException(
+        'Failed to increment sequence "$sequenceName": $error',
+        context: 'MongoConnection.nextSequenceValue',
+        stack: stackTrace.toString(),
+      );
+    }
+  }
+
   String _connectionUri(MongoConnectionConfig cfg) {
     try {
       final uri = Uri.parse(cfg.url);
@@ -236,7 +276,8 @@ class MongoDartDatabaseAdapter implements MongoDatabaseAdapter {
     }
   }
 
-  Future<Map<String, dynamic>> _runDbCommand(Map<String, dynamic> command) async {
+  Future<Map<String, dynamic>> _runDbCommand(
+      Map<String, dynamic> command) async {
     if (_db == null || !_connected) {
       throw MongoConnectionException(
         'MongoDB connection is not open.',
@@ -244,7 +285,8 @@ class MongoDartDatabaseAdapter implements MongoDatabaseAdapter {
       );
     }
     final normalizedCommand = _normalizeCommand(command);
-    final dynamic response = await (_db as dynamic).runCommand(normalizedCommand);
+    final dynamic response =
+        await (_db as dynamic).runCommand(normalizedCommand);
     if (response is Map) {
       final map = Map<String, dynamic>.from(response);
       final ok = map['ok'];

@@ -29,6 +29,10 @@ abstract class MongoDatabaseAdapter {
     required String collectionName,
     required List<String> fields,
   });
+
+  Future<int> nextSequenceValue({
+    required String sequenceName,
+  });
 }
 
 abstract class MongoCollectionAdapter {

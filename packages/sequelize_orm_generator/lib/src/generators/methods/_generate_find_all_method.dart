@@ -57,7 +57,8 @@ void _generateFindAllMethod(
     '        final instance = $valuesClassName.fromJson(result.data, operation: \'findAll\', rowIndex: rowIndex);',
   );
   buffer.writeln('        instance.originalQuery = query;');
-  buffer.writeln('        instance.setPreviousDataValues(instance.toJson());');
+  buffer
+      .writeln('        instance.setPreviousDataValues(instance.toRawJson());');
   buffer.writeln('        return instance;');
   buffer.writeln('      }).toList()');
   buffer.writeln('    );');

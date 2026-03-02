@@ -11,6 +11,7 @@ abstract class Users {
   @PrimaryKey()
   @AutoIncrement()
   @NotNull()
+  @ColumnName('_id')
   DataType id = DataType.INTEGER;
 
   @Validate.IsEmail('Email is not valid')

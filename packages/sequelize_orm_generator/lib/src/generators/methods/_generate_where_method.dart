@@ -9,7 +9,7 @@ void _generateWhereMethod(
   buffer.writeln('    final keys = $generatedClassName().getPrimaryKeys();');
   buffer.writeln('    if (keys.isEmpty) return null;');
   buffer.writeln();
-  buffer.writeln('    final json = toJson();');
+  buffer.writeln('    final json = toRawJson();');
   buffer.writeln('    final whereClause = <String, dynamic>{};');
   buffer.writeln('    for (final key in keys) {');
   buffer.writeln('      final value = json[key];');

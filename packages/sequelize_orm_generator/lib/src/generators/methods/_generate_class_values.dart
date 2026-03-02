@@ -120,7 +120,7 @@ void _generateClassValues(
   buffer.writeln('    );');
   buffer.writeln('  }');
   buffer.writeln();
-  buffer.writeln('  Map<String, dynamic> toJson() {');
+  buffer.writeln('  Map<String, dynamic> toRawJson() {');
   buffer.writeln('    return {');
   for (var field in fields) {
     final serializedFieldValue = _toJsonFieldValueExpression(
@@ -135,19 +135,34 @@ void _generateClassValues(
     if (assoc.associationType == 'hasOne' ||
         assoc.associationType == 'belongsTo') {
       buffer.writeln(
-        "      '$jsonKey': ${assoc.fieldName}?.toJson(),",
+        "      '$jsonKey': ${assoc.fieldName}?.toRawJson(),",
       );
     } else {
       buffer.writeln(
-        "      '$jsonKey': ${assoc.fieldName}?.map((e) => e.toJson()).toList(),",
+        "      '$jsonKey': ${assoc.fieldName}?.map((e) => e.toRawJson()).toList(),",
       );
     }
   }
   buffer.writeln('    };');
   buffer.writeln('  }');
   buffer.writeln();
+  buffer.writeln('  Map<String, dynamic> toJson() {');
+  buffer.writeln('    return {');
+  for (var field in fields) {
+    buffer.writeln("      '${field.fieldName}': ${field.fieldName},");
+  }
+  for (var assoc in associations) {
+    buffer.writeln("      '${assoc.fieldName}': ${assoc.fieldName},");
+  }
+  buffer.writeln('    };');
+  buffer.writeln('  }');
+  buffer.writeln();
   buffer.writeln('  @override');
-  buffer.writeln('  String toString() => toJson().toString();');
+  buffer.writeln(
+    "  String toString() => '$valuesClassName('"
+    " '\${toJson().entries.map((e) => '\${e.key}: \${e.value}').join(', ')}'"
+    " ')';",
+  );
   buffer.writeln();
 
   // Generate where() method (also satisfies getPrimaryKeyMap from mixin)
@@ -396,7 +411,7 @@ void _generateMixinMethods(
   buffer.writeln(
     '    // Update previousDataValues after reload to track current state',
   );
-  buffer.writeln('    setPreviousDataValues(toJson());');
+  buffer.writeln('    setPreviousDataValues(toRawJson());');
   buffer.writeln();
   buffer.writeln('    return this as $valuesClassName;');
   buffer.writeln('  }');

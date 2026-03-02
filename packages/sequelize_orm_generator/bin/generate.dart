@@ -45,8 +45,23 @@ void main(List<String> args) async {
   } else {
     final modelsFolderRel =
         sequelizeOrmConfig.modelsPath ?? p.join('lib', 'models');
-    final folderAbs = toAbsolutePath(packageRoot, modelsFolderRel);
-    inputs.addAll(findModelFiles(folderAbs));
+    final defaultFolderAbs = toAbsolutePath(packageRoot, modelsFolderRel);
+
+    final candidateFolders = <String>{defaultFolderAbs};
+    final cwdAbs = p.normalize(Directory.current.absolute.path);
+    final packageRootAbs = p.normalize(packageRoot);
+    final cwdInPackage =
+        cwdAbs == packageRootAbs || p.isWithin(packageRootAbs, cwdAbs);
+    if (cwdInPackage) {
+      candidateFolders.add(cwdAbs);
+    }
+
+    final found = <String>{};
+    for (final folderAbs in candidateFolders) {
+      found.addAll(findModelFiles(folderAbs));
+    }
+    final sortedFound = found.toList()..sort();
+    inputs.addAll(sortedFound);
   }
 
   if (inputs.isEmpty) {
@@ -97,7 +112,7 @@ Sequelize Dart Generator
 Usage:
   dart run sequelize_orm_generator:generate --input lib/models/users.model.dart
   dart run sequelize_orm_generator:generate --folder lib/models
-  dart run sequelize_orm_generator:generate              # defaults to sequelize_orm.models_path (or lib/models)
+  dart run sequelize_orm_generator:generate              # scans sequelize_orm.models_path (or lib/models) and current folder
   dart run sequelize_orm_generator:generate --registry
   dart run sequelize_orm_generator:generate --server
 
@@ -122,8 +137,7 @@ Options:
   String? input,
   String? folder,
   String? output,
-})
-_parseArgs(List<String> args) {
+}) _parseArgs(List<String> args) {
   String? valueAfter(String flag) {
     final idx = args.indexOf(flag);
     if (idx == -1) return null;

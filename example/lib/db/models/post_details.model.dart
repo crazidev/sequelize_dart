@@ -10,7 +10,7 @@ part 'post_details.model.g.dart';
 )
 abstract class PostDetails {
   @ColumnDefinition(
-    name: 'id',
+    name: '_id',
     type: DataType.INTEGER,
     primaryKey: true,
     autoIncrement: true,
@@ -37,7 +37,7 @@ abstract class PostDetails {
 
   @ColumnDefinition(
     name: 'userId',
-    type: DataType.INTEGER,
+    type: DataType.OBJECT_ID,
   )
   dynamic userId;
 
