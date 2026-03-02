@@ -8,6 +8,7 @@ import 'package:sequelize_orm_mongodb/src/mongo_association.dart';
 import 'package:sequelize_orm_mongodb/src/mongo_exceptions.dart';
 import 'package:sequelize_orm_mongodb/src/mongo_lookup_builder.dart';
 import 'package:sequelize_orm_mongodb/src/mongo_operator_translator.dart';
+import 'package:sequelize_orm_mongodb/src/mongo_profiler.dart';
 
 class MongoQueryEngine extends QueryEngineInterface {
   MongoQueryEngine({
@@ -16,6 +17,7 @@ class MongoQueryEngine extends QueryEngineInterface {
     MongoLookupBuilder? lookupBuilder,
     MongoAssociationResolver? associationResolver,
     this.defaultParanoidField = 'deletedAt',
+    MongoProfiler? profiler,
   })  : _database = database,
         _operatorTranslator =
             operatorTranslator ?? const MongoOperatorTranslator(),
@@ -26,9 +28,11 @@ class MongoQueryEngine extends QueryEngineInterface {
                 : MongoLookupBuilder(
                     associationResolver: associationResolver,
                     operatorTranslator: operatorTranslator,
-                  ));
+                  )),
+        _profiler = profiler;
 
   final MongoDatabaseAdapter _database;
+  final MongoProfiler? _profiler;
   final MongoOperatorTranslator _operatorTranslator;
   final MongoAssociationResolver? _associationResolver;
   final MongoLookupBuilder? _lookupBuilder;
@@ -46,34 +50,78 @@ class MongoQueryEngine extends QueryEngineInterface {
     dynamic model,
     Transaction? transaction,
   }) async {
+    _profiler?.startOperation('findAll');
     try {
-      final plan = _buildQueryPlan(
-        query: query,
-        model: model,
-      );
+      final plan = _profiler != null
+          ? _profiler!.measureSync(
+              MongoProfiler.phaseBuildPlan,
+              () => _buildQueryPlan(
+                query: query,
+                model: model,
+              ),
+              detail: modelName,
+            )
+          : _buildQueryPlan(
+              query: query,
+              model: model,
+            );
       final collection = _collection(modelName);
 
-      final docs = plan.includes.isNotEmpty
-          ? await _runAggregationQuery(
-              modelName: modelName,
-              collection: collection,
-              plan: plan,
-            )
-          : await collection.find(
-              where: plan.where,
-              sort: plan.sort,
-              limit: plan.limit,
-              skip: plan.offset,
-              projection: plan.projection,
-            );
+      List<Map<String, dynamic>> docs;
+      if (plan.includes.isNotEmpty) {
+        docs = _profiler != null
+            ? await _profiler!.measure(
+                MongoProfiler.phaseDbAggregate,
+                () => _runAggregationQuery(
+                  modelName: modelName,
+                  collection: collection,
+                  plan: plan,
+                ),
+                detail: '$modelName (with includes)',
+              )
+            : await _runAggregationQuery(
+                modelName: modelName,
+                collection: collection,
+                plan: plan,
+              );
+      } else {
+        docs = _profiler != null
+            ? await _profiler!.measure(
+                MongoProfiler.phaseDbFind,
+                () => collection.find(
+                  where: plan.where,
+                  sort: plan.sort,
+                  limit: plan.limit,
+                  skip: plan.offset,
+                  projection: plan.projection,
+                ),
+                detail: modelName,
+              )
+            : await collection.find(
+                where: plan.where,
+                sort: plan.sort,
+                limit: plan.limit,
+                skip: plan.offset,
+                projection: plan.projection,
+              );
+      }
 
-      return docs.map((doc) => ModelInstanceData(data: doc)).toList();
+      final result = _profiler != null
+          ? _profiler!.measureSync(
+              MongoProfiler.phaseResultTransform,
+              () => docs.map((doc) => ModelInstanceData(data: doc)).toList(),
+              detail: '${docs.length} docs',
+            )
+          : docs.map((doc) => ModelInstanceData(data: doc)).toList();
+      return result;
     } catch (error, stackTrace) {
       throw _wrapError(
         error: error,
         stackTrace: stackTrace,
         context: 'Exception: failed to execute findAll()',
       );
+    } finally {
+      _profiler?.endOperation(operation: 'findAll');
     }
   }
 
@@ -85,41 +133,74 @@ class MongoQueryEngine extends QueryEngineInterface {
     dynamic model,
     Transaction? transaction,
   }) async {
+    _profiler?.startOperation('findOne');
     try {
-      final plan = _buildQueryPlan(
-        query: query,
-        model: model,
-      );
+      final plan = _profiler != null
+          ? _profiler!.measureSync(
+              MongoProfiler.phaseBuildPlan,
+              () => _buildQueryPlan(query: query, model: model),
+              detail: modelName,
+            )
+          : _buildQueryPlan(query: query, model: model);
       final collection = _collection(modelName);
 
       Map<String, dynamic>? doc;
       if (plan.includes.isNotEmpty) {
-        final docs = await _runAggregationQuery(
-          modelName: modelName,
-          collection: collection,
-          plan: plan.copyWith(limit: 1),
-        );
+        final docs = _profiler != null
+            ? await _profiler!.measure(
+                MongoProfiler.phaseDbAggregate,
+                () => _runAggregationQuery(
+                  modelName: modelName,
+                  collection: collection,
+                  plan: plan.copyWith(limit: 1),
+                ),
+                detail: '$modelName (findOne + includes)',
+              )
+            : await _runAggregationQuery(
+                modelName: modelName,
+                collection: collection,
+                plan: plan.copyWith(limit: 1),
+              );
         if (docs.isNotEmpty) {
           doc = docs.first;
         }
       } else {
-        doc = await collection.findOne(
-          where: plan.where,
-          sort: plan.sort,
-          projection: plan.projection,
-        );
+        doc = _profiler != null
+            ? await _profiler!.measure(
+                MongoProfiler.phaseDbFindOne,
+                () => collection.findOne(
+                  where: plan.where,
+                  sort: plan.sort,
+                  projection: plan.projection,
+                ),
+                detail: modelName,
+              )
+            : await collection.findOne(
+                where: plan.where,
+                sort: plan.sort,
+                projection: plan.projection,
+              );
       }
 
       if (doc == null) {
         return null;
       }
-      return ModelInstanceData(data: doc);
+      final result = _profiler != null
+          ? _profiler!.measureSync(
+              MongoProfiler.phaseResultTransform,
+              () => ModelInstanceData(data: doc!),
+              detail: '1 doc',
+            )
+          : ModelInstanceData(data: doc);
+      return result;
     } catch (error, stackTrace) {
       throw _wrapError(
         error: error,
         stackTrace: stackTrace,
         context: 'Exception: failed to execute findOne()',
       );
+    } finally {
+      _profiler?.endOperation(operation: 'findOne');
     }
   }
 
@@ -1019,23 +1100,57 @@ class MongoQueryEngine extends QueryEngineInterface {
     required Query? query,
     required dynamic model,
   }) {
-    final json = query?.toJson() ?? <String, dynamic>{};
+    Map<String, dynamic> json;
+    if (_profiler != null) {
+      json = _profiler!.measureSync(
+        MongoProfiler.phaseQueryJson,
+        () => query?.toJson() ?? <String, dynamic>{},
+      );
+    } else {
+      json = query?.toJson() ?? <String, dynamic>{};
+    }
     final rawWhere = json['where'];
     Map<String, dynamic> where = rawWhere is Map
         ? Map<String, dynamic>.from(rawWhere)
         : <String, dynamic>{};
 
     if (_isParanoidModel(model) && json['paranoid'] != false) {
-      where = _mergeAnd(
-        where,
-        {
-          _paranoidField(model): {r'$eq': null},
-        },
-      );
+      if (_profiler != null) {
+        where = _profiler!.measureSync(
+          MongoProfiler.phaseParanoidMerge,
+          () => _mergeAnd(
+            where,
+            {
+              _paranoidField(model): {r'$eq': null},
+            },
+          ),
+        );
+      } else {
+        where = _mergeAnd(
+          where,
+          {
+            _paranoidField(model): {r'$eq': null},
+          },
+        );
+      }
     }
 
-    final translatedWhere = _operatorTranslator.translateWhere(where);
-    final includes = _extractIncludes(json['include']);
+    Map<String, dynamic> translatedWhere;
+    if (_profiler != null) {
+      translatedWhere = _profiler!.measureSync(
+        MongoProfiler.phaseTranslateWhere,
+        () => _operatorTranslator.translateWhere(where),
+      );
+    } else {
+      translatedWhere = _operatorTranslator.translateWhere(where);
+    }
+
+    final includes = _profiler != null
+        ? _profiler!.measureSync(
+            MongoProfiler.phaseIncludeExtract,
+            () => _extractIncludes(json['include']),
+          )
+        : _extractIncludes(json['include']);
 
     return _MongoQueryPlan(
       where: translatedWhere,

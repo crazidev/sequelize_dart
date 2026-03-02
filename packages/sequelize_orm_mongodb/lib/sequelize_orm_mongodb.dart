@@ -9,4 +9,5 @@ export 'src/mongo_exceptions.dart';
 export 'src/mongo_like_pattern_converter.dart';
 export 'src/mongo_lookup_builder.dart';
 export 'src/mongo_operator_translator.dart';
+export 'src/mongo_profiler.dart';
 export 'src/mongo_query_engine.dart';

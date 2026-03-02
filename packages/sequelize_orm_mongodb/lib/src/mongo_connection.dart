@@ -3,6 +3,7 @@
 import 'package:mongo_dart/mongo_dart.dart' as mongo;
 import 'package:sequelize_orm_mongodb/src/mongo_adapter.dart';
 import 'package:sequelize_orm_mongodb/src/mongo_exceptions.dart';
+import 'package:sequelize_orm_mongodb/src/mongo_profiler.dart';
 
 class MongoConnectionConfig {
   final String url;
@@ -17,13 +18,27 @@ class MongoConnectionConfig {
 class MongoConnection {
   final MongoConnectionConfig config;
   final MongoDatabaseAdapter _adapter;
+  final MongoProfiler? _profiler;
 
   MongoConnection({
     required this.config,
     MongoDatabaseAdapter? adapter,
-  }) : _adapter = adapter ?? MongoDartDatabaseAdapter(config: config);
+    MongoProfiler? profiler,
+  })  : _adapter = adapter ?? MongoDartDatabaseAdapter(config: config),
+        _profiler = profiler;
 
-  Future<void> open() => _adapter.connect();
+  Future<void> open() async {
+    if (_profiler != null) {
+      _profiler!.startOperation('connection.open');
+      final sw = Stopwatch()..start();
+      await _adapter.connect();
+      sw.stop();
+      _profiler!.record(MongoProfiler.phaseConnection, sw.elapsed, detail: 'connect');
+      _profiler!.endOperation(operation: 'connection.open');
+    } else {
+      await _adapter.connect();
+    }
+  }
 
   Future<void> close() => _adapter.close();
 

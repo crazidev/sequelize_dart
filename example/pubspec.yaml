@@ -18,6 +18,7 @@ dependencies:
 
 
 dev_dependencies:
+  benchmark_harness: ^2.3.1
   sequelize_orm_generator:
     path: ../packages/sequelize_orm_generator
   build_runner: ^2.10.4
