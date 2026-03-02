@@ -15,12 +15,11 @@
       "name": "Debug Dart Server",
       "type": "dart",
       "request": "launch",
+      "debuggerType": "dart",
       "program": "${workspaceFolder}/example/lib/main.dart",
-      "cwd": "${workspaceFolder}/example",
-      "vmAdditionalArgs": [
-        "--enable-asserts"
-      ],
-      "console": "debugConsole"
+      "args": [
+        "--dart-define=enable_asserts=true"
+      ]
     },
     {
       "name": "Debug Node.js (dart2js)",

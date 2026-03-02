@@ -168,6 +168,15 @@ ComparisonOperator notIRegexp(String column, String pattern) {
 // Other Operators
 // ============================================================================
 
+// MongoDB-only operator helper.
+// Uses server-side JavaScript evaluation through `$where`.
+ComparisonOperator mongoWhere(String javascriptExpression) {
+  return ComparisonOperator(
+    column: r'$where',
+    value: javascriptExpression,
+  );
+}
+
 /// Column reference: = "table"."column"
 ComparisonOperator col(String column, String columnReference) {
   return ComparisonOperator(column: column, value: {'\$col': columnReference});

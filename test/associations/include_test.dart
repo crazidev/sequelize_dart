@@ -7,6 +7,8 @@ import '../test_helper.dart';
 
 /// Store the seeded user's ID for use in tests
 late int seededUserId;
+List<String> get mongoQueries =>
+    capturedSql.where((query) => query.startsWith('[mongo:')).toList();
 
 void main() {
   group('Include Query Tests',
@@ -61,9 +63,15 @@ void main() {
 
       expect(users, isNotEmpty);
       expect(lastSql, isNotNull);
-      expect(lastSql, containsSql('SELECT'));
-      // Verify that include was processed
-      expect(selectQueries.length, greaterThan(0));
+      if (isMongo) {
+        expect(lastSql, contains('[mongo:aggregate.find]'));
+        expect(lastSql, contains('"pipeline"'));
+        expect(lastSql, contains(r'"$lookup"'));
+      } else {
+        expect(lastSql, containsSql('SELECT'));
+        // Verify that include was processed
+        expect(selectQueries.length, greaterThan(0));
+      }
     });
 
     test('Include with separate query', () async {
@@ -75,8 +83,13 @@ void main() {
       );
 
       expect(users, isNotEmpty);
-      // With separate: true, there should be multiple queries
-      expect(selectQueries.length, greaterThan(1));
+      if (isMongo) {
+        // Mongo uses aggregate pipeline include translation.
+        expect(mongoQueries.length, greaterThan(0));
+      } else {
+        // With separate: true, there should be multiple queries
+        expect(selectQueries.length, greaterThan(1));
+      }
     });
 
     test('Include with filtering (where clause)', () async {
@@ -93,9 +106,15 @@ void main() {
       );
 
       expect(users, isNotEmpty);
-      // Verify that where clause was included in the query
-      final sql = selectQueries.last;
-      expect(sql, containsSql('WHERE'));
+      if (isMongo) {
+        final mongo = mongoQueries.last;
+        expect(mongo, contains('"title"'));
+        expect(mongo, contains(r'"$regex"'));
+      } else {
+        // Verify that where clause was included in the query
+        final sql = selectQueries.last;
+        expect(sql, containsSql('WHERE'));
+      }
     });
 
     test('Include with required (INNER JOIN)', () async {
@@ -107,9 +126,15 @@ void main() {
       );
 
       expect(users, isNotEmpty);
-      // With required: true, should use INNER JOIN
-      final sql = selectQueries.first;
-      expect(sql, anyOf(containsSql('INNER JOIN'), containsSql('JOIN')));
+      if (isMongo) {
+        final mongo = mongoQueries.first;
+        expect(mongo, contains('"posts.0"'));
+        expect(mongo, contains(r'"$exists":true'));
+      } else {
+        // With required: true, should use INNER JOIN
+        final sql = selectQueries.first;
+        expect(sql, anyOf(containsSql('INNER JOIN'), containsSql('JOIN')));
+      }
     });
 
     test('Include with pagination (limit and offset)', () async {
@@ -125,9 +150,14 @@ void main() {
       );
 
       expect(users, isNotEmpty);
-      // Verify limit was applied
-      final sql = selectQueries.last;
-      expect(sql, containsSql('LIMIT'));
+      if (isMongo) {
+        final mongo = mongoQueries.last;
+        expect(mongo, contains(r'"$limit":5'));
+      } else {
+        // Verify limit was applied
+        final sql = selectQueries.last;
+        expect(sql, containsSql('LIMIT'));
+      }
     });
 
     test('Include with ordering', () async {
@@ -144,9 +174,15 @@ void main() {
       );
 
       expect(users, isNotEmpty);
-      // Verify order was applied
-      final sql = selectQueries.last;
-      expect(sql, containsSql('ORDER BY'));
+      if (isMongo) {
+        final mongo = mongoQueries.last;
+        expect(mongo, contains(r'"$sort"'));
+        expect(mongo, contains('"id":-1'));
+      } else {
+        // Verify order was applied
+        final sql = selectQueries.last;
+        expect(sql, containsSql('ORDER BY'));
+      }
     });
 
     test('HasOne association include', () async {
@@ -176,8 +212,13 @@ void main() {
       );
 
       expect(users, isNotEmpty);
-      // Verify that nested includes are processed
-      expect(selectQueries.length, greaterThan(0));
+      if (isMongo) {
+        expect(mongoQueries.length, greaterThan(0));
+        expect(mongoQueries.last, contains('"postDetails"'));
+      } else {
+        // Verify that nested includes are processed
+        expect(selectQueries.length, greaterThan(0));
+      }
     });
 
     test('IncludeBuilder creation and toJson', () async {

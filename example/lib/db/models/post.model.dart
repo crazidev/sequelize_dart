@@ -12,6 +12,7 @@ part 'post.model.g.dart';
 abstract class Post {
   @PrimaryKey()
   @AutoIncrement()
+  @ColumnName('_id')
   DataType id = DataType.INTEGER;
 
   DataType title = DataType.STRING;

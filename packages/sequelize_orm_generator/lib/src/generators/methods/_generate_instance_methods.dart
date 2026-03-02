@@ -123,7 +123,7 @@ void _generateInstanceMethods(
     );
     buffer.writeln('    // Get current data from instance (before any reload)');
     buffer.writeln('    // This preserves user modifications');
-    buffer.writeln('    final currentData = toJson();');
+    buffer.writeln('    final currentData = toRawJson();');
     buffer.writeln();
     buffer.writeln('    // Get primary key values');
     buffer.writeln(
@@ -149,6 +149,34 @@ void _generateInstanceMethods(
     buffer.writeln('    final previousData = previousDataValues;');
     buffer.writeln();
     buffer.writeln(
+      '    // Keep only model attribute keys (exclude association payloads)',
+    );
+    buffer.writeln('    const validAttributeKeys = <String>{');
+    for (final field in fields) {
+      buffer.writeln("      '${field.name}',");
+    }
+    buffer.writeln('    };');
+    buffer.writeln(
+      '    Map<String, dynamic> filterAttributeData(Map<String, dynamic>? source) {',
+    );
+    buffer.writeln('      if (source == null) return <String, dynamic>{};');
+    buffer.writeln('      final filtered = <String, dynamic>{};');
+    buffer.writeln('      for (final entry in source.entries) {');
+    buffer.writeln('        if (validAttributeKeys.contains(entry.key)) {');
+    buffer.writeln('          filtered[entry.key] = entry.value;');
+    buffer.writeln('        }');
+    buffer.writeln('      }');
+    buffer.writeln('      return filtered;');
+    buffer.writeln('    }');
+    buffer.writeln();
+    buffer.writeln(
+      '    final filteredCurrentData = filterAttributeData(currentData);',
+    );
+    buffer.writeln(
+      '    final filteredPreviousData = filterAttributeData(previousData);',
+    );
+    buffer.writeln();
+    buffer.writeln(
       '    // Merge previousData with currentData to preserve foreign keys and other fields',
     );
     buffer.writeln(
@@ -158,9 +186,9 @@ void _generateInstanceMethods(
       '    // Start with previousData, then overlay non-null values from currentData',
     );
     buffer.writeln(
-      '    final mergedData = <String, dynamic>{...?previousData};',
+      '    final mergedData = <String, dynamic>{...filteredPreviousData};',
     );
-    buffer.writeln('    for (final entry in currentData.entries) {');
+    buffer.writeln('    for (final entry in filteredCurrentData.entries) {');
     buffer.writeln(
       '      // Only update with non-null values from currentData',
     );
@@ -199,7 +227,7 @@ void _generateInstanceMethods(
     buffer.writeln('    final result = await QueryEngine().save(');
     buffer.writeln('      modelName: $generatedClassName().modelName,');
     buffer.writeln('      currentData: dataToSave,');
-    buffer.writeln('      previousData: previousData,');
+    buffer.writeln('      previousData: filteredPreviousData,');
     buffer.writeln('      primaryKeyValues: pkValues,');
     buffer.writeln('      sequelize: $generatedClassName().sequelizeInstance,');
     buffer.writeln('      model: $generatedClassName().sequelizeModel,');
@@ -213,7 +241,7 @@ void _generateInstanceMethods(
     buffer.writeln('    _updateFields(updatedInstance);');
     buffer.writeln();
     buffer.writeln('    // Update previous data snapshot');
-    buffer.writeln('    setPreviousDataValues(toJson());');
+    buffer.writeln('    setPreviousDataValues(toRawJson());');
     buffer.writeln();
     buffer.writeln('    return 1; // save() always returns 1 if successful');
     buffer.writeln('  }');

@@ -1,0 +1,21 @@
+name: sequelize_orm_mongodb
+description: MongoDB query engine and translators for sequelize_orm.
+version: 0.1.0
+repository: https://github.com/crazidev/sequelize_orm_dart/tree/main/packages/sequelize_orm_mongodb
+resolution: workspace
+
+topics:
+  - orm
+  - mongodb
+  - nosql
+  - database
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  mongo_dart: ^0.10.8
+  sequelize_orm: ^0.2.0
+
+dev_dependencies:
+  test: ^1.28.0

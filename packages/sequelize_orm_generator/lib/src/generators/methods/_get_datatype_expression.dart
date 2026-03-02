@@ -22,6 +22,15 @@ String _getDataTypeExpression(_FieldInfo field) {
     typeBase = 'DataType.${field.dataType}';
   }
 
+  if (field.dataType == 'ENUM' &&
+      field.enumValues != null &&
+      field.enumValues!.isNotEmpty) {
+    final values = field.enumValues!
+        .map((value) => "'${value.replaceAll("'", r"\'")}'")
+        .join(', ');
+    typeBase = 'DataType.ENUM([$values])';
+  }
+
   String typeExpression = typeBase;
   if (field.unsigned) typeExpression += '.UNSIGNED';
   if (field.zerofill) typeExpression += '.ZEROFILL';

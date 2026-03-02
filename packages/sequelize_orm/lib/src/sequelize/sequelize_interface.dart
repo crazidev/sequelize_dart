@@ -86,6 +86,44 @@ abstract class SequelizeInterface {
 
   Future<void> close();
 
+  /// Registers a query engine for this sequelize instance.
+  ///
+  /// When [useBridge] is false, initialization and associations run in
+  /// bridge-less mode and all query calls route to the registered engine.
+  void setQueryEngine(
+    QueryEngineInterface engine, {
+    bool useBridge = true,
+  });
+
+  /// Resolves the active query engine for this sequelize instance.
+  QueryEngineInterface resolveQueryEngine();
+
+  /// Whether this sequelize instance currently uses the JS bridge.
+  bool get usesBridgeQueryEngine;
+
+  /// Registers association metadata for runtime consumers (e.g. Mongo lookup translation).
+  void registerAssociationDefinition({
+    required String sourceModel,
+    required String associationName,
+    required String targetModel,
+    required String associationType,
+    String? foreignKey,
+    String? sourceKey,
+    String? targetKey,
+  });
+
+  /// Looks up association metadata by source model and association name.
+  Map<String, dynamic>? getAssociationDefinition({
+    required String sourceModel,
+    required String associationName,
+  });
+
+  /// Returns known primary keys for a model.
+  List<String> getModelPrimaryKeys(String modelName);
+
+  /// Returns a read-only snapshot of the configured connection options.
+  Map<String, dynamic>? get connectionConfig;
+
   /// Whether debug logging is enabled.
   bool get debug;
 

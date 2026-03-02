@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:sequelize_orm/src/query/query/query.dart';
 
 /// Base class for generated $ModelValues classes.
@@ -60,5 +62,15 @@ abstract class ModelValuesBase<T extends ModelValuesBase<T>> {
     originalQuery = result.originalQuery ?? originalQuery;
 
     return this as T;
+  }
+
+  @override
+  String toString() {
+    final json = toJson();
+    try {
+      return jsonEncode(json);
+    } catch (_) {
+      return json.toString();
+    }
   }
 }

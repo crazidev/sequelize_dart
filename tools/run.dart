@@ -190,5 +190,6 @@ Examples:
   dart run tools/run.dart setup-bridge pnpm
   dart run tools/run.dart watch-models
   dart run tools/run.dart test --postgres
+  dart run tools/run.dart test --mongo --mongo-url=mongodb://localhost:27017 --mongo-database=sequelize_dart
 ''');
 }

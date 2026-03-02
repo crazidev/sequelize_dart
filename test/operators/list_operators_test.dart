@@ -8,6 +8,17 @@ import '../test_helper.dart';
 ///
 /// These tests verify that list operators produce correct SQL output.
 void main() {
+  if (isMongo) {
+    group('List Operators', () {
+      test(
+        'skipped for Mongo',
+        () {},
+        skip: 'Mongo SQL-string operator assertions are not supported.',
+      );
+    });
+    return;
+  }
+
   setUpAll(() async {
     await initTestEnvironment();
   });

@@ -15,6 +15,18 @@ import 'test_helper.dart';
 /// - Whole-column `.eq()` with type-safe generics
 /// - Combining JSON conditions with `and()`, `or()`
 void main() {
+  if (isMongo) {
+    group('JSON Query Tests', () {
+      test(
+        'skipped for Mongo',
+        () {},
+        skip:
+            'Mongo JSON path operator parity is not fully supported yet.',
+      );
+    });
+    return;
+  }
+
   // Unique prefix to avoid collisions with other test suites
   final prefix = DateTime.now().millisecondsSinceEpoch;
 

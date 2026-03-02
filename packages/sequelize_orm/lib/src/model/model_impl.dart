@@ -41,6 +41,20 @@ abstract class Model<T> extends ModelInterface {
       sequelize.log('>> $modelName hasOne ${model.modelName}');
     }
 
+    final associationName = as ?? model.modelName;
+    sequelize.registerAssociationDefinition(
+      sourceModel: modelName,
+      associationName: associationName,
+      targetModel: model.modelName,
+      associationType: 'hasOne',
+      foreignKey: foreignKey,
+      sourceKey: sourceKey,
+    );
+
+    if (!sequelize.usesBridgeQueryEngine) {
+      return Association();
+    }
+
     await sequelize.bridge.call('associateModel', {
       'sourceModel': modelName,
       'targetModel': model.modelName,
@@ -66,6 +80,20 @@ abstract class Model<T> extends ModelInterface {
       sequelize.log('>> $modelName hasMany ${model.modelName}');
     }
 
+    final associationName = as ?? model.modelName;
+    sequelize.registerAssociationDefinition(
+      sourceModel: modelName,
+      associationName: associationName,
+      targetModel: model.modelName,
+      associationType: 'hasMany',
+      foreignKey: foreignKey,
+      sourceKey: sourceKey,
+    );
+
+    if (!sequelize.usesBridgeQueryEngine) {
+      return Association();
+    }
+
     await sequelize.bridge.call('associateModel', {
       'sourceModel': modelName,
       'targetModel': model.modelName,
@@ -89,6 +117,20 @@ abstract class Model<T> extends ModelInterface {
   }) async {
     if (sequelize.debug) {
       sequelize.log('>> $modelName belongsTo ${model.modelName}');
+    }
+
+    final associationName = as ?? model.modelName;
+    sequelize.registerAssociationDefinition(
+      sourceModel: modelName,
+      associationName: associationName,
+      targetModel: model.modelName,
+      associationType: 'belongsTo',
+      foreignKey: foreignKey,
+      targetKey: targetKey,
+    );
+
+    if (!sequelize.usesBridgeQueryEngine) {
+      return Association();
     }
 
     await sequelize.bridge.call('associateModel', {

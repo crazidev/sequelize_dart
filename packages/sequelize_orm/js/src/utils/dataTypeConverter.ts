@@ -17,6 +17,8 @@ const dataTypeMap: Record<string, any> = {
   DATE: DataTypes.DATE,
   DATEONLY: DataTypes.DATEONLY,
   UUID: DataTypes.UUID,
+  OBJECT_ID: DataTypes.STRING,
+  OBJECTID: DataTypes.STRING,
   JSON: DataTypes.JSON,
   JSONB: DataTypes.JSONB,
   BLOB: DataTypes.BLOB,

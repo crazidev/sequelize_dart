@@ -4,9 +4,12 @@ import 'package:sequelize_orm/sequelize_orm.dart';
 import 'package:sequelize_orm_example/db/models/post.model.dart';
 import 'package:sequelize_orm_example/db/models/post_details.model.dart';
 import 'package:sequelize_orm_example/db/models/users.model.dart';
+import 'package:sequelize_orm_mongodb/sequelize_orm_mongodb.dart';
 
 const connectionString =
     'postgresql://postgres:postgres@localhost:5432/postgres';
+const mongoUrl = 'mongodb://localhost:27017';
+const mongoDatabase = 'sequelize_dart';
 
 /// Benchmark results holder
 class BenchmarkResult {
@@ -62,7 +65,8 @@ Future<void> main() async {
   final initStopwatch = Stopwatch()..start();
 
   final sequelize = Sequelize().createInstance(
-    connection: SequelizeConnection.postgres(url: connectionString),
+    // connection: SequelizeConnection.postgres(url: connectionString),
+    connection: MongoConnectionOptions(url: mongoUrl, database: mongoDatabase),
   );
 
   await sequelize.initialize(

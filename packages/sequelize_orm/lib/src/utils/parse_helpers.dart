@@ -19,7 +19,8 @@ SequelizeBigInt? parseSequelizeBigIntValue(dynamic v) {
   if (v == null) return null;
   if (v is String) return SequelizeBigInt(v);
   if (v is int) return SequelizeBigInt.fromInt(v);
-  throw FormatException('Expected String or int for BigInt, got ${v.runtimeType}');
+  throw FormatException(
+      'Expected String or int for BigInt, got ${v.runtimeType}');
 }
 
 double? parseDoubleValue(dynamic v) {
@@ -49,13 +50,17 @@ DateTime? parseDateTimeValue(dynamic v) {
 String? parseStringValue(dynamic v) {
   if (v == null) return null;
   if (v is String) return v;
+  final coerced = _tryCoerceObjectLikeString(v);
+  if (coerced != null) return coerced;
   throw FormatException('Expected String, got ${v.runtimeType}');
 }
 
 Map<String, dynamic>? parseMapValue(dynamic v) {
   if (v == null) return null;
   if (v is Map) return Map<String, dynamic>.from(v);
-  if (v is String) return Map<String, dynamic>.from(jsonDecode(v) as Map); // Bridge may return JSON columns as strings
+  if (v is String)
+    return Map<String, dynamic>.from(
+        jsonDecode(v) as Map); // Bridge may return JSON columns as strings
   throw FormatException('Expected Map, got ${v.runtimeType}');
 }
 
@@ -144,4 +149,27 @@ StackTrace _filterStack(StackTrace stack) {
     );
   }).toList();
   return StackTrace.fromString(renumbered.join('\n'));
+}
+
+String? _tryCoerceObjectLikeString(dynamic v) {
+  // Handle BSON/ObjectId-like values without taking a hard dependency on
+  // Mongo packages in core parsing helpers.
+  try {
+    final dynamic candidate = v;
+    final dynamic hex = candidate.toHexString();
+    if (hex is String && hex.isNotEmpty) {
+      return hex;
+    }
+  } catch (_) {}
+
+  final text = v.toString();
+  final wrapped = RegExp(r'ObjectId\("([0-9a-fA-F]{24})"\)').firstMatch(text);
+  if (wrapped != null) {
+    return wrapped.group(1);
+  }
+  final bare = RegExp(r'^[0-9a-fA-F]{24}$').firstMatch(text);
+  if (bare != null) {
+    return bare.group(0);
+  }
+  return null;
 }

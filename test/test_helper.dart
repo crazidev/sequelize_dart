@@ -4,12 +4,15 @@ import 'package:sequelize_orm/sequelize_orm.dart';
 import 'package:sequelize_orm_example/db/models/post.model.dart';
 import 'package:sequelize_orm_example/db/models/post_details.model.dart';
 import 'package:sequelize_orm_example/db/models/users.model.dart';
+import 'package:sequelize_orm_mongodb/sequelize_orm_mongodb.dart';
 import 'package:test/test.dart';
 
 /// Connection strings for test databases
 const postgresUrl = 'postgresql://postgres:postgres@localhost:5432/postgres';
 const mysqlUrl = 'mysql://root@localhost:3306/sequelize_orm';
 const mariadbUrl = 'mariadb://root@localhost:3307/sequelize_orm';
+const defaultMongoUrl = 'mongodb://localhost:27017';
+const defaultMongoDatabase = 'sequelize_dart';
 
 /// SQLite database file path for tests (auto-cleaned on teardown)
 const sqliteStorage = 'test_sequelize.db';
@@ -24,7 +27,7 @@ late Sequelize sequelize;
 /// Available after [initTestEnvironment] is called, but the getter itself
 /// can be used before that (it only reads the env var).
 ///
-/// Supported values: `postgres` (default), `mysql`, `mariadb`, `sqlite`.
+/// Supported values: `postgres` (default), `mysql`, `mariadb`, `sqlite`, `mongo`.
 ///
 /// Usage:
 /// ```sh
@@ -45,6 +48,9 @@ bool get isPostgres => dbType == 'postgres';
 
 /// Whether the active dialect is MySQL or MariaDB.
 bool get isMysqlFamily => dbType == 'mysql' || dbType == 'mariadb';
+
+/// Whether the active dialect is MongoDB.
+bool get isMongo => dbType == 'mongo';
 
 /// Initialize the test environment
 /// Call this in setUpAll() in your test files
@@ -69,6 +75,14 @@ Future<void> initTestEnvironment() async {
         dbFile.deleteSync();
       }
       connection = SqliteConnection(storage: sqliteStorage);
+      normalizeJsonTypes = false;
+      break;
+    case 'mongo':
+      connection = MongoConnectionOptions(
+        url: Platform.environment['DB_MONGO_URL'] ?? defaultMongoUrl,
+        database:
+            Platform.environment['DB_MONGO_DATABASE'] ?? defaultMongoDatabase,
+      );
       normalizeJsonTypes = false;
       break;
     case 'postgres':
@@ -143,7 +157,11 @@ void clearCapturedSql() {
 }
 
 /// Get the last captured SQL query
-String get lastSql => capturedSql.isNotEmpty ? capturedSql.last : '';
+///
+/// We return the captured query batch (joined) rather than only the final
+/// statement because some dialect adapters (notably Mongo) emit a follow-up
+/// read after a write operation.
+String get lastSql => capturedSql.join('\n');
 
 /// Get all captured SQL queries that contain SELECT
 List<String> get selectQueries =>
@@ -159,6 +177,62 @@ class _SqlMatcher extends Matcher {
   @override
   bool matches(dynamic item, Map matchState) {
     if (item is! String) return false;
+
+    final mongoOperations = _extractMongoOperations(item);
+    if (mongoOperations.isNotEmpty) {
+      final expectedUpper = expected.toUpperCase();
+      final expectedLower = expected.toLowerCase();
+      if (expectedUpper == 'SELECT') {
+        return mongoOperations.any(
+          (op) =>
+              op == 'find' ||
+              op == 'findone' ||
+              op == 'findall' ||
+              op == 'aggregate',
+        );
+      }
+      if (expectedUpper == 'UPDATE') {
+        return mongoOperations.any(
+          (op) =>
+              op.contains('update') ||
+              op.contains('increment') ||
+              op.contains('decrement') ||
+              op.contains('softdelete') ||
+              op == 'restore' ||
+              op == 'save',
+        );
+      }
+      if (expectedUpper == 'INSERT') {
+        return mongoOperations.any(
+          (op) => {'create', 'bulkcreate', 'save'}.contains(op),
+        );
+      }
+      if (expectedUpper == 'DELETE') {
+        return mongoOperations.any(
+          (op) =>
+              op == 'destroy' ||
+              op == 'truncate' ||
+              op == 'instancedestroy' ||
+              op.contains('delete'),
+        );
+      }
+      if (expectedUpper == 'WHERE') {
+        final lowerItem = item.toLowerCase();
+        return lowerItem.contains('"where"') || lowerItem.contains(r'$match');
+      }
+      if (expectedLower.contains('count(')) {
+        return mongoOperations.contains('count');
+      }
+      if (expectedLower.contains('max(')) {
+        return mongoOperations.contains('max');
+      }
+      if (expectedLower.contains('min(')) {
+        return mongoOperations.contains('min');
+      }
+      if (expectedLower.contains('sum(')) {
+        return mongoOperations.contains('sum');
+      }
+    }
 
     // Normalize: remove quotes (both " and `) and convert to lowercase
     String normalize(String sql) {
@@ -178,4 +252,16 @@ class _SqlMatcher extends Matcher {
   @override
   Description describe(Description description) =>
       description.add('contains SQL similar to ').addDescriptionOf(expected);
+
+  List<String> _extractMongoOperations(String sql) {
+    final matches =
+        RegExp(r'\[mongo:([a-zA-Z0-9_.-]+)\]').allMatches(sql).toList();
+    if (matches.isEmpty) {
+      return const <String>[];
+    }
+    return matches
+        .map((match) => match.group(1)?.toLowerCase())
+        .whereType<String>()
+        .toList();
+  }
 }
