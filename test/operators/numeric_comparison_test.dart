@@ -8,6 +8,17 @@ import '../test_helper.dart';
 ///
 /// These tests verify that numeric operators produce correct SQL output.
 void main() {
+  if (isMongo) {
+    group('Numeric Comparison Operators', () {
+      test(
+        'skipped for Mongo',
+        () {},
+        skip: 'Mongo SQL-string operator assertions are not supported.',
+      );
+    });
+    return;
+  }
+
   setUpAll(() async {
     await initTestEnvironment();
   });

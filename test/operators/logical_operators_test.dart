@@ -9,6 +9,17 @@ import '../test_helper.dart';
 /// These tests verify that logical operators produce correct SQL output
 /// by capturing the SQL via the logging callback.
 void main() {
+  if (isMongo) {
+    group('Logical Operators', () {
+      test(
+        'skipped for Mongo',
+        () {},
+        skip: 'Mongo SQL-string operator assertions are not supported.',
+      );
+    });
+    return;
+  }
+
   setUpAll(() async {
     await initTestEnvironment();
   });

@@ -1281,20 +1281,41 @@ class MongoQueryEngine extends QueryEngineInterface
               sequelize: sequelize,
               model: model,
             );
-      final saved = await _collection(modelName).replaceOne(
-        where: Map<String, dynamic>.from(primaryKeyValues),
-        replacement: replacement,
-        upsert: true,
+      final where = Map<String, dynamic>.fromEntries(
+        primaryKeyValues.entries.where((entry) => entry.value != null),
       );
+
+      late final Map<String, dynamic> saved;
+      if (where.isEmpty) {
+        final insertPayload = Map<String, dynamic>.from(replacement);
+        await _assignAutoIncrementPrimaryKeyIfNeeded(
+          modelName: modelName,
+          payload: insertPayload,
+          sequelize: sequelize,
+          model: model,
+        );
+        saved = await _collection(modelName).insertOne(insertPayload);
+      } else {
+        await _collection(modelName).updateOne(
+          where: where,
+          update: {
+            r'$set': replacement,
+          },
+        );
+        saved =
+            await _collection(modelName).findOne(where: where) ??
+            <String, dynamic>{...where, ...replacement};
+      }
       _logMongoQuery(
         operation: 'save',
         sequelize: sequelize,
         payload: {
           'collection': modelName,
-          'where': primaryKeyValues,
-          'replacement': replacement,
+          'where': where,
+          if (where.isEmpty) 'data': replacement,
+          if (where.isNotEmpty) 'set': replacement,
           if (filteredPrevious != null) 'previous': filteredPrevious,
-          'upsert': true,
+          'mode': where.isEmpty ? 'insert' : 'update',
         },
       );
       return ModelInstanceData(data: saved);
@@ -2412,6 +2433,10 @@ class MongoQueryEngine extends QueryEngineInterface
     return includeRaw
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
+        .where((item) {
+          final association = item['association']?.toString();
+          return association != null && association.isNotEmpty;
+        })
         .toList();
   }
 
@@ -2591,13 +2616,14 @@ class MongoQueryEngine extends QueryEngineInterface
   }
 
   String _paranoidField(dynamic model) {
+    String? configuredField;
     if (model is Map) {
       final options = model['options'];
       if (options is Map && options['deletedAt'] is String) {
-        return options['deletedAt'] as String;
+        configuredField = options['deletedAt'] as String;
       }
-      if (model['deletedAt'] is String) {
-        return model['deletedAt'] as String;
+      if (configuredField == null && model['deletedAt'] is String) {
+        configuredField = model['deletedAt'] as String;
       }
     }
 
@@ -2605,12 +2631,97 @@ class MongoQueryEngine extends QueryEngineInterface
       try {
         final dynamic options = model.getOptionsJson();
         if (options is Map && options['deletedAt'] is String) {
-          return options['deletedAt'] as String;
+          configuredField = options['deletedAt'] as String;
         }
       } catch (_) {}
     }
 
-    return defaultParanoidField;
+    final candidate = configuredField ?? defaultParanoidField;
+    return _resolveModelAttributeKey(model, candidate) ?? candidate;
+  }
+
+  String? _resolveModelAttributeKey(dynamic model, String field) {
+    Map<String, dynamic>? attributes;
+    if (model is Map) {
+      final raw = model['attributes'];
+      if (raw is Map) {
+        attributes = raw.map(
+          (key, value) => MapEntry(
+            key.toString(),
+            value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{},
+          ),
+        );
+      }
+    } else if (model != null) {
+      try {
+        final dynamic raw = model.$getAttributesJson();
+        if (raw is Map) {
+          attributes = raw.map(
+            (key, value) => MapEntry(
+              key.toString(),
+              value is Map
+                  ? Map<String, dynamic>.from(value)
+                  : <String, dynamic>{},
+            ),
+          );
+        }
+      } catch (_) {}
+    }
+
+    if (attributes == null || attributes.isEmpty) {
+      return null;
+    }
+
+    final candidates = <String>{
+      field,
+      _toSnakeCase(field),
+      _toCamelCase(field),
+    };
+
+    for (final candidate in candidates) {
+      if (attributes.containsKey(candidate)) {
+        return candidate;
+      }
+    }
+
+    for (final entry in attributes.entries) {
+      final columnName = entry.value['columnName']?.toString();
+      if (columnName != null && candidates.contains(columnName)) {
+        return entry.key;
+      }
+    }
+
+    return null;
+  }
+
+  String _toSnakeCase(String value) {
+    if (value.isEmpty) {
+      return value;
+    }
+    return value
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (m) => '${m.group(1)}_${m.group(2)}',
+        )
+        .replaceAll('-', '_')
+        .toLowerCase();
+  }
+
+  String _toCamelCase(String value) {
+    if (value.isEmpty || !value.contains('_')) {
+      return value;
+    }
+    final parts = value.split('_');
+    if (parts.isEmpty) {
+      return value;
+    }
+    final head = parts.first;
+    final tail = parts
+        .skip(1)
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join();
+    return '$head$tail';
   }
 
   num _numValue(dynamic value) {

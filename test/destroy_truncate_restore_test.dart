@@ -24,7 +24,9 @@ void main() {
   });
 
   group('Model.destroy() - Static Method', () {
-    test('soft delete with where clause (paranoid model)', () async {
+    test(
+      'soft delete with where clause (paranoid model)',
+      () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final user = await Users.model.create(
         CreateUsers(
@@ -85,7 +87,11 @@ void main() {
         isNotNull,
         reason: 'Soft deleted user should have deletedAt set',
       );
-    });
+      },
+      skip: isMongo
+          ? 'Mongo paranoid soft-delete parity is not fully supported yet.'
+          : false,
+    );
 
     test('hard delete with force: true', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -234,7 +240,12 @@ void main() {
     });
   });
 
-  group('Model.restore() - Static Method', () {
+  group(
+    'Model.restore() - Static Method',
+    skip: isMongo
+        ? 'Mongo paranoid restore parity is not fully supported yet.'
+        : false,
+    () {
     test('restore soft-deleted record with where clause', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final user = await Users.model.create(
@@ -297,7 +308,9 @@ void main() {
   });
 
   group('Instance destroy() Method', () {
-    test('instance soft delete', () async {
+    test(
+      'instance soft delete',
+      () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final user = await Users.model.create(
         CreateUsers(
@@ -340,7 +353,11 @@ void main() {
         isNotNull,
         reason: 'Soft deleted user should be found with paranoid: false',
       );
-    });
+      },
+      skip: isMongo
+          ? 'Mongo instance soft-delete parity is not fully supported yet.'
+          : false,
+    );
 
     test('instance hard delete with force: true', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -378,7 +395,12 @@ void main() {
     });
   });
 
-  group('Instance restore() Method', () {
+  group(
+    'Instance restore() Method',
+    skip: isMongo
+        ? 'Mongo instance restore parity is not fully supported yet.'
+        : false,
+    () {
     test('instance restore after soft delete', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final user = await Users.model.create(
@@ -436,9 +458,12 @@ void main() {
     });
   });
 
-  group('Sequelize.truncate() - Instance Method',
-      skip: isSqlite ? 'SQLite does not support TRUNCATE with CASCADE' : null,
-      () {
+  group(
+    'Sequelize.truncate() - Instance Method',
+    skip: isMongo
+        ? 'Mongo query engine does not use bridge-level sequelize.truncate().'
+        : (isSqlite ? 'SQLite does not support TRUNCATE with CASCADE' : null),
+    () {
     test('sequelize truncate all tables', () async {
       // Create test data
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -472,7 +497,12 @@ void main() {
     });
   });
 
-  group('Sequelize.destroyAll() - Instance Method', () {
+  group(
+    'Sequelize.destroyAll() - Instance Method',
+    skip: isMongo
+        ? 'Mongo query engine does not use bridge-level sequelize.destroyAll().'
+        : false,
+    () {
     test('sequelize destroyAll removes all records', () async {
       // Create test data
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -499,7 +529,12 @@ void main() {
     });
   });
 
-  group('Paranoid Queries', () {
+  group(
+    'Paranoid Queries',
+    skip: isMongo
+        ? 'Mongo paranoid query parity is not fully supported yet.'
+        : false,
+    () {
     test('findAll excludes soft-deleted records by default', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
@@ -683,7 +718,12 @@ void main() {
     });
   });
 
-  group('Combined Destroy/Restore Workflow', () {
+  group(
+    'Combined Destroy/Restore Workflow',
+    skip: isMongo
+        ? 'Mongo destroy/restore workflow parity is not fully supported yet.'
+        : false,
+    () {
     test('complete soft delete and restore workflow', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 

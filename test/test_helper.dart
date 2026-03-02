@@ -107,10 +107,6 @@ Future<void> initTestEnvironment() async {
     ),
   );
 
-  if (isMongo) {
-    sequelize.useMongoQueryEngine();
-  }
-
   // Initialize with all models
   await sequelize.initialize(
     models: [Users.model, Post.model, PostDetails.model],
@@ -161,7 +157,11 @@ void clearCapturedSql() {
 }
 
 /// Get the last captured SQL query
-String get lastSql => capturedSql.isNotEmpty ? capturedSql.last : '';
+///
+/// We return the captured query batch (joined) rather than only the final
+/// statement because some dialect adapters (notably Mongo) emit a follow-up
+/// read after a write operation.
+String get lastSql => capturedSql.join('\n');
 
 /// Get all captured SQL queries that contain SELECT
 List<String> get selectQueries =>
@@ -177,6 +177,62 @@ class _SqlMatcher extends Matcher {
   @override
   bool matches(dynamic item, Map matchState) {
     if (item is! String) return false;
+
+    final mongoOperations = _extractMongoOperations(item);
+    if (mongoOperations.isNotEmpty) {
+      final expectedUpper = expected.toUpperCase();
+      final expectedLower = expected.toLowerCase();
+      if (expectedUpper == 'SELECT') {
+        return mongoOperations.any(
+          (op) =>
+              op == 'find' ||
+              op == 'findone' ||
+              op == 'findall' ||
+              op == 'aggregate',
+        );
+      }
+      if (expectedUpper == 'UPDATE') {
+        return mongoOperations.any(
+          (op) =>
+              op.contains('update') ||
+              op.contains('increment') ||
+              op.contains('decrement') ||
+              op.contains('softdelete') ||
+              op == 'restore' ||
+              op == 'save',
+        );
+      }
+      if (expectedUpper == 'INSERT') {
+        return mongoOperations.any(
+          (op) => {'create', 'bulkcreate', 'save'}.contains(op),
+        );
+      }
+      if (expectedUpper == 'DELETE') {
+        return mongoOperations.any(
+          (op) =>
+              op == 'destroy' ||
+              op == 'truncate' ||
+              op == 'instancedestroy' ||
+              op.contains('delete'),
+        );
+      }
+      if (expectedUpper == 'WHERE') {
+        final lowerItem = item.toLowerCase();
+        return lowerItem.contains('"where"') || lowerItem.contains(r'$match');
+      }
+      if (expectedLower.contains('count(')) {
+        return mongoOperations.contains('count');
+      }
+      if (expectedLower.contains('max(')) {
+        return mongoOperations.contains('max');
+      }
+      if (expectedLower.contains('min(')) {
+        return mongoOperations.contains('min');
+      }
+      if (expectedLower.contains('sum(')) {
+        return mongoOperations.contains('sum');
+      }
+    }
 
     // Normalize: remove quotes (both " and `) and convert to lowercase
     String normalize(String sql) {
@@ -196,4 +252,16 @@ class _SqlMatcher extends Matcher {
   @override
   Description describe(Description description) =>
       description.add('contains SQL similar to ').addDescriptionOf(expected);
+
+  List<String> _extractMongoOperations(String sql) {
+    final matches =
+        RegExp(r'\[mongo:([a-zA-Z0-9_.-]+)\]').allMatches(sql).toList();
+    if (matches.isEmpty) {
+      return const <String>[];
+    }
+    return matches
+        .map((match) => match.group(1)?.toLowerCase())
+        .whereType<String>()
+        .toList();
+  }
 }

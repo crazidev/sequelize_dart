@@ -4,11 +4,32 @@ import 'package:sequelize_orm/sequelize_orm.dart';
 import 'package:sequelize_orm/src/bridge/bridge_client.dart';
 import 'package:sequelize_orm/src/sequelize/sequelize_interface.dart';
 
+typedef DialectInitializer = void Function(Sequelize sequelize);
+
 /// Unified Sequelize implementation for both Dart VM and dart2js.
 /// Both platforms now use the bridge pattern (stdio for VM, Worker Thread for JS).
 ///
 /// {@category Get Started}
 class Sequelize extends SequelizeInterface {
+  static final Map<String, DialectInitializer> _dialectInitializers =
+      <String, DialectInitializer>{};
+
+  /// Registers a dialect-specific initializer that runs during createInstance.
+  ///
+  /// This allows external packages to automatically attach custom query engines
+  /// based on connection dialect (e.g. Mongo).
+  static void registerDialectInitializer({
+    required String dialect,
+    required DialectInitializer initializer,
+  }) {
+    _dialectInitializers[dialect.toLowerCase()] = initializer;
+  }
+
+  /// Removes a previously registered dialect initializer.
+  static void unregisterDialectInitializer(String dialect) {
+    _dialectInitializers.remove(dialect.toLowerCase());
+  }
+
   final BridgeClient _bridge = BridgeClient.instance;
   final Map<String, Model> _models = {};
   final Map<String, Map<String, dynamic>> _associationDefinitions = {};
@@ -84,6 +105,13 @@ class Sequelize extends SequelizeInterface {
     }
 
     _connectionConfig = config;
+
+    final dialect = config['dialect']?.toString().toLowerCase();
+    final initializer = dialect == null ? null : _dialectInitializers[dialect];
+    if (_queryEngine == null && initializer != null) {
+      initializer(this);
+    }
+
     return this;
   }
 

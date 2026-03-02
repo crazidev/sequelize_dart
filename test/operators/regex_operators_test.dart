@@ -11,6 +11,17 @@ import '../test_helper.dart';
 /// SQLite does not natively support REGEXP without a user-defined function,
 /// so these tests are skipped for SQLite.
 void main() {
+  if (isMongo) {
+    group('Regex Operators', () {
+      test(
+        'skipped for Mongo',
+        () {},
+        skip: 'Mongo SQL-string operator assertions are not supported.',
+      );
+    });
+    return;
+  }
+
   setUpAll(() async {
     await initTestEnvironment();
   });

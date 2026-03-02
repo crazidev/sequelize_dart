@@ -13,11 +13,11 @@ const mongoUrl = 'mongodb://localhost:27017';
 const mongoDatabase = 'sequelize_dart';
 
 final sequelize = Sequelize().createInstance(
-  // connection: SequelizeConnection.postgres(url: postgresConnectionString),
-  connection: MongoConnectionOptions(
-    url: mongoUrl,
-    database: mongoDatabase,
-  ),
+  connection: SequelizeConnection.postgres(url: postgresConnectionString),
+  // connection: MongoConnectionOptions(
+  //   url: mongoUrl,
+  //   database: mongoDatabase,
+  // ),
   logging: (message) {
     if (message.startsWith('[mongo:')) {
       MongoDbFormatter.printFormatted(message);
@@ -30,13 +30,18 @@ final sequelize = Sequelize().createInstance(
 
 /// Main entry point - handles database setup and initialization
 Future<void> main() async {
-  sequelize.useMongoQueryEngine();
-
   await sequelize.initialize(
     models: Db.allModels(),
   );
 
   await sequelize.sync();
+
+  for (var model in Db.allModels()) {
+    await model.truncate(
+      cascade: true,
+      restartIdentity: true,
+    );
+  }
 
   await sequelize.seed(
     seeders: Db.allSeeders(),

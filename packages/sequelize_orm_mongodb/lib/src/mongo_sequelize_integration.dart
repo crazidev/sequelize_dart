@@ -132,8 +132,16 @@ class MongoSequelizeIntegration {
           associationName: associationName,
           targetCollection: targetModel,
           associationType: associationType,
-          localField: sourceKey ?? sourcePrimaryKey,
-          foreignField: foreignKey ?? _defaultForeignKey(sourceModel),
+          localField: _resolveAttributeKey(
+            sequelize: sequelize,
+            modelName: sourceModel,
+            field: sourceKey ?? sourcePrimaryKey,
+          ),
+          foreignField: _resolveAttributeKey(
+            sequelize: sequelize,
+            modelName: targetModel,
+            field: foreignKey ?? _defaultForeignKey(sourceModel),
+          ),
         );
       case MongoAssociationType.belongsTo:
         return MongoAssociationDefinition(
@@ -141,10 +149,90 @@ class MongoSequelizeIntegration {
           associationName: associationName,
           targetCollection: targetModel,
           associationType: associationType,
-          localField: foreignKey ?? _defaultForeignKey(targetModel),
-          foreignField: targetKey ?? targetPrimaryKey,
+          localField: _resolveAttributeKey(
+            sequelize: sequelize,
+            modelName: sourceModel,
+            field: foreignKey ?? _defaultForeignKey(targetModel),
+          ),
+          foreignField: _resolveAttributeKey(
+            sequelize: sequelize,
+            modelName: targetModel,
+            field: targetKey ?? targetPrimaryKey,
+          ),
         );
     }
+  }
+
+  static String _resolveAttributeKey({
+    required Sequelize sequelize,
+    required String modelName,
+    required String field,
+  }) {
+    final model = sequelize.getModel(modelName);
+    if (model == null) {
+      return field;
+    }
+
+    final dynamic dynamicModel = model;
+    final rawAttributes = dynamicModel.$getAttributesJson();
+    final attributes = rawAttributes.map(
+      (key, value) => MapEntry(key.toString(), Map<String, dynamic>.from(value)),
+    );
+    if (attributes.isEmpty) {
+      return field;
+    }
+
+    final snake = _toSnakeCase(field);
+    final camel = _toCamelCase(field);
+    final directCandidates = <String>{field, snake, camel};
+
+    for (final candidate in directCandidates) {
+      if (attributes.containsKey(candidate)) {
+        return candidate;
+      }
+    }
+
+    for (final entry in attributes.entries) {
+      final columnName = entry.value['columnName']?.toString();
+      if (columnName == null || columnName.isEmpty) {
+        continue;
+      }
+      if (directCandidates.contains(columnName)) {
+        return entry.key;
+      }
+    }
+
+    return field;
+  }
+
+  static String _toSnakeCase(String value) {
+    if (value.isEmpty) {
+      return value;
+    }
+    return value
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (m) => '${m.group(1)}_${m.group(2)}',
+        )
+        .replaceAll('-', '_')
+        .toLowerCase();
+  }
+
+  static String _toCamelCase(String value) {
+    if (value.isEmpty || !value.contains('_')) {
+      return value;
+    }
+    final parts = value.split('_');
+    if (parts.isEmpty) {
+      return value;
+    }
+    final head = parts.first;
+    final tail = parts
+        .skip(1)
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join();
+    return '$head$tail';
   }
 
   static MongoAssociationType? _parseAssociationType(String associationType) {

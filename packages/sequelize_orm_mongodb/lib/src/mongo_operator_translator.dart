@@ -151,6 +151,9 @@ class MongoOperatorTranslator {
         case r'$is':
           translatedOperators[r'$eq'] = _translateValue(opValue);
           break;
+        case r'$isNot':
+          translatedOperators[r'$ne'] = _translateValue(opValue);
+          break;
         case r'$not':
           translatedOperators[r'$not'] = _translateNotValue(opValue);
           break;

@@ -70,13 +70,19 @@ class MongoLookupBuilder {
       final nestedIncludes = nestedIncludeRaw
           .whereType<Map>()
           .map((value) => Map<String, dynamic>.from(value))
+          .where((value) {
+            final association = value['association']?.toString();
+            return association != null && association.isNotEmpty;
+          })
           .toList();
-      subPipeline.addAll(
-        buildLookupStages(
-          sourceModel: definition.targetCollection,
-          includes: nestedIncludes,
-        ),
-      );
+      if (nestedIncludes.isNotEmpty) {
+        subPipeline.addAll(
+          buildLookupStages(
+            sourceModel: definition.targetCollection,
+            includes: nestedIncludes,
+          ),
+        );
+      }
     }
 
     final includeOrder = include['order'];

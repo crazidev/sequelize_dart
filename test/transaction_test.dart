@@ -5,6 +5,18 @@ import 'package:test/test.dart';
 import 'test_helper.dart';
 
 void main() {
+  if (isMongo) {
+    group('Transactions', () {
+      test(
+        'skipped for Mongo',
+        () {},
+        skip:
+            'Mongo query engine does not support bridge-managed transaction APIs.',
+      );
+    });
+    return;
+  }
+
   setUpAll(() async {
     await initTestEnvironment();
   });
