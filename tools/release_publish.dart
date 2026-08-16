@@ -99,7 +99,8 @@ Future<void> main(List<String> args) async {
         }
       } else {
         _info('\nSkipping GitHub releases: gh CLI is not installed.');
-        _info('  Install it from https://cli.github.com/ then re-run with --github-release');
+        _info(
+            '  Install it from https://cli.github.com/ then re-run with --github-release');
       }
     }
 
@@ -233,7 +234,8 @@ Future<void> _createTag(_Package pkg) async {
     return;
   }
 
-  await _run('git', ['tag', '-a', tag, '-m', 'Release ${pkg.name} ${pkg.version}']);
+  await _run(
+      'git', ['tag', '-a', tag, '-m', 'Release ${pkg.name} ${pkg.version}']);
   await _run('git', ['push', 'origin', tag]);
 }
 
@@ -248,7 +250,8 @@ Future<bool> _isAlreadyPublished(_Package pkg) async {
     final client = HttpClient();
     try {
       final request = await client.getUrl(
-        Uri.parse('https://pub.dev/api/packages/${pkg.name}/versions/${pkg.version}'),
+        Uri.parse(
+            'https://pub.dev/api/packages/${pkg.name}/versions/${pkg.version}'),
       );
       final response = await request.close();
       await response.drain<void>();
@@ -372,8 +375,7 @@ Future<void> _run(
   String? workingDirectory,
 }) async {
   final display = [executable, ...arguments].join(' ');
-  final cwdSuffix =
-      workingDirectory != null ? ' (cwd: $workingDirectory)' : '';
+  final cwdSuffix = workingDirectory != null ? ' (cwd: $workingDirectory)' : '';
   stdout.writeln('  \$ $display$cwdSuffix');
 
   final process = await Process.start(

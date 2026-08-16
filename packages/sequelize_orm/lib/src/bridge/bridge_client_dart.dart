@@ -234,8 +234,36 @@ class BridgeClient implements BridgeClientInterface {
       print('[BridgeClient] Failed to resolve package URI for bundle: $e');
     }
 
-    // Fallback to the logical package path which will trigger the "not found"
-    // error in start() if the resolution failed.
+    // In AOT binaries, Isolate.resolvePackageUri returns null.
+    // Search current directory, parent directories, and executable path.
+    final candidatePaths = [
+      'packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
+      '../packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
+      '../../packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
+      p.join(p.dirname(Platform.resolvedExecutable),
+          'packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js'),
+      p.join(p.dirname(Platform.resolvedExecutable),
+          '../packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js'),
+    ];
+
+    for (final candidate in candidatePaths) {
+      if (File(candidate).existsSync()) {
+        return p.absolute(candidate);
+      }
+    }
+
+    // Traverse upward from Directory.current to find repo root
+    var dir = Directory.current;
+    for (var i = 0; i < 5; i++) {
+      final probe = File(p.join(dir.path,
+          'packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js'));
+      if (probe.existsSync()) {
+        return probe.absolute.path;
+      }
+      if (dir.parent.path == dir.path) break;
+      dir = dir.parent;
+    }
+
     return 'packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js';
   }
 

@@ -35,7 +35,8 @@ void main() {
       );
 
       expect(user.id, isNotNull, reason: 'User should be created');
-      expect(user.deletedAt, isNull, reason: 'deletedAt should be null initially');
+      expect(user.deletedAt, isNull,
+          reason: 'deletedAt should be null initially');
 
       clearCapturedSql();
 
@@ -126,7 +127,8 @@ void main() {
       expect(
         findResult,
         isNull,
-        reason: 'Hard deleted user should not be found even with paranoid: false',
+        reason:
+            'Hard deleted user should not be found even with paranoid: false',
       );
     });
 
@@ -534,7 +536,8 @@ void main() {
       );
     });
 
-    test('findAll with paranoid: false includes soft-deleted records', () async {
+    test('findAll with paranoid: false includes soft-deleted records',
+        () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
       // Create and soft delete a user
@@ -560,7 +563,8 @@ void main() {
       expect(
         users.length,
         equals(1),
-        reason: 'findAll with paranoid: false should include soft-deleted records',
+        reason:
+            'findAll with paranoid: false should include soft-deleted records',
       );
       expect(
         users.first.deletedAt,
@@ -603,7 +607,8 @@ void main() {
       );
     });
 
-    test('findOne with paranoid: false includes soft-deleted records', () async {
+    test('findOne with paranoid: false includes soft-deleted records',
+        () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
       // Create and soft delete a user
@@ -629,7 +634,8 @@ void main() {
       expect(
         foundUser,
         isNotNull,
-        reason: 'findOne with paranoid: false should include soft-deleted records',
+        reason:
+            'findOne with paranoid: false should include soft-deleted records',
       );
       expect(
         foundUser?.deletedAt,
@@ -706,15 +712,18 @@ void main() {
       final afterDelete = await Users.model.findOne(
         where: (u) => u.id.eq(user.id),
       );
-      expect(afterDelete, isNull, reason: 'User should not be found after soft delete');
+      expect(afterDelete, isNull,
+          reason: 'User should not be found after soft delete');
 
       // 4. Verify exists with paranoid: false
       final withParanoid = await Users.model.findOne(
         where: (u) => u.id.eq(user.id),
         paranoid: false,
       );
-      expect(withParanoid, isNotNull, reason: 'User should exist with paranoid: false');
-      expect(withParanoid?.deletedAt, isNotNull, reason: 'deletedAt should be set');
+      expect(withParanoid, isNotNull,
+          reason: 'User should exist with paranoid: false');
+      expect(withParanoid?.deletedAt, isNotNull,
+          reason: 'deletedAt should be set');
 
       // 5. Restore
       await Users.model.restore(
@@ -725,22 +734,26 @@ void main() {
       final afterRestore = await Users.model.findOne(
         where: (u) => u.id.eq(user.id),
       );
-      expect(afterRestore, isNotNull, reason: 'User should be found after restore');
-      expect(afterRestore?.deletedAt, isNull, reason: 'deletedAt should be null after restore');
+      expect(afterRestore, isNotNull,
+          reason: 'User should be found after restore');
+      expect(afterRestore?.deletedAt, isNull,
+          reason: 'deletedAt should be null after restore');
 
       // 7. Hard delete
       final hardDeleteCount = await Users.model.destroy(
         where: (u) => u.id.eq(user.id),
         force: true,
       );
-      expect(hardDeleteCount, equals(1), reason: 'Hard delete should affect 1 row');
+      expect(hardDeleteCount, equals(1),
+          reason: 'Hard delete should affect 1 row');
 
       // 8. Verify completely gone
       final afterHardDelete = await Users.model.findOne(
         where: (u) => u.id.eq(user.id),
         paranoid: false,
       );
-      expect(afterHardDelete, isNull, reason: 'User should be completely gone after hard delete');
+      expect(afterHardDelete, isNull,
+          reason: 'User should be completely gone after hard delete');
     });
   });
 }

@@ -104,10 +104,10 @@ SQL `BIGINT` can hold values up to 2^63 - 1, but JavaScript numbers lose precisi
 
 #### Dart type mapping
 
-| SQL Type | Dart Type |
-|---|---|
-| `TINYINT`, `SMALLINT`, `MEDIUMINT`, `INTEGER` | `int` |
-| `BIGINT` | `SequelizeBigInt` |
+| SQL Type                                      | Dart Type         |
+| --------------------------------------------- | ----------------- |
+| `TINYINT`, `SMALLINT`, `MEDIUMINT`, `INTEGER` | `int`             |
+| `BIGINT`                                      | `SequelizeBigInt` |
 
 #### Defining a BIGINT column
 
@@ -358,6 +358,7 @@ DataType.JSONB(type: Map<String, bool>)
 `JSONB` stores data in a binary format and supports indexing in PostgreSQL. Use `JSONB` for PostgreSQL and `JSON` for MySQL / other databases.
 
 By default, Sequelize normalizes JSON types automatically (`normalizeJsonTypes: true`). This means you can write `DataType.JSON` or `DataType.JSONB` and Sequelize will convert it to the correct type for the connected database:
+
 - **PostgreSQL**: `JSON` is automatically promoted to `JSONB` (required for full JSON querying)
 - **MySQL / MariaDB**: `JSONB` is automatically downgraded to `JSON` (the only supported type)
 
@@ -369,6 +370,7 @@ final sequelize = Sequelize().createInstance(
   normalizeJsonTypes: false, // opt out of automatic type normalization
 );
 ```
+
 :::
 
 :::tip Bridge compatibility
@@ -381,16 +383,16 @@ For a complete guide on querying JSON columns — including `.key()`, `.at()`, `
 
 The following table shows how each SQL data type maps to a Dart type in generated models:
 
-| SQL Type | Dart Type | Notes |
-|---|---|---|
-| `TINYINT`, `SMALLINT`, `MEDIUMINT`, `INTEGER` | `int` | |
-| `BIGINT` | `SequelizeBigInt` | String-backed to prevent precision loss |
-| `FLOAT`, `DOUBLE`, `DECIMAL` | `double` | |
-| `BOOLEAN` | `bool` | Also parses `1`/`0` from `int` |
-| `DATE`, `DATEONLY` | `DateTime` | |
-| `STRING`, `CHAR`, `TEXT`, `UUID` | `String` | |
-| `JSON`, `JSONB` | `Map<String, dynamic>` | Customizable via `type:` parameter |
-| `BLOB` | `List<int>` | Raw bytes |
+| SQL Type                                      | Dart Type              | Notes                                   |
+| --------------------------------------------- | ---------------------- | --------------------------------------- |
+| `TINYINT`, `SMALLINT`, `MEDIUMINT`, `INTEGER` | `int`                  |                                         |
+| `BIGINT`                                      | `SequelizeBigInt`      | String-backed to prevent precision loss |
+| `FLOAT`, `DOUBLE`, `DECIMAL`                  | `double`               |                                         |
+| `BOOLEAN`                                     | `bool`                 | Also parses `1`/`0` from `int`          |
+| `DATE`, `DATEONLY`                            | `DateTime`             |                                         |
+| `STRING`, `CHAR`, `TEXT`, `UUID`              | `String`               |                                         |
+| `JSON`, `JSONB`                               | `Map<String, dynamic>` | Customizable via `type:` parameter      |
+| `BLOB`                                        | `List<int>`            | Raw bytes                               |
 
 ## Chaining Example
 

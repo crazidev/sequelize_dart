@@ -19,7 +19,8 @@ SequelizeBigInt? parseSequelizeBigIntValue(dynamic v) {
   if (v == null) return null;
   if (v is String) return SequelizeBigInt(v);
   if (v is int) return SequelizeBigInt.fromInt(v);
-  throw FormatException('Expected String or int for BigInt, got ${v.runtimeType}');
+  throw FormatException(
+      'Expected String or int for BigInt, got ${v.runtimeType}');
 }
 
 double? parseDoubleValue(dynamic v) {
@@ -55,7 +56,9 @@ String? parseStringValue(dynamic v) {
 Map<String, dynamic>? parseMapValue(dynamic v) {
   if (v == null) return null;
   if (v is Map) return Map<String, dynamic>.from(v);
-  if (v is String) return Map<String, dynamic>.from(jsonDecode(v) as Map); // Bridge may return JSON columns as strings
+  if (v is String)
+    return Map<String, dynamic>.from(
+        jsonDecode(v) as Map); // Bridge may return JSON columns as strings
   throw FormatException('Expected Map, got ${v.runtimeType}');
 }
 

@@ -39,28 +39,28 @@ class Users {
 
 ## Table Options
 
-| Option             | Type     | Description                                              |
-| ------------------ | -------- | -------------------------------------------------------- |
-| `tableName`        | `String` | The name of the table in the database                    |
-| `underscored`      | `bool`   | Use snake_case column names. Default: `false`            |
-| `timestamps`       | `bool`   | Add `createdAt` / `updatedAt` columns. Default: `true`  |
-| `paranoid`         | `bool`   | Soft deletes via `deletedAt`. Requires timestamps        |
-| `freezeTableName`  | `bool`   | Prevent automatic pluralisation                          |
-| `schema`           | `String` | Database schema (e.g. `public`)                          |
+| Option            | Type     | Description                                            |
+| ----------------- | -------- | ------------------------------------------------------ |
+| `tableName`       | `String` | The name of the table in the database                  |
+| `underscored`     | `bool`   | Use snake_case column names. Default: `false`          |
+| `timestamps`      | `bool`   | Add `createdAt` / `updatedAt` columns. Default: `true` |
+| `paranoid`        | `bool`   | Soft deletes via `deletedAt`. Requires timestamps      |
+| `freezeTableName` | `bool`   | Prevent automatic pluralisation                        |
+| `schema`          | `String` | Database schema (e.g. `public`)                        |
 
 ## Column Annotations
 
-| Annotation            | Description                              |
-| --------------------- | ---------------------------------------- |
-| `@PrimaryKey()`       | Marks the column as the primary key      |
-| `@AutoIncrement()`    | Column auto-increments                   |
-| `@ColumnName('name')` | Set the database column name explicitly  |
-| `@NotNull()`          | Adds a NOT NULL constraint               |
-| `@AllowNull()`        | Explicitly allows NULL                   |
-| `@Default(value)`     | Sets a default value                     |
-| `@Unique()`           | Adds a unique constraint                 |
-| `@Index()`            | Creates an index on the column           |
-| `@Comment('text')`    | Adds a comment to the column             |
+| Annotation            | Description                             |
+| --------------------- | --------------------------------------- |
+| `@PrimaryKey()`       | Marks the column as the primary key     |
+| `@AutoIncrement()`    | Column auto-increments                  |
+| `@ColumnName('name')` | Set the database column name explicitly |
+| `@NotNull()`          | Adds a NOT NULL constraint              |
+| `@AllowNull()`        | Explicitly allows NULL                  |
+| `@Default(value)`     | Sets a default value                    |
+| `@Unique()`           | Adds a unique constraint                |
+| `@Index()`            | Creates an index on the column          |
+| `@Comment('text')`    | Adds a comment to the column            |
 
 ## Data Types
 

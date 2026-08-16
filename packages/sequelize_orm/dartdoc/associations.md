@@ -3,11 +3,11 @@ related data efficiently via eager loading and foreign key management.
 
 ## Association Types
 
-| Annotation    | Relationship | Example                    |
-| ------------- | ------------ | -------------------------- |
-| `@HasOne`     | One-to-one   | User has one Profile       |
-| `@HasMany`    | One-to-many  | User has many Posts        |
-| `@BelongsTo`  | Child-parent | Post belongs to User       |
+| Annotation   | Relationship | Example              |
+| ------------ | ------------ | -------------------- |
+| `@HasOne`    | One-to-one   | User has one Profile |
+| `@HasMany`   | One-to-many  | User has many Posts  |
+| `@BelongsTo` | Child-parent | Post belongs to User |
 
 ## Defining Associations
 

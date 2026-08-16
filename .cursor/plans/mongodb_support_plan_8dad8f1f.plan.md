@@ -9,7 +9,7 @@ todos:
     content: Implement MongoConnection wrapping mongo_dart client with connection config
     status: pending
   - id: mongo-operator-translator
-    content: "Implement operator translator: $notIn->$nin, $like->$regex, $startsWith->^regex, $col->$expr, etc."
+    content: 'Implement operator translator: $notIn->$nin, $like->$regex, $startsWith->^regex, $col->$expr, etc.'
     status: pending
   - id: mongo-like-to-regex
     content: Implement LIKE pattern to MongoDB regex converter (%, _, escaping)
@@ -33,10 +33,10 @@ todos:
     content: Add MongoDB DialectCapabilities (all operators except match, no sync)
     status: pending
   - id: mongo-generator
-    content: "Update generator for mongodb dialect: _id primary key convention, skip sync, skip match"
+    content: 'Update generator for mongodb dialect: _id primary key convention, skip sync, skip match'
     status: pending
   - id: mongo-analyzer-rules
-    content: "Add analyzer lint rules: mongodb_no_schema_sync, mongodb_match_not_supported, mongodb_id_convention"
+    content: 'Add analyzer lint rules: mongodb_no_schema_sync, mongodb_match_not_supported, mongodb_id_convention'
     status: pending
   - id: mongo-tests
     content: Write tests for operator translation, aggregation pipeline, $lookup generation, and query engine
@@ -65,7 +65,6 @@ These JSON operators are sent to MongoDB verbatim:
 
 ### Minor Translation
 
-
 | ORM JSON Operator     | MongoDB Equivalent                          | Translation                     |
 | --------------------- | ------------------------------------------- | ------------------------------- |
 | `$notIn: [...]`       | `$nin: [...]`                               | Rename key                      |
@@ -83,7 +82,6 @@ These JSON operators are sent to MongoDB verbatim:
 | `$iRegexp: 'p'`       | `{$regex: 'p', $options: 'i'}`              | Rename + flag                   |
 | `$is: null`           | `{$eq: null}`                               | Simplify                        |
 | `$col: 'otherField'`  | `{$expr: {$eq: ['$field', '$otherField']}}` | Use `$expr`                     |
-
 
 ### LIKE Pattern to Regex Conversion
 
@@ -157,7 +155,6 @@ Implements [packages/sequelize_orm/lib/src/query/query_engine/query_engine_inter
 
 ### Method Mapping
 
-
 | QueryEngineInterface Method | MongoDB Implementation                                                          |
 | --------------------------- | ------------------------------------------------------------------------------- |
 | `findAll`                   | `collection.find(translatedQuery).toList()` with sort/skip/limit                |
@@ -177,7 +174,6 @@ Implements [packages/sequelize_orm/lib/src/query/query_engine/query_engine_inter
 | `restore`                   | `collection.updateMany(where, {$unset: {deletedAt: ''}})` (paranoid)            |
 | `instanceDestroy`           | `collection.deleteOne({_id: id})` or set `deletedAt` if paranoid                |
 | `instanceRestore`           | `collection.updateOne({_id: id}, {$unset: {deletedAt: ''}})`                    |
-
 
 ### Associations via `$lookup`
 
@@ -228,13 +224,11 @@ Include options map to sub-pipeline stages:
 
 ### BelongsTo Methods
 
-
 | Method            | MongoDB Implementation                                                            |
 | ----------------- | --------------------------------------------------------------------------------- |
 | `belongsToGet`    | `db.collection(targetModel).findOne({_id: foreignKeyValue})`                      |
 | `belongsToSet`    | `db.collection(sourceModel).updateOne({_id: id}, {$set: {foreignKey: targetId}})` |
 | `belongsToCreate` | Insert into target collection, then update source foreign key                     |
-
 
 ## Dialect Capabilities
 
@@ -290,7 +284,6 @@ Minimal -- MongoDB is very permissive. Only a few rules needed:
 
 ## Comparison: Engine Complexity Across Dialects
 
-
 | Aspect               | SQL (current)              | MongoDB (new)               | Firestore (new)                 |
 | -------------------- | -------------------------- | --------------------------- | ------------------------------- |
 | Operator translation | Delegated to Sequelize.js  | ~15 key renames/transforms  | ~10 mappings, many unsupported  |
@@ -299,7 +292,6 @@ Minimal -- MongoDB is very permissive. Only a few rules needed:
 | Schema               | DDL via sync()             | Schemaless                  | Schemaless                      |
 | Query complexity     | Full SQL                   | Near-full (missing tsquery) | Very limited                    |
 | Engine code size     | Thin (delegates to bridge) | Thin (near pass-through)    | Medium (more translation)       |
-
 
 MongoDB is the **lowest-effort** dialect to add after the dialect-aware infrastructure is built.
 

@@ -34,6 +34,7 @@ targets:
 ## Running the generator
 
 ### Method 1: CLI (Recommended & Faster)
+
 The `generate` command is optimized for model generation and runs significantly faster than `build_runner`.
 
 ```bash
@@ -42,6 +43,7 @@ dart run sequelize_orm_generator:generate
 ```
 
 ### Method 2: `build_runner`
+
 Standard Dart code generation.
 
 ```bash
@@ -60,16 +62,16 @@ For each `*.model.dart` file, the generator produces a `*.model.g.dart` file con
 
 The main model class with query methods:
 
-| Method              | Description                       |
-| ------------------- | --------------------------------- |
-| `findAll()`         | Find all records matching filters |
-| `findOne()`         | Find a single record              |
-| `findByPrimaryKey()`| Find by primary key               |
-| `create()`          | Create a new record               |
-| `update()`          | Update matching records           |
-| `count()`           | Count matching records            |
-| `max()` / `min()`   | Column max/min value              |
-| `sum()`             | Column sum                        |
+| Method               | Description                       |
+| -------------------- | --------------------------------- |
+| `findAll()`          | Find all records matching filters |
+| `findOne()`          | Find a single record              |
+| `findByPrimaryKey()` | Find by primary key               |
+| `create()`           | Create a new record               |
+| `update()`           | Update matching records           |
+| `count()`            | Count matching records            |
+| `max()` / `min()`    | Column max/min value              |
+| `sum()`              | Column sum                        |
 
 ### Values class (`UsersValues`)
 
@@ -117,11 +119,11 @@ Users.model.findAll(
 
 The generator also produces a centralized model registry. Create a `*.registry.dart` file (e.g. `lib/models/db.registry.dart`) and the generator will scan all `*.model.dart` files to produce a registry class:
 
-| Registry file            | Generated class | Output file      |
-| ------------------------ | --------------- | ---------------- |
-| `db.registry.dart`       | `Db`            | `db.dart`        |
-| `models.registry.dart`   | `Models`        | `models.dart`    |
-| `database.registry.dart` | `Database`      | `database.dart`  |
+| Registry file            | Generated class | Output file     |
+| ------------------------ | --------------- | --------------- |
+| `db.registry.dart`       | `Db`            | `db.dart`       |
+| `models.registry.dart`   | `Models`        | `models.dart`   |
+| `database.registry.dart` | `Database`      | `database.dart` |
 
 The generated registry provides:
 

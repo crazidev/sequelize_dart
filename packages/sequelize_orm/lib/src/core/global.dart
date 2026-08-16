@@ -42,20 +42,23 @@ String resolveBridgeWorkerPath() {
 
   // Try possible paths relative to current working directory
   final possiblePaths = [
-    // From project root: packages/sequelize_orm/js/
+    // From project root: packages/sequelize_orm/lib/src/bridge/
     path.join(
       path.join(path.join(cwd, 'packages'), 'sequelize_orm'),
-      path.join('js', bundleName),
+      path.join(path.join('lib', 'src'), path.join('bridge', bundleName)),
     ),
-    // From example directory: ../packages/sequelize_orm/js/
+    // From example directory: ../packages/sequelize_orm/lib/src/bridge/
     path.join(
       path.join(path.join(cwd, '..'), 'packages'),
-      path.join(path.join('sequelize_orm', 'js'), bundleName),
+      path.join(
+        path.join('sequelize_orm', 'lib'),
+        path.join('src', path.join('bridge', bundleName)),
+      ),
     ),
     // Node modules style
     path.join(
       path.join(path.join(cwd, 'node_modules'), 'sequelize_orm'),
-      path.join('js', bundleName),
+      path.join(path.join('lib', 'src'), path.join('bridge', bundleName)),
     ),
     // Fallback to same directory
     path.join(cwd, bundleName),

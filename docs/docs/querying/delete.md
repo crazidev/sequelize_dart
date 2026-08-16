@@ -52,12 +52,12 @@ await Users.model.destroy(
 
 ### Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `where` | `Function` | Required. Callback to build the WHERE clause |
-| `force` | `bool` | If `true`, performs hard delete even on paranoid models |
-| `limit` | `int` | Maximum number of records to delete |
-| `individualHooks` | `bool` | If `true`, runs hooks for each instance |
+| Option            | Type       | Description                                             |
+| ----------------- | ---------- | ------------------------------------------------------- |
+| `where`           | `Function` | Required. Callback to build the WHERE clause            |
+| `force`           | `bool`     | If `true`, performs hard delete even on paranoid models |
+| `limit`           | `int`      | Maximum number of records to delete                     |
+| `individualHooks` | `bool`     | If `true`, runs hooks for each instance                 |
 
 ## Model.truncate() - Clear Table
 
@@ -76,11 +76,11 @@ await Users.model.truncate(
 
 ### Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `cascade` | `bool` | Truncate dependent tables as well |
-| `restartIdentity` | `bool` | Reset auto-increment sequences |
-| `force` | `bool` | Force truncate even on paranoid models |
+| Option            | Type   | Description                            |
+| ----------------- | ------ | -------------------------------------- |
+| `cascade`         | `bool` | Truncate dependent tables as well      |
+| `restartIdentity` | `bool` | Reset auto-increment sequences         |
+| `force`           | `bool` | Force truncate even on paranoid models |
 
 ## Model.restore() - Restore Soft-Deleted Records
 
@@ -101,11 +101,11 @@ final user = await Users.model.findOne(
 
 ### Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `where` | `Function` | Required. Callback to build the WHERE clause |
-| `limit` | `int` | Maximum number of records to restore |
-| `individualHooks` | `bool` | If `true`, runs hooks for each instance |
+| Option            | Type       | Description                                  |
+| ----------------- | ---------- | -------------------------------------------- |
+| `where`           | `Function` | Required. Callback to build the WHERE clause |
+| `limit`           | `int`      | Maximum number of records to restore         |
+| `individualHooks` | `bool`     | If `true`, runs hooks for each instance      |
 
 ## Sequelize-Level Operations
 

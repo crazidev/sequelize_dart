@@ -4,13 +4,13 @@ This document summarizes how the Sequelize Dart ORM codebase is structured and h
 
 ## 1. Package Structure
 
-| Package / Area | Purpose |
-|----------------|--------|
-| **`packages/sequelize_orm`** | Core ORM: `Sequelize`, `Model`, query API, connection options, bridge client. |
+| Package / Area                         | Purpose                                                                                                              |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **`packages/sequelize_orm`**           | Core ORM: `Sequelize`, `Model`, query API, connection options, bridge client.                                        |
 | **`packages/sequelize_orm_generator`** | Build-time generator: reads `@Table` models and emits `*.model.g.dart` (model classes, columns, CRUD, associations). |
-| **`packages/sequelize_orm_analyzer`** | Analyzer/lint rules (e.g. table must be abstract). |
-| **`example`** | Sample app: `Db` registry, models, seeders, `main.dart` wiring. |
-| **`packages/sequelize_orm/js`** | Node bridge: TypeScript server that runs Sequelize.js and handles JSON-RPC. |
+| **`packages/sequelize_orm_analyzer`**  | Analyzer/lint rules (e.g. table must be abstract).                                                                   |
+| **`example`**                          | Sample app: `Db` registry, models, seeders, `main.dart` wiring.                                                      |
+| **`packages/sequelize_orm/js`**        | Node bridge: TypeScript server that runs Sequelize.js and handles JSON-RPC.                                          |
 
 ## 2. High-Level Flow
 
@@ -49,17 +49,17 @@ So: **typed Dart callbacks → Query (and QueryOperator tree) → toJson() → b
 
 ## 7. Key Files by Concern
 
-| Concern | Files |
-|--------|--------|
-| **App bootstrap** | `example/lib/main.dart`, `example/lib/db/db.dart` |
-| **Sequelize instance & init** | `packages/sequelize_orm/lib/src/sequelize/sequelize_impl.dart` |
-| **Model base & CRUD API** | `packages/sequelize_orm/lib/src/model/model_impl.dart` |
-| **Running queries** | `packages/sequelize_orm/lib/src/query/query_engine/query_engine_impl.dart` |
-| **Query shape** | `packages/sequelize_orm/lib/src/query/query/query.dart` |
-| **Bridge (Dart)** | `packages/sequelize_orm/lib/src/bridge/bridge_client_interface.dart`, `bridge_client_dart.dart` (and JS variant) |
-| **Bridge (Node)** | `packages/sequelize_orm/js/src/request_handler.ts`, `handlers/*.ts` |
-| **Code generation** | `packages/sequelize_orm_generator/lib/src/sequelize_model_generator.dart` and `generators/methods/_generate_*.dart` |
-| **Annotations** | `packages/sequelize_orm/lib/src/annotations.dart` and `annotations/*.dart` |
+| Concern                       | Files                                                                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **App bootstrap**             | `example/lib/main.dart`, `example/lib/db/db.dart`                                                                   |
+| **Sequelize instance & init** | `packages/sequelize_orm/lib/src/sequelize/sequelize_impl.dart`                                                      |
+| **Model base & CRUD API**     | `packages/sequelize_orm/lib/src/model/model_impl.dart`                                                              |
+| **Running queries**           | `packages/sequelize_orm/lib/src/query/query_engine/query_engine_impl.dart`                                          |
+| **Query shape**               | `packages/sequelize_orm/lib/src/query/query/query.dart`                                                             |
+| **Bridge (Dart)**             | `packages/sequelize_orm/lib/src/bridge/bridge_client_interface.dart`, `bridge_client_dart.dart` (and JS variant)    |
+| **Bridge (Node)**             | `packages/sequelize_orm/js/src/request_handler.ts`, `handlers/*.ts`                                                 |
+| **Code generation**           | `packages/sequelize_orm_generator/lib/src/sequelize_model_generator.dart` and `generators/methods/_generate_*.dart` |
+| **Annotations**               | `packages/sequelize_orm/lib/src/annotations.dart` and `annotations/*.dart`                                          |
 
 ## 8. Tech Stack Summary
 

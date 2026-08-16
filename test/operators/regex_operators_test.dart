@@ -23,7 +23,8 @@ void main() {
     clearCapturedSql();
   });
 
-  group('Regex Operators', skip: isSqlite ? 'SQLite does not support REGEXP natively' : null, () {
+  group('Regex Operators',
+      skip: isSqlite ? 'SQLite does not support REGEXP natively' : null, () {
     test('regexp produces correct SQL', () async {
       await Users.model.findAll(
         where: (user) => user.email.regexp('^admin'),

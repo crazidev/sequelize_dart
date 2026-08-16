@@ -57,8 +57,7 @@ Future<int> _runSeedCommand({
     databaseName: databaseName,
   );
 
-  final hasDiscreteParams =
-      selectedProfile != null &&
+  final hasDiscreteParams = selectedProfile != null &&
       (selectedProfile.host != null ||
           selectedProfile.database != null ||
           selectedProfile.user != null);
@@ -213,8 +212,7 @@ Options:
   bool? force,
   bool verbose,
   String? packageRoot,
-})
-_parseArgs(List<String> args) {
+}) _parseArgs(List<String> args) {
   String? valueAfter(String flag) {
     final idx = args.indexOf(flag);
     if (idx == -1) return null;

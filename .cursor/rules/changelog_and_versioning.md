@@ -24,11 +24,11 @@ When bumping the version (e.g., from `0.1.4` to `0.1.5`), you **MUST** update th
 
 - Update `packages/sequelize_orm/CHANGELOG.md` with every release.
 - Use the following categories for entries:
-    - **FEAT**: New features or significant additions.
-    - **FIX**: Bug fixes.
-    - **IMPROVEMENT**: Non-breaking enhancements or performance gains.
-    - **CHORE**: Internal maintenance, documentation updates, or refactoring.
-    - **REFACTOR**: Specifically for structural code changes that don't change behavior.
+  - **FEAT**: New features or significant additions.
+  - **FIX**: Bug fixes.
+  - **IMPROVEMENT**: Non-breaking enhancements or performance gains.
+  - **CHORE**: Internal maintenance, documentation updates, or refactoring.
+  - **REFACTOR**: Specifically for structural code changes that don't change behavior.
 - Entries should be concise but descriptive.
 
 ## Code Generation Recommendation

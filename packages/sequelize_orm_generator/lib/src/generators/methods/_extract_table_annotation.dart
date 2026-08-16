@@ -50,9 +50,8 @@ Map<String, dynamic> _extractTableAnnotation(ConstantReader annotation) {
     result['collate'] = annotation.peek('collate')?.stringValue;
   }
   if (annotation.peek('initialAutoIncrement')?.isNull == false) {
-    result['initialAutoIncrement'] = annotation
-        .peek('initialAutoIncrement')
-        ?.stringValue;
+    result['initialAutoIncrement'] =
+        annotation.peek('initialAutoIncrement')?.stringValue;
   }
 
   // Complex types - extract their values

@@ -17,8 +17,8 @@ void _extractNumberValidator(
   final numValue = valueReader?.isNull == false
       ? valueReader?.literalValue
       : versionReader?.isNull == false
-      ? versionReader?.intValue
-      : null;
+          ? versionReader?.intValue
+          : null;
 
   if (numValue == null) return;
 

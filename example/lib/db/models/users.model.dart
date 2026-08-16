@@ -47,3 +47,40 @@ abstract class Users {
 
   static UsersModel get model => UsersModel();
 }
+
+class Address {
+  final String city;
+  final String country;
+
+  Address({required this.city, required this.country});
+
+  factory Address.fromJson(Map<String, dynamic> json) {
+    return Address(
+      city: json['city'],
+      country: json['country'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'city': city,
+      'country': country,
+    };
+  }
+}
+
+class Metadata {
+  final String role;
+  final bool isAdmin;
+  final String level;
+  final Address address;
+  final int age;
+
+  Metadata({
+    required this.role,
+    required this.isAdmin,
+    required this.level,
+    required this.address,
+    required this.age,
+  });
+}

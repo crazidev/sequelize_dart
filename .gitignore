@@ -1,29 +1,49 @@
 # https://dart.dev/guides/libraries/private-files
 # Created by `dart pub`
 .dart_tool/
+**/.dart_tool/
 
 # Avoid committing pubspec.lock for library packages; see
 # https://dart.dev/guides/libraries/private-files#pubspeclock.
 pubspec.lock
-build/*
-node_modules/*
+*.lock
+.packages
+
+# Build outputs
+build/
+**/build/
+out/
+**/out/
 temp/
 example/build/
-*.lock
+benchmarks/build/
 
-# Bridge server bundle (generated file)
+# Node modules & bundle dependencies
+node_modules/
+**/node_modules/
+package-lock.json
+**/package-lock.json
+# Prettier & generated files
+.prettiercache
+*.g.dart
+**/*.g.dart
+
+# Bridge server bundle internal artifacts
 packages/sequelize_orm/js/node_modules/
 packages/sequelize_orm/js/package-lock.json
+
+# Serverpod temporary files
+.serverpod/
+**/.serverpod/
 
 # Docusaurus
 docs/build/*
 docs/.docusaurus/*
 docs/node_modules/*
 
-# Prettier
-.prettiercache
-*.g.dart
-package-lock.json
-package.json
+# OS / Editor artifacts
+.DS_Store
+**/.DS_Store
 .idea/
 *.iml
+.vscode/

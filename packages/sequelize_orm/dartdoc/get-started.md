@@ -73,6 +73,7 @@ class Users {
 ## Generate Code
 
 ### `generate` (Recommended)
+
 This command is significantly faster than `build_runner` as it only processes your models.
 
 ```bash
@@ -80,6 +81,7 @@ dart run sequelize_orm_generator:generate
 ```
 
 ### `build_runner`
+
 Standard Dart code generation. Use this if you have other builders in your project.
 
 ```bash

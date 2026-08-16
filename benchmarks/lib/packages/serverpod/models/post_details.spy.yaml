@@ -1,0 +1,17 @@
+class: PostDetail
+table: post_details
+fields:
+  likes: int?
+  metadata: String?
+  postId:
+    type: int?
+    column: post_id
+  userId:
+    type: int?
+    column: user_id
+  createdAt:
+    type: DateTime?
+    column: created_at
+  updatedAt:
+    type: DateTime?
+    column: updated_at

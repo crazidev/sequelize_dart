@@ -26,24 +26,24 @@ abstract class Users {
 
 **Array JSON:**
 
-| Definition | Dart type |
-|---|---|
-| `DataType.JSONB(type: List<String>)` | `List<String>?` |
-| `DataType.JSONB(type: List<int>)` | `List<int>?` |
-| `DataType.JSONB(type: List<double>)` | `List<double>?` |
-| `DataType.JSONB(type: List<bool>)` | `List<bool>?` |
-| `DataType.JSONB(type: List<dynamic>)` | `List<dynamic>?` |
+| Definition                                         | Dart type                     |
+| -------------------------------------------------- | ----------------------------- |
+| `DataType.JSONB(type: List<String>)`               | `List<String>?`               |
+| `DataType.JSONB(type: List<int>)`                  | `List<int>?`                  |
+| `DataType.JSONB(type: List<double>)`               | `List<double>?`               |
+| `DataType.JSONB(type: List<bool>)`                 | `List<bool>?`                 |
+| `DataType.JSONB(type: List<dynamic>)`              | `List<dynamic>?`              |
 | `DataType.JSONB(type: List<Map<String, dynamic>>)` | `List<Map<String, dynamic>>?` |
 
 **Object JSON:**
 
-| Definition | Dart type |
-|---|---|
-| `DataType.JSONB` _(default)_ | `Map<String, dynamic>?` |
-| `DataType.JSONB(type: Map<String, String>)` | `Map<String, String>?` |
-| `DataType.JSONB(type: Map<String, int>)` | `Map<String, int>?` |
-| `DataType.JSONB(type: Map<String, double>)` | `Map<String, double>?` |
-| `DataType.JSONB(type: Map<String, bool>)` | `Map<String, bool>?` |
+| Definition                                  | Dart type               |
+| ------------------------------------------- | ----------------------- |
+| `DataType.JSONB` _(default)_                | `Map<String, dynamic>?` |
+| `DataType.JSONB(type: Map<String, String>)` | `Map<String, String>?`  |
+| `DataType.JSONB(type: Map<String, int>)`    | `Map<String, int>?`     |
+| `DataType.JSONB(type: Map<String, double>)` | `Map<String, double>?`  |
+| `DataType.JSONB(type: Map<String, bool>)`   | `Map<String, bool>?`    |
 
 :::tip JSON vs JSONB
 `JSONB` stores data in a binary format and supports indexing in PostgreSQL. Use `JSONB` for PostgreSQL and `JSON` for MySQL / other databases.
@@ -75,21 +75,21 @@ await Db.users.create(CreateUsers(
 
 This produces the following JSON values in the database:
 
-| Column | Value |
-|---|---|
-| `tags` | `["dart", "flutter", "sequelize"]` |
-| `scores` | `[95, 87, 100]` |
+| Column     | Value                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| `tags`     | `["dart", "flutter", "sequelize"]`                                                             |
+| `scores`   | `[95, 87, 100]`                                                                                |
 | `metadata` | `{"role": "admin", "level": 5, "active": true, "address": {"city": "Berlin", "zip": "10115"}}` |
 
 ## Querying JSON Columns
 
 JSON/JSONB columns are generated as `JsonColumn<T>`, where `T` is the Dart type (e.g., `JsonColumn<List<String>>` for array columns). This provides type-safe equality checks and a fluent API with three core methods:
 
-| Method | Description | SQL operator |
-|---|---|---|
-| `.key('name')` | Navigate to a key in a JSON object | `->` |
-| `.at(index)` | Navigate to an array element by index | `->` |
-| `.unquote()` | Extract as text instead of JSON | `->>` |
+| Method         | Description                           | SQL operator |
+| -------------- | ------------------------------------- | ------------ |
+| `.key('name')` | Navigate to a key in a JSON object    | `->`         |
+| `.at(index)`   | Navigate to an array element by index | `->`         |
+| `.unquote()`   | Extract as text instead of JSON       | `->>`        |
 
 ---
 
@@ -189,6 +189,7 @@ For cross-database array comparison, use `.eq()` to compare the entire array:
 // Cross-database: compare the full array
 where: (u) => u.tags.eq(['dart', 'flutter', 'sequelize'])
 ```
+
 :::
 
 ### Whole-column equality
@@ -210,12 +211,12 @@ where: (u) => u.metadata.eq({'role': 'admin', 'level': 5})
 
 ## PostgreSQL vs MySQL Compatibility
 
-| Operation | MySQL JSON | PG JSON | PG JSONB |
-|---|---|---|---|
-| `.eq()` on whole column | Works | Fails | Works |
-| `.key('x').eq(...)` | Works | Fails | Works |
-| `.at(0).eq('x')` | Works | Works | Works |
-| `.contains([...])` | Fails | Fails | Works |
+| Operation               | MySQL JSON | PG JSON | PG JSONB |
+| ----------------------- | ---------- | ------- | -------- |
+| `.eq()` on whole column | Works      | Fails   | Works    |
+| `.key('x').eq(...)`     | Works      | Fails   | Works    |
+| `.at(0).eq('x')`        | Works      | Works   | Works    |
+| `.contains([...])`      | Fails      | Fails   | Works    |
 
 :::tip normalizeJsonTypes
 By default (`normalizeJsonTypes: true`), Sequelize automatically converts `JSON` to `JSONB` on PostgreSQL and `JSONB` to `JSON` on MySQL. This means you can write your models once and they work across databases without code changes.
@@ -295,33 +296,33 @@ const Column('tags[0]').eq('dart')
 
 The type parameter `T` controls what `.eq()` and `.ne()` accept. For example, `JsonColumn<List<String>>` expects a `List<String>`.
 
-| Method | Returns | Description |
-|---|---|---|
-| `.key(name)` | `JsonPath` | Navigate to a key in the JSON object |
-| `.at(index)` | `JsonPath` | Navigate to an array element by index |
-| `.unquote()` | `JsonText` | Extract the whole column as text (`->>`) |
-| `.eq(T)`, `.ne(T)` | `ComparisonOperator` | Compare the whole JSON value (type-safe) |
-| `.contains(dynamic)` | `ComparisonOperator` | Array containment — PostgreSQL JSONB only |
-| `.isNull()`, `.isNotNull()` | `ComparisonOperator` | Null checks |
+| Method                      | Returns              | Description                               |
+| --------------------------- | -------------------- | ----------------------------------------- |
+| `.key(name)`                | `JsonPath`           | Navigate to a key in the JSON object      |
+| `.at(index)`                | `JsonPath`           | Navigate to an array element by index     |
+| `.unquote()`                | `JsonText`           | Extract the whole column as text (`->>`)  |
+| `.eq(T)`, `.ne(T)`          | `ComparisonOperator` | Compare the whole JSON value (type-safe)  |
+| `.contains(dynamic)`        | `ComparisonOperator` | Array containment — PostgreSQL JSONB only |
+| `.isNull()`, `.isNotNull()` | `ComparisonOperator` | Null checks                               |
 
 ### `JsonPath`
 
-| Method | Returns | Description |
-|---|---|---|
-| `.key(name)` | `JsonPath` | Navigate deeper into a nested key |
-| `.at(index)` | `JsonPath` | Navigate to an array element |
-| `.unquote()` | `JsonText` | Switch from `->` to `->>` (text extraction) |
-| `.eq()`, `.ne()`, `.gt()`, `.gte()`, `.lt()`, `.lte()` | `ComparisonOperator` | Comparison operators |
-| `.isNull()`, `.isNotNull()` | `ComparisonOperator` | Null checks |
+| Method                                                 | Returns              | Description                                 |
+| ------------------------------------------------------ | -------------------- | ------------------------------------------- |
+| `.key(name)`                                           | `JsonPath`           | Navigate deeper into a nested key           |
+| `.at(index)`                                           | `JsonPath`           | Navigate to an array element                |
+| `.unquote()`                                           | `JsonText`           | Switch from `->` to `->>` (text extraction) |
+| `.eq()`, `.ne()`, `.gt()`, `.gte()`, `.lt()`, `.lte()` | `ComparisonOperator` | Comparison operators                        |
+| `.isNull()`, `.isNotNull()`                            | `ComparisonOperator` | Null checks                                 |
 
 ### `JsonText`
 
 Returned by `.unquote()`. Operates on text extracted by `->>` and should only be used for **string comparisons**. For numeric or boolean comparisons, use `JsonPath` directly (without `.unquote()`).
 
-| Method | Returns | Description |
-|---|---|---|
-| `.eq()`, `.ne()`, `.gt()`, `.gte()`, `.lt()`, `.lte()` | `ComparisonOperator` | Comparison operators |
-| `.like()`, `.notLike()` | `ComparisonOperator` | Pattern matching |
-| `.iLike()`, `.notILike()` | `ComparisonOperator` | Case-insensitive pattern matching (PostgreSQL) |
-| `.startsWith()`, `.endsWith()`, `.substring()` | `ComparisonOperator` | String prefix/suffix/contains |
-| `.isNull()`, `.isNotNull()` | `ComparisonOperator` | Null checks |
+| Method                                                 | Returns              | Description                                    |
+| ------------------------------------------------------ | -------------------- | ---------------------------------------------- |
+| `.eq()`, `.ne()`, `.gt()`, `.gte()`, `.lt()`, `.lte()` | `ComparisonOperator` | Comparison operators                           |
+| `.like()`, `.notLike()`                                | `ComparisonOperator` | Pattern matching                               |
+| `.iLike()`, `.notILike()`                              | `ComparisonOperator` | Case-insensitive pattern matching (PostgreSQL) |
+| `.startsWith()`, `.endsWith()`, `.substring()`         | `ComparisonOperator` | String prefix/suffix/contains                  |
+| `.isNull()`, `.isNotNull()`                            | `ComparisonOperator` | Null checks                                    |

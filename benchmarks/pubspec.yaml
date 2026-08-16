@@ -1,0 +1,23 @@
+name: orm_benchmarks
+description: Benchmarks comparing Sequelize ORM, Drift, and Serverpod.
+version: 1.0.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  sequelize_orm:
+    path: ../packages/sequelize_orm
+  drift: ^2.24.0
+  drift_postgres: ^1.3.1
+  postgres: ^3.5.0
+  serverpod: 3.4.12
+  serverpod_auth_idp_server: 3.4.12
+  serverpod_auth_core_server: 3.4.12
+  meta: ^1.16.0
+  benchmark_harness: ^2.3.1
+
+dev_dependencies:
+  lints: ^6.0.0

@@ -30,6 +30,7 @@ abstract class Users {
 ```
 
 When `deletedAt` is configured, Sequelize Dart automatically:
+
 - Performs soft deletes instead of hard deletes when calling `destroy()`
 - Excludes soft-deleted records from queries by default
 - Enables the `restore()` method to recover deleted records

@@ -4,9 +4,9 @@
 - **FEAT**: Zone-based transaction inheritance — database operations automatically participate in the active transaction within the same `Zone`.
 - **FEAT**: Support for nested managed transactions.
 - **IMPROVEMENT**: Enhanced `truncate` and `destroy` options in the JS bridge:
-    - Added support for `cascade` (PostgreSQL/MySQL).
-    - Added support for `restartIdentity` (PostgreSQL).
-    - Added support for `withoutForeignKeyChecks` (MySQL/MariaDB/SQLite).
+  - Added support for `cascade` (PostgreSQL/MySQL).
+  - Added support for `restartIdentity` (PostgreSQL).
+  - Added support for `withoutForeignKeyChecks` (MySQL/MariaDB/SQLite).
 - **IMPROVEMENT**: Optimized `QueryEngine` to resolve transactions from the current `Zone` if not explicitly provided.
 - **IMPROVEMENT**: Updated `feature-list.md` to track Transaction implementation status.
 - **FIX**: Resolved setup race condition in `include_test.dart` by ensuring tables are synced before truncation.

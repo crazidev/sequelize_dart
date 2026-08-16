@@ -6,7 +6,7 @@ todos:
     content: Add `dialect` field to sequelize.yaml config and GeneratorNamingConfig (postgres, mysql, mariadb, sqlite, mssql, firestore)
     status: pending
   - id: dialect-compat-map
-    content: "Define dialect compatibility map: which methods, operators, and features each dialect supports"
+    content: 'Define dialect compatibility map: which methods, operators, and features each dialect supports'
     status: pending
   - id: generator-dialect-aware
     content: Update code generator to read dialect from config and conditionally emit only compatible methods
@@ -36,7 +36,7 @@ todos:
     content: Implement CollectionPathResolver that builds Firestore paths from model parent hierarchy
     status: pending
   - id: firebase-operator-translator
-    content: "Implement operator translator: JSON query operators -> Firestore .where() chains"
+    content: 'Implement operator translator: JSON query operators -> Firestore .where() chains'
     status: pending
   - id: firebase-query-engine
     content: Implement FirestoreQueryEngine (QueryEngineInterface) with all CRUD + aggregation methods
@@ -77,8 +77,6 @@ graph LR
   Analyzer -->|"warning: like() not\nsupported on firestore"| IDEWarning["IDE Warnings"]
 ```
 
-
-
 ## Step 1: Dialect Configuration
 
 ### 1a. sequelize.yaml
@@ -87,7 +85,7 @@ Add `dialect` as a top-level field (already partially exists under `connection.d
 
 ```yaml
 # sequelize.yaml
-dialect: firestore        # or: postgres, mysql, mariadb, sqlite, mssql
+dialect: firestore # or: postgres, mysql, mariadb, sqlite, mssql
 
 models_path: lib/db/models
 seeders_path: lib/db/seeders
@@ -311,12 +309,9 @@ graph TB
   Analyzer -->|"IDE warnings"| DevExperience["Developer IDE"]
 ```
 
-
-
 ## Summary of Changes Per Package
 
 - **sequelize_orm** -- Add `parent` to `@Table`, `collectionGroup` to `Query`, add `DialectCapabilities` class
 - **sequelize_orm_generator** -- Read dialect from config, conditionally generate methods/operators based on `DialectCapabilities`, generate Firestore path metadata when dialect is firestore
 - **sequelize_orm_analyzer** -- Read dialect from `sequelize.yaml`, add lint rules for incompatible operators/methods, add Firestore-specific rules (whereIn limit, or limit, index hints)
 - **sequelize_orm_firebase** (new) -- FirestoreQueryEngine, operator translator, path resolver, connection class
-

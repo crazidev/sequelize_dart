@@ -4,7 +4,7 @@
 //   dart run tools/run.dart <command> [options]
 //   dart run tools/run.dart --help
 //
-// Commands (each can be run individually):
+//   benchmark      Run multi-ORM benchmark suite (options: --seed, --posts=N, --users=N)
 //   benchmark-bridge Measure round-trip latency between Dart and the bridge
 //   build          Compile Dart to JS (optional: --input=, --output=)
 //   setup-bridge   Install and build bridge server bundle
@@ -14,6 +14,7 @@
 //   watch-js       Watch Dart files and recompile to JS
 //   watch-bridge   Watch TypeScript and rebuild bridge
 //   setup-dev      Start PostgreSQL in Docker for development
+//   setup-db       Setup database dialect (postgres, mysql, mariadb) for dev/test
 //   setup-git-hooks  Install git hooks from .github/hooks
 //   test           Run tests (forwards to tools/test.dart)
 //   release        Release/publish (forwards to tools/release_publish.dart)
@@ -21,13 +22,16 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'package:path/path.dart' as p;
 
+part 'cmds/benchmark_cmd.dart';
 part 'cmds/benchmark_bridge_cmd.dart';
 part 'cmds/build_all_cmd.dart';
 part 'cmds/build_cmd.dart';
 part 'cmds/format_cmd.dart';
 part 'cmds/release_cmd.dart';
 part 'cmds/setup_bridge_cmd.dart';
+part 'cmds/setup_db_cmd.dart';
 part 'cmds/setup_dev_cmd.dart';
 part 'cmds/setup_git_hook_cmd.dart';
 part 'cmds/test_cmd.dart';
@@ -52,6 +56,13 @@ void main(List<String> args) async {
 
   try {
     switch (command) {
+      case 'benchmark':
+        await cmdBenchmark(root, rest);
+        break;
+      case 'build-benchmark':
+      case 'compile-benchmark':
+        await cmdBuildBenchmark(root, rest);
+        break;
       case 'benchmark-bridge':
         await cmdBenchmarkBridge(root, rest);
         break;
@@ -78,6 +89,9 @@ void main(List<String> args) async {
         break;
       case 'setup-dev':
         await cmdSetupDev(root);
+        break;
+      case 'setup-db':
+        await cmdSetupDb(root, rest);
         break;
       case 'setup-git-hooks':
         await cmdSetupGitHooks(root);
@@ -166,6 +180,8 @@ Sequelize ORM – cross-platform tools (Windows, macOS, Linux)
 Usage: dart run tools/run.dart <command> [options]
 
 Commands:
+  benchmark        Run multi-ORM benchmark suite (Sequelize ORM, Drift, Serverpod)
+                    Options: --seed (re-sync and seed DB), --posts=N, --users=N
   benchmark-bridge  Measure round-trip latency between Dart and the bridge
                     Options: --postgres (default), --mysql, --mariadb, --sqlite
                              --iterations=N (default: 100), --verbose
@@ -179,6 +195,7 @@ Commands:
   watch-js         Watch Dart files, recompile to JS on change
   watch-bridge     Watch TypeScript, rebuild bridge on change
   setup-dev        Start PostgreSQL in Docker for development
+  setup-db         Start database in Docker (postgres, mysql, mariadb) for dev or testing (options: --dev, --test, --reset)
   setup-git-hooks  Install git hooks from .github/hooks
   test             Run tests (pass flags to tools/test.dart)
   release          Release/publish (pass flags to tools/release_publish.dart)

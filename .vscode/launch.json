@@ -17,9 +17,7 @@
       "request": "launch",
       "program": "${workspaceFolder}/example/lib/main.dart",
       "cwd": "${workspaceFolder}/example",
-      "vmAdditionalArgs": [
-        "--enable-asserts"
-      ],
+      "vmAdditionalArgs": ["--enable-asserts"],
       "console": "debugConsole"
     },
     {
@@ -30,12 +28,8 @@
       "cwd": "${workspaceFolder}/example",
       "sourceMaps": true,
       "preLaunchTask": "Build: dart2js",
-      "outFiles": [
-        "${workspaceFolder}/example/build/**/*.js"
-      ],
-      "skipFiles": [
-        "<node_internals>/**"
-      ]
+      "outFiles": ["${workspaceFolder}/example/build/**/*.js"],
+      "skipFiles": ["<node_internals>/**"]
     },
     {
       "cwd": "${workspaceFolder}",
@@ -58,9 +52,7 @@
       "type": "dart",
       "request": "launch",
       "program": "${workspaceFolder}/tools/run.dart",
-      "args": [
-        "test"
-      ],
+      "args": ["test"],
       "cwd": "${workspaceFolder}",
       "console": "debugConsole"
     }

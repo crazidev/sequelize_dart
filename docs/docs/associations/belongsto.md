@@ -132,4 +132,3 @@ final details = await PostDetails.model.create(
 ## Instance methods (planned)
 
 Sequelize supports instance methods for `belongsTo` such as `getX`, `setX`, and `createX` (see the Sequelize docs for details). We have generator code prepared for these methods, but **but we're currently testing** until the API is perfect.
-

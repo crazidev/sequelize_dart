@@ -1,0 +1,9 @@
+class: Post
+table: posts
+fields:
+  title: String?
+  content: String?
+  userId:
+    type: int?
+    column: user_id
+  views: int?

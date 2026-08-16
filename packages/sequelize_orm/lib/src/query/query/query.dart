@@ -14,7 +14,7 @@ export 'query_attributes.dart';
 class Query extends QueryInterface {
   final QueryOperator? where;
   final List<IncludeBuilder>?
-  include; // Type-safe includes with infinite nesting support
+      include; // Type-safe includes with infinite nesting support
   final dynamic order;
   final dynamic group;
   final int? limit;
@@ -70,9 +70,8 @@ class Query extends QueryInterface {
   Map<String, dynamic> toJson() {
     // Convert include to JSON format
     // Supports infinite levels of nesting through recursive IncludeBuilder.toJson()
-    final List<Map<String, dynamic>>? includeJson = include
-        ?.map((inc) => inc.toJson())
-        .toList();
+    final List<Map<String, dynamic>>? includeJson =
+        include?.map((inc) => inc.toJson()).toList();
 
     return {
       'where': where?.toJson(),

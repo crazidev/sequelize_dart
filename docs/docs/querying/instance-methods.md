@@ -44,10 +44,10 @@ await user?.destroy(force: true);
 
 ### Options
 
-| Option | Type | Description |
-|--------|------|-------------|
+| Option  | Type   | Description                                               |
+| ------- | ------ | --------------------------------------------------------- |
 | `force` | `bool` | If `true`, performs a hard delete even on paranoid models |
-| `hooks` | `bool` | If `false`, skips lifecycle hooks |
+| `hooks` | `bool` | If `false`, skips lifecycle hooks                         |
 
 ## restore()
 
@@ -70,9 +70,9 @@ print(restored != null);  // true
 
 ### Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `hooks` | `bool` | If `false`, skips lifecycle hooks |
+| Option    | Type   | Description                                     |
+| --------- | ------ | ----------------------------------------------- |
+| `hooks`   | `bool` | If `false`, skips lifecycle hooks               |
 | `logging` | `bool` | If `false`, disables logging for this operation |
 
 ## Complete Example

@@ -123,7 +123,7 @@ Access tasks via: `Cmd+Shift+P` → "Tasks: Run Task"
    cd example
    # Recommended (Faster)
    dart run sequelize_orm_generator:generate
-   
+
    # Or using build_runner
    dart run build_runner build --delete-conflicting-outputs
    ```

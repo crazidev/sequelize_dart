@@ -9,6 +9,7 @@ Sequelize Dart provides full transaction support for atomic, consistent database
 ## Managed Transactions
 
 A managed transaction is the simplest and safest way to work with transactions. You pass a callback to `sequelize.transaction()`. The transaction is automatically:
+
 - **Committed** if the callback returns without throwing.
 - **Rolled back** if the callback throws any error.
 
@@ -148,12 +149,12 @@ try {
 
 Sequelize Dart enforces strict lifecycle rules on transactions:
 
-| Scenario | Behavior |
-| :--- | :--- |
-| Using a committed transaction | Throws `SequelizeException` immediately |
-| Using a rolled-back transaction | Throws `SequelizeException` immediately |
-| Calling `commit()` twice | Throws `StateError` |
-| Calling `rollback()` after `commit()` | Throws `StateError` |
+| Scenario                              | Behavior                                |
+| :------------------------------------ | :-------------------------------------- |
+| Using a committed transaction         | Throws `SequelizeException` immediately |
+| Using a rolled-back transaction       | Throws `SequelizeException` immediately |
+| Calling `commit()` twice              | Throws `StateError`                     |
+| Calling `rollback()` after `commit()` | Throws `StateError`                     |
 
 This protects you from subtle bugs where a finished transaction is accidentally reused.
 
@@ -172,11 +173,11 @@ await tx.rollback();
 
 ## API Reference
 
-| Method | Returns | Description |
-| :--- | :--- | :--- |
-| `sequelize.transaction(callback)` | `Future<T>` | Manages the full lifecycle of a transaction. |
-| `sequelize.startUnmanagedTransaction()` | `Future<Transaction>` | Returns a manually controlled transaction. |
-| `transaction.commit()` | `Future<void>` | Commits the transaction. Throws `StateError` if already finished. |
-| `transaction.rollback()` | `Future<void>` | Rolls back the transaction. Throws `StateError` if already finished. |
-| `transaction.isFinished` | `bool` | Whether the transaction has been committed or rolled back. |
-| `Transaction.current` | `Transaction?` | Gets the active transaction from the current Dart `Zone`. |
+| Method                                  | Returns               | Description                                                          |
+| :-------------------------------------- | :-------------------- | :------------------------------------------------------------------- |
+| `sequelize.transaction(callback)`       | `Future<T>`           | Manages the full lifecycle of a transaction.                         |
+| `sequelize.startUnmanagedTransaction()` | `Future<Transaction>` | Returns a manually controlled transaction.                           |
+| `transaction.commit()`                  | `Future<void>`        | Commits the transaction. Throws `StateError` if already finished.    |
+| `transaction.rollback()`                | `Future<void>`        | Rolls back the transaction. Throws `StateError` if already finished. |
+| `transaction.isFinished`                | `bool`                | Whether the transaction has been committed or rolled back.           |
+| `Transaction.current`                   | `Transaction?`        | Gets the active transaction from the current Dart `Zone`.            |

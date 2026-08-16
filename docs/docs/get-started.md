@@ -59,6 +59,7 @@ Then run:
 ```bash
 dart pub get
 ```
+
 ## Database Connection
 
 Sequelize Dart supports PostgreSQL, MySQL, MariaDB, SQLite. Here's how to set up a connection:

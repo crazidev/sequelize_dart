@@ -26,7 +26,7 @@
 - ❌ `dialect`
 - ❌ `models`
 - ❌ `options`
-- ❌ `pool` 
+- ❌ `pool`
 - ❌ `rawOptions`
 
 ### Accessors
@@ -76,6 +76,7 @@
 - ❌ `withConnection()`
 
 ### Static / SQL Helpers
+
 - ✅ `Sequelize.fn()`
 - ✅ `Sequelize.col()`
 - ✅ `Sequelize.literal()`

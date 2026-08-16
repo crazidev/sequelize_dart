@@ -19,8 +19,8 @@ void _extractStringValidator(
   final stringValue = valueReader?.isNull == false
       ? valueReader?.stringValue
       : dateReader?.isNull == false
-      ? dateReader?.stringValue
-      : null;
+          ? dateReader?.stringValue
+          : null;
 
   if (stringValue == null) return;
 

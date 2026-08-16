@@ -122,8 +122,7 @@ Options:
   String? input,
   String? folder,
   String? output,
-})
-_parseArgs(List<String> args) {
+}) _parseArgs(List<String> args) {
   String? valueAfter(String flag) {
     final idx = args.indexOf(flag);
     if (idx == -1) return null;

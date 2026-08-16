@@ -100,10 +100,10 @@ You can also use the `.eq()` and `.not()` methods with the generated enum, raw s
 
 ## Summary Table
 
-| Syntax | Description | Example |
-|---|---|---|
-| **Shortcuts** | Direct properties (via `@EnumPrefix`) | `u.status.isActive` |
-| **Grouped** | Nested under `eq`/`not` | `u.status.eq.active` |
-| **Null** | Function-based checks | `u.status.isNull()` |
-| **Methods** | Type-safe method calls | `u.status.eq(UsersStatus.active)` |
-| **Negation** | Negated comparisons | `u.status.not.active` |
+| Syntax        | Description                           | Example                           |
+| ------------- | ------------------------------------- | --------------------------------- |
+| **Shortcuts** | Direct properties (via `@EnumPrefix`) | `u.status.isActive`               |
+| **Grouped**   | Nested under `eq`/`not`               | `u.status.eq.active`              |
+| **Null**      | Function-based checks                 | `u.status.isNull()`               |
+| **Methods**   | Type-safe method calls                | `u.status.eq(UsersStatus.active)` |
+| **Negation**  | Negated comparisons                   | `u.status.not.active`             |

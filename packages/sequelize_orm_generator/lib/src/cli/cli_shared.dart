@@ -259,8 +259,7 @@ SequelizeOrmConfig? _tryReadConfigFromSequelizeYaml(File sequelizeYaml) {
     final dbs = <String, DbProfile>{};
 
     if (databaseNode is YamlMap) {
-      final isSingle =
-          databaseNode.containsKey('url') ||
+      final isSingle = databaseNode.containsKey('url') ||
           databaseNode.containsKey('host') ||
           databaseNode.containsKey('dialect');
 
@@ -750,9 +749,9 @@ Future<bool> generateRegistries({
 
   final registryFilesAbs = (registryRelPaths != null)
       ? registryRelPaths
-            .map((r) => toAbsolutePath(packageRoot, r))
-            .where((p) => p.endsWith('.registry.dart'))
-            .toList()
+          .map((r) => toAbsolutePath(packageRoot, r))
+          .where((p) => p.endsWith('.registry.dart'))
+          .toList()
       : findRegistryFiles(packageRoot);
 
   if (registryFilesAbs.isEmpty) {
@@ -1038,9 +1037,8 @@ Future<void> runServer(String packageRoot) async {
 
       if (input != null) {
         final inputAbs = toAbsolutePath(packageRoot, input);
-        final outAbs = output != null
-            ? toAbsolutePath(packageRoot, output)
-            : null;
+        final outAbs =
+            output != null ? toAbsolutePath(packageRoot, output) : null;
         final ok = await generateOne(
           collection: collection,
           packageRoot: packageRoot,
@@ -1079,9 +1077,8 @@ Future<void> runServer(String packageRoot) async {
 
     if (cmd == 'registry') {
       final List<dynamic>? filesDyn = msg['files'] as List<dynamic>?;
-      final files = (filesDyn == null)
-          ? null
-          : filesDyn.whereType<String>().toList();
+      final files =
+          (filesDyn == null) ? null : filesDyn.whereType<String>().toList();
 
       final ok = await generateRegistries(
         packageRoot: packageRoot,

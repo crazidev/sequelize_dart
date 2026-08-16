@@ -17,11 +17,11 @@ class TableMustBeAbstract extends AnalysisRule {
   );
 
   TableMustBeAbstract()
-    : super(
-        name: 'table_must_be_abstract',
-        description:
-            'Ensures that any class with @Table annotation is an abstract class.',
-      );
+      : super(
+          name: 'table_must_be_abstract',
+          description:
+              'Ensures that any class with @Table annotation is an abstract class.',
+        );
 
   @override
   LintCode get diagnosticCode => code;

@@ -40,7 +40,9 @@ The transaction system is designed to provide both high-level "managed" transact
 ## Technical Details (Code Reference)
 
 ### Transaction Resolution Pattern
+
 Used across all `QueryEngine` methods (findAll, create, update, etc.):
+
 ```dart
 Transaction? _resolveTransaction(Transaction? transaction) {
   final tx = transaction ?? Transaction.current;
@@ -55,6 +57,7 @@ Transaction? _resolveTransaction(Transaction? transaction) {
 ```
 
 ### Managed Lifecycle (Sequelize Implementation)
+
 ```dart
 @override
 Future<T> transaction<T>(Future<T> Function(Transaction transaction) callback) async {
@@ -76,14 +79,14 @@ Future<T> transaction<T>(Future<T> Function(Transaction transaction) callback) a
 
 ## File Manifest
 
-| Path | Purpose | Key Changes |
-| :--- | :--- | :--- |
-| `lib/src/transaction/transaction.dart` | Atomic state and scoping | `isFinished` flag, `scope()` method, `Transaction.current`. |
-| `lib/src/query/query_engine/query_engine_impl.dart` | Database operation orchestration | Integrated `_resolveTransaction` into all 30+ core methods. |
-| `lib/src/sequelize/sequelize_impl.dart` | Public API Implementation | Added `startUnmanagedTransaction`, updated `transaction` lifecycle. |
-| `lib/src/sequelize/sequelize_interface.dart` | API Definition | Documentation and method split for better IDE support. |
-| `lib/src/bridge/sequelize_exceptions.dart` | Error reporting | Improved formatting of transaction lifecycle errors. |
-| `js/src/handlers/association.ts` | JS-level method discovery | Dynamic method finding for association creators. |
+| Path                                                | Purpose                          | Key Changes                                                         |
+| :-------------------------------------------------- | :------------------------------- | :------------------------------------------------------------------ |
+| `lib/src/transaction/transaction.dart`              | Atomic state and scoping         | `isFinished` flag, `scope()` method, `Transaction.current`.         |
+| `lib/src/query/query_engine/query_engine_impl.dart` | Database operation orchestration | Integrated `_resolveTransaction` into all 30+ core methods.         |
+| `lib/src/sequelize/sequelize_impl.dart`             | Public API Implementation        | Added `startUnmanagedTransaction`, updated `transaction` lifecycle. |
+| `lib/src/sequelize/sequelize_interface.dart`        | API Definition                   | Documentation and method split for better IDE support.              |
+| `lib/src/bridge/sequelize_exceptions.dart`          | Error reporting                  | Improved formatting of transaction lifecycle errors.                |
+| `js/src/handlers/association.ts`                    | JS-level method discovery        | Dynamic method finding for association creators.                    |
 
 ---
 

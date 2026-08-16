@@ -1,0 +1,20 @@
+name: sequelize_orm_tools
+description: Cross-platform developer CLI and tooling suite for Sequelize ORM Dart.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.6.0
+
+executables:
+  sqtools: run
+  sequelize_orm_tools: run
+  tools: run
+
+dependencies:
+  meta: ^1.16.0
+  path: ^1.9.0
+
+dev_dependencies:
+  lints: ^6.0.0

@@ -197,8 +197,7 @@ void main() {
         where: (u) => u.lastName.eq('BigInt'),
       );
 
-      final bigintUsers =
-          users.where((u) => u.lastName == 'BigInt').toList();
+      final bigintUsers = users.where((u) => u.lastName == 'BigInt').toList();
       expect(bigintUsers.length, greaterThanOrEqualTo(2));
 
       for (final user in bigintUsers) {

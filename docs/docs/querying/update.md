@@ -36,7 +36,7 @@ if (user != null) {
   // Update fields locally
   user.firstName = 'Updated Name';
   user.email = 'updated@example.com';
-  
+
   // Persist changes to the database
   await user.save();
 }

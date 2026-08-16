@@ -1,0 +1,26 @@
+class: User
+table: users
+fields:
+  email: String
+  firstName:
+    type: String
+    column: first_name
+  lastName:
+    type: String?
+    column: last_name
+  phoneNumber:
+    type: int?
+    column: phone_number
+  deletedAt:
+    type: DateTime?
+    column: deleted_at
+  status: String?
+  tags: String?
+  scores: String?
+  metadata: String?
+  createdAt:
+    type: DateTime?
+    column: created_at
+  updatedAt:
+    type: DateTime?
+    column: updated_at

@@ -30,8 +30,8 @@ analyzerServer:
   extraArgs: []
 
 model:
-  includeGlobs: ["**/*.model.dart"]
-  generatedExtension: ".model.g.dart"
+  includeGlobs: ['**/*.model.dart']
+  generatedExtension: '.model.g.dart'
   partDirectiveRequired: true
 ```
 

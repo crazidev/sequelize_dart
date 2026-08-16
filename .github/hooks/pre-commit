@@ -34,21 +34,23 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}🔧 Building Javascript bridge bundle...${NC}\n"
-if [ -f "tools/setup_bridge.sh" ]; then
+if [ -f "tools/run.dart" ]; then
+  dart run tools/run.dart setup-bridge
+elif [ -f "tools/setup_bridge.sh" ]; then
   bash tools/setup_bridge.sh
 fi
 
 echo -e "${BLUE}🔧 Running pre-commit formatting...${NC}\n"
 
-# Run the format script
-if [ -f "tools/format.sh" ]; then
-  bash tools/format.sh
-  
-  # Stage the formatted files
+if [ -f "tools/run.dart" ]; then
+  dart run tools/run.dart format
   git add -u
-  
+  echo -e "\n${GREEN}✅ Pre-commit formatting complete!${NC}"
+elif [ -f "tools/format.sh" ]; then
+  bash tools/format.sh
+  git add -u
   echo -e "\n${GREEN}✅ Pre-commit formatting complete!${NC}"
 else
-  echo -e "${RED}❌ Format script not found at tools/format.sh${NC}"
+  echo -e "${RED}❌ Format tool not found${NC}"
   exit 1
 fi

@@ -29,13 +29,13 @@ dart run sequelize_orm_generator:generate --registry
 dart run sequelize_orm_generator:generate --server
 ```
 
-| Option | Description |
-|--------|-------------|
-| `--input <path>` | Single `*.model.dart` file to generate. |
-| `--folder <path>` | Folder to scan for `**/*.model.dart`. |
-| `--registry` | Generate only the `*.registry.dart` outputs. |
-| `--output <path>` | Output path (only applies to `--input`). |
-| `--server` | Run as a persistent stdio server (JSON lines). |
+| Option                  | Description                                        |
+| ----------------------- | -------------------------------------------------- |
+| `--input <path>`        | Single `*.model.dart` file to generate.            |
+| `--folder <path>`       | Folder to scan for `**/*.model.dart`.              |
+| `--registry`            | Generate only the `*.registry.dart` outputs.       |
+| `--output <path>`       | Output path (only applies to `--input`).           |
+| `--server`              | Run as a persistent stdio server (JSON lines).     |
 | `--package-root <path>` | Package root (defaults to nearest `pubspec.yaml`). |
 
 ### `seed` -- Database seeding
@@ -59,14 +59,14 @@ dart run sequelize_orm_generator:seed --force
 dart run sequelize_orm_generator:seed --verbose
 ```
 
-| Option | Description |
-|--------|-------------|
-| `--url <url>` | Direct database connection URL. |
-| `--database <name>` | Select a database profile from `sequelize.yaml`. |
-| `--dialect <dialect>` | Override the dialect (postgres, mysql, mariadb, sqlite). |
-| `--alter` / `--no-alter` | Whether to run `sync({alter: true})` before seeding. (Default: `true`) |
+| Option                   | Description                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `--url <url>`            | Direct database connection URL.                                                         |
+| `--database <name>`      | Select a database profile from `sequelize.yaml`.                                        |
+| `--dialect <dialect>`    | Override the dialect (postgres, mysql, mariadb, sqlite).                                |
+| `--alter` / `--no-alter` | Whether to run `sync({alter: true})` before seeding. (Default: `true`)                  |
 | `--force` / `--no-force` | Whether to run `sync({force: true})` (drops tables!) before seeding. (Default: `false`) |
-| `--verbose` / `-v` | Show detailed logs, including SQL queries and seeder status. |
+| `--verbose` / `-v`       | Show detailed logs, including SQL queries and seeder status.                            |
 
 ---
 
@@ -135,9 +135,9 @@ void main() async {
 
 - **`seeders`**: A list of `SequelizeSeeding` instances (usually provided by `Db.allSeeders()`).
 - **`syncTableMode`**: Controls how tables are synchronized before seeding:
-    - `SyncTableMode.alter`: Equivalent to `sync({alter: true})`.
-    - `SyncTableMode.force`: Equivalent to `sync({force: true})`.
-    - `SyncTableMode.none`: Skips synchronization.
+  - `SyncTableMode.alter`: Equivalent to `sync({alter: true})`.
+  - `SyncTableMode.force`: Equivalent to `sync({force: true})`.
+  - `SyncTableMode.none`: Skips synchronization.
 - **`log`**: An optional callback `Function(String message)` to receive seeder progress notifications.
 
 ---
@@ -176,12 +176,15 @@ class UserSeeder extends SequelizeSeeding<CreateUser> {
 Sequelize Dart provides flexible logging for both SQL queries and internal setup processes.
 
 ### Redirection of Logs
+
 When you provide a `logging` callback to `createInstance`, **all** SQL-related logs are redirected there, including:
+
 - Standard SQL queries (`SELECT`, `INSERT`, etc.).
 - Model definitions (`CREATE TABLE`).
 - Association setup logs.
 
 ### Internal Debug Logging
+
 The `debug` flag in `createInstance` enables internal diagnostic logs that help you verify that Sequelize is initializing correctly.
 
 ```dart

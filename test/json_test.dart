@@ -348,8 +348,7 @@ void main() {
         where: (u) => u.lastName.eq('JSON'),
       );
 
-      final jsonUsers =
-          users.where((u) => u.lastName == 'JSON').toList();
+      final jsonUsers = users.where((u) => u.lastName == 'JSON').toList();
       expect(jsonUsers.length, greaterThanOrEqualTo(2));
 
       for (final user in jsonUsers) {

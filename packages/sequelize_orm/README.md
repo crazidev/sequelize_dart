@@ -167,13 +167,13 @@ final userById = await Db.users.findByPrimaryKey(1);
 
 ## Supported databases
 
-| Database   | Factory method                    |
-| ---------- | --------------------------------- |
-| PostgreSQL | `SequelizeConnection.postgres()`  |
-| MySQL      | `SequelizeConnection.mysql()`     |
-| MariaDB    | `SequelizeConnection.mariadb()`   |
-| SQLite     | `SequelizeConnection.sqlite()`    |
-| MSSQL      | `SequelizeConnection.mssql()`     |
+| Database   | Factory method                   |
+| ---------- | -------------------------------- |
+| PostgreSQL | `SequelizeConnection.postgres()` |
+| MySQL      | `SequelizeConnection.mysql()`    |
+| MariaDB    | `SequelizeConnection.mariadb()`  |
+| SQLite     | `SequelizeConnection.sqlite()`   |
+| MSSQL      | `SequelizeConnection.mssql()`    |
 
 You can connect using individual parameters or a connection URL:
 
