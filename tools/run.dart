@@ -42,6 +42,47 @@ part 'cmds/watch_models_cmd.dart';
 
 void cmdlog(String msg) => stdout.writeln('[tools] $msg');
 
+/// Resolved path to the docker binary.
+String get _dockerBin {
+  for (final candidate in [
+    '/usr/local/bin/docker',
+    '/usr/bin/docker',
+    '/opt/homebrew/bin/docker',
+  ]) {
+    if (File(candidate).existsSync()) return candidate;
+  }
+  return 'docker'; // fallback – rely on PATH
+}
+
+/// Environment overrides for docker subprocesses.
+/// Injects DOCKER_HOST so the daemon socket is always found regardless of
+/// which shell profile is (or isn't) loaded in the subprocess.
+Map<String, String> get _dockerEnv {
+  final env = Map<String, String>.from(Platform.environment);
+  // Prefer an explicit DOCKER_HOST already set in the environment
+  if (env.containsKey('DOCKER_HOST')) return env;
+  // Auto-detect common socket paths (Colima default, then Docker Desktop)
+  for (final sock in [
+    '${Platform.environment['HOME']}/.colima/default/docker.sock',
+    '${Platform.environment['HOME']}/.colima/docker.sock',
+    '/var/run/docker.sock',
+  ]) {
+    if (File(sock).existsSync()) {
+      env['DOCKER_HOST'] = 'unix://$sock';
+      return env;
+    }
+  }
+  return env;
+}
+
+/// Run a docker command, returning the [ProcessResult].
+Future<ProcessResult> _docker(List<String> args) =>
+    Process.run(_dockerBin, args, environment: _dockerEnv, runInShell: false);
+
+/// Start a docker process (streaming I/O), returning the [Process].
+Future<Process> _dockerStart(List<String> args) =>
+    Process.start(_dockerBin, args, environment: _dockerEnv, runInShell: false);
+
 void main(List<String> args) async {
   final root = _projectRoot;
   Directory.current = root;

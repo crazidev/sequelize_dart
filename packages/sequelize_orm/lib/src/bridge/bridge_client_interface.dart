@@ -1,7 +1,12 @@
+import 'bridge_latency.dart';
+
 /// Interface for bridge clients
 /// Both Dart VM (stdio) and dart2js (worker thread) implementations
 /// follow this interface.
 abstract class BridgeClientInterface {
+  /// Optional callback invoked after every bridge call with latency details.
+  void Function(BridgeLatencyInfo info)? latencyCallback;
+
   /// Start the bridge and connect to the database
   Future<void> start({
     required Map<String, dynamic> connectionConfig,

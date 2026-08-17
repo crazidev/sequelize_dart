@@ -1,4 +1,4 @@
-import { Sequelize } from '@sequelize/core';
+import { Sequelize } from './sequelizeExports';
 
 /**
  * Build a JSON path expression from path segments.
@@ -28,7 +28,7 @@ function buildJsonPath(path: ReadonlyArray<number | string>): string {
  * Sequelize v7 alpha hasn't implemented this yet (the dialect sets
  * jsonOperations: false with a TODO comment).
  */
-export function enableSqliteJsonSupport(sequelize: Sequelize): void {
+export function enableSqliteJsonSupport(sequelize: any): void {
   const dialect = (sequelize as any).dialect;
   if (!dialect || !dialect.name?.startsWith('sqlite')) return;
 

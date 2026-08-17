@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:orm_benchmarks/packages/drift/drift_benchmark.dart';
 import 'package:orm_benchmarks/packages/sequelize/sequelize_benchmark.dart';
+import 'package:orm_benchmarks/packages/sequelize/sequelize_quickjs_benchmark.dart';
 import 'package:orm_benchmarks/packages/serverpod/serverpod_benchmark.dart';
 import 'package:orm_benchmarks/utils/export.dart';
 
@@ -21,9 +22,11 @@ void main(List<String> args) async {
   print('  1. Sequelize ORM (Dart)');
   print('  2. Drift');
   print('  3. Serverpod ORM');
+  print('  4. Sequelize ORM (QuickJS)');
   print('Shared Database: PostgreSQL (localhost:5432/postgres)');
   print(
-      'Settings: ${warmupMillisArg}ms warmup / ${exerciseMillisArg}ms sample window per query');
+    'Settings: ${warmupMillisArg}ms warmup / ${exerciseMillisArg}ms sample window per query',
+  );
   print('============================================================\n');
 
   if (shouldSeed) {
@@ -42,6 +45,7 @@ void main(List<String> args) async {
     DriftBenchmark(),
     ServerpodOrmBenchmark(),
     SequelizeOrmBenchmark(),
+    SequelizeOrmQuickjsBenchmark(),
   ];
 
   final reports = <PackageBenchmarkReport>[];

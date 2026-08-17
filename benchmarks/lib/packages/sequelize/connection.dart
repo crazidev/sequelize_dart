@@ -1,7 +1,7 @@
+import 'package:orm_benchmarks/packages/sequelize/models/post.model.dart';
+import 'package:orm_benchmarks/packages/sequelize/models/post_details.model.dart';
+import 'package:orm_benchmarks/packages/sequelize/models/users.model.dart';
 import 'package:sequelize_orm/sequelize_orm.dart';
-import 'models/users.model.dart';
-import 'models/post.model.dart';
-import 'models/post_details.model.dart';
 
 const postgresConnectionString =
     'postgresql://postgres:postgres@localhost:5432/postgres';
@@ -17,6 +17,7 @@ Sequelize createSequelizeInstance() {
 /// Initializes Sequelize and registers all models
 Future<Sequelize> initSequelize() async {
   final sequelize = createSequelizeInstance();
+
   await sequelize.initialize(
     models: [
       Users.model,
@@ -24,5 +25,6 @@ Future<Sequelize> initSequelize() async {
       PostDetails.model,
     ],
   );
+
   return sequelize;
 }

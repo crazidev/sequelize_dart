@@ -10,6 +10,8 @@ environment:
 dependencies:
   sequelize_orm:
     path: ../packages/sequelize_orm
+  sequelize_orm_quickjs:
+    path: ../packages/sequelize_orm_quickjs
   drift: ^2.24.0
   drift_postgres: ^1.3.1
   postgres: ^3.5.0

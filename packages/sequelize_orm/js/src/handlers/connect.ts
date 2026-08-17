@@ -1,4 +1,4 @@
-import { Sequelize } from '@sequelize/core';
+import { Sequelize } from '../utils/sequelizeExports';
 import { selectDialect } from '../utils/dialectSelector';
 import { enableSqliteJsonSupport } from '../utils/sqliteJsonSupport';
 import { setOptions, setSequelize, sendNotification } from '../utils/state';

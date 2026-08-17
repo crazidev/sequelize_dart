@@ -72,14 +72,15 @@ class SequelizeCoreOptions {
   });
 
   Map<String, dynamic> toJson() {
-    return {
-      'host': host,
-      'user': user,
-      'password': password,
-      'port': port,
-      'database': database,
-      'url': url,
+    final map = <String, dynamic>{
       'hoistIncludeOptions': hoistIncludeOptions,
     };
+    if (host != null) map['host'] = host;
+    if (user != null) map['user'] = user;
+    if (password != null) map['password'] = password;
+    if (port != null) map['port'] = port;
+    if (database != null) map['database'] = database;
+    if (url != null) map['url'] = url;
+    return map;
   }
 }

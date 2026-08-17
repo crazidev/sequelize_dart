@@ -35,7 +35,7 @@ ModelInstanceData _toModelInstanceData(dynamic item) {
 /// Unified QueryEngine implementation for both Dart VM and dart2js.
 /// Both platforms use the bridge pattern for database operations.
 class QueryEngine extends QueryEngineInterface {
-  BridgeClient getBridge(dynamic sequelize) {
+  BridgeClientInterface getBridge(dynamic sequelize) {
     if (sequelize == null) {
       throw Exception('Sequelize instance is required');
     }

@@ -3,8 +3,6 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:sequelize_orm/sequelize_orm.dart';
-import 'package:sequelize_orm/src/bridge/bridge_client_dart.dart';
-import 'package:sequelize_orm/src/bridge/bridge_latency.dart';
 import 'package:sequelize_orm_example/db/models/post.model.dart';
 import 'package:sequelize_orm_example/db/models/post_details.model.dart';
 import 'package:sequelize_orm_example/db/models/users.model.dart';

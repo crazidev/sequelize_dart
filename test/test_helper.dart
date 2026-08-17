@@ -4,6 +4,7 @@ import 'package:sequelize_orm/sequelize_orm.dart';
 import 'package:sequelize_orm_example/db/models/post.model.dart';
 import 'package:sequelize_orm_example/db/models/post_details.model.dart';
 import 'package:sequelize_orm_example/db/models/users.model.dart';
+import 'package:sequelize_orm_quickjs/sequelize_orm_quickjs.dart';
 import 'package:test/test.dart';
 
 /// Connection strings for test databases
@@ -46,9 +47,18 @@ bool get isPostgres => dbType == 'postgres';
 /// Whether the active dialect is MySQL or MariaDB.
 bool get isMysqlFamily => dbType == 'mysql' || dbType == 'mariadb';
 
+/// Whether the active engine is QuickJS.
+bool get isQuickJs =>
+    Platform.environment['USE_QUICKJS'] == 'true' ||
+    Platform.environment['SEQUELIZE_ENGINE'] == 'quickjs';
+
 /// Initialize the test environment
 /// Call this in setUpAll() in your test files
 Future<void> initTestEnvironment() async {
+  if (isQuickJs) {
+    BridgeClient.overrideWith(QuickJsBridgeClient.instance);
+  }
+
   // Clear any previously captured SQL
   capturedSql.clear();
 
@@ -97,6 +107,8 @@ Future<void> initTestEnvironment() async {
   await sequelize.initialize(
     models: [Users.model, Post.model, PostDetails.model],
   );
+
+  await sequelize.sync(alter: true);
 }
 
 /// Seed initial data for tests

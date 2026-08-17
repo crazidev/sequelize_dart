@@ -3,8 +3,6 @@ import 'package:orm_benchmarks/packages/sequelize/models/post.model.dart';
 import 'package:orm_benchmarks/utils/base_benchmark.dart';
 import 'package:orm_benchmarks/utils/step_profiler.dart';
 import 'package:sequelize_orm/sequelize_orm.dart';
-import 'package:sequelize_orm/src/bridge/bridge_client_dart.dart';
-import 'package:sequelize_orm/src/bridge/bridge_latency.dart';
 
 export 'connection.dart';
 export 'queries.dart';

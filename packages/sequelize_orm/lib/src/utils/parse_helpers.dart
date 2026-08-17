@@ -75,7 +75,11 @@ List<int>? parseBlobValue(dynamic v) {
 /// `parseJsonList<int>`, `parseJsonList<Map<String, dynamic>>`, etc.
 List<T>? parseJsonList<T>(dynamic v) {
   if (v == null) return null;
-  if (v is String) v = jsonDecode(v);
+  if (v is String) {
+    if (v == 'null') return null;
+    v = jsonDecode(v);
+    if (v == null) return null;
+  }
   if (v is List) return List<T>.from(v);
   throw FormatException('Expected List<$T>, got ${v.runtimeType}');
 }
@@ -87,7 +91,11 @@ List<T>? parseJsonList<T>(dynamic v) {
 /// `parseJsonMap<String>`, `parseJsonMap<int>`, etc.
 Map<String, T>? parseJsonMap<T>(dynamic v) {
   if (v == null) return null;
-  if (v is String) v = jsonDecode(v);
+  if (v is String) {
+    if (v == 'null') return null;
+    v = jsonDecode(v);
+    if (v == null) return null;
+  }
   if (v is Map) return Map<String, T>.from(v);
   throw FormatException('Expected Map<String, $T>, got ${v.runtimeType}');
 }

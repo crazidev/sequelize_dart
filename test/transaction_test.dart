@@ -224,101 +224,117 @@ void main() {
   // NESTED TRANSACTIONS
   // ──────────────────────────────────────────────
   group('Nested Managed Transactions', () {
-    test('nested transaction commits independently of outer', () async {
-      final emailOuter =
-          'outer_${DateTime.now().millisecondsSinceEpoch}@example.com';
-      final emailNested =
-          'nested_${DateTime.now().millisecondsSinceEpoch}@example.com';
+    test(
+      'nested transaction commits independently of outer',
+      () async {
+        final emailOuter =
+            'outer_${DateTime.now().millisecondsSinceEpoch}@example.com';
+        final emailNested =
+            'nested_${DateTime.now().millisecondsSinceEpoch}@example.com';
 
-      await expectLater(
-        () => sequelize.transaction((_) async {
-          await Users.model.create(
-            CreateUsers(
-                email: emailOuter, firstName: 'Outer', lastName: 'User'),
-          );
-
-          // Nested transaction — commits before outer fails
-          await sequelize.transaction((_) async {
+        await expectLater(
+          sequelize.transaction((_) async {
+            // Outer transaction writes
             await Users.model.create(
               CreateUsers(
-                  email: emailNested, firstName: 'Nested', lastName: 'User'),
+                  email: emailOuter, firstName: 'Outer', lastName: 'User'),
             );
-          });
 
-          // Force outer to fail
-          throw Exception('Outer transaction fails intentionally');
-        }),
-        throwsException,
-      );
+            // Nested transaction — commits before outer fails
+            await sequelize.transaction((_) async {
+              await Users.model.create(
+                CreateUsers(
+                    email: emailNested, firstName: 'Nested', lastName: 'User'),
+              );
+            });
 
-      // Outer was rolled back
-      final foundOuter =
-          await Users.model.findOne(where: (u) => u.email.eq(emailOuter));
-      expect(foundOuter, isNull,
-          reason: 'Outer transaction should be rolled back');
+            // Force outer to fail
+            throw Exception('Outer transaction fails intentionally');
+          }),
+          throwsException,
+        );
 
-      // Nested was its own committed transaction
-      final foundNested =
-          await Users.model.findOne(where: (u) => u.email.eq(emailNested));
-      expect(foundNested, isNotNull,
-          reason: 'Nested transaction should have committed');
-    });
+        // Outer was rolled back
+        final foundOuter =
+            await Users.model.findOne(where: (u) => u.email.eq(emailOuter));
+        expect(foundOuter, isNull,
+            reason: 'Outer transaction should be rolled back');
+
+        // Nested was its own committed transaction
+        final foundNested =
+            await Users.model.findOne(where: (u) => u.email.eq(emailNested));
+        expect(foundNested, isNotNull,
+            reason: 'Nested transaction should have committed');
+      },
+      skip: isSqlite
+          ? 'SQLite locks the entire database and does not support concurrent write transactions easily'
+          : null,
+    );
   });
 
   // ──────────────────────────────────────────────
   // UNMANAGED INSIDE MANAGED
   // ──────────────────────────────────────────────
   group('Unmanaged Transaction inside Managed Transaction', () {
-    test('unmanaged tx is independent of managed tx rollback', () async {
-      final emailManaged =
-          'mix_m_${DateTime.now().millisecondsSinceEpoch}@example.com';
-      final emailUnmanaged =
-          'mix_u_${DateTime.now().millisecondsSinceEpoch}@example.com';
+    test(
+      'unmanaged tx is independent of managed tx rollback',
+      () async {
+        final emailManaged =
+            'mix_m_${DateTime.now().millisecondsSinceEpoch}@example.com';
+        final emailUnmanaged =
+            'mix_u_${DateTime.now().millisecondsSinceEpoch}@example.com';
 
-      final txUn = await sequelize.startUnmanagedTransaction();
+        final txUn = await sequelize.startUnmanagedTransaction();
 
-      try {
-        await sequelize.transaction((_) async {
-          // Created in managed (inherited)
-          await Users.model.create(
-            CreateUsers(
-                email: emailManaged, firstName: 'Managed', lastName: 'Mix'),
-          );
+        try {
+          await sequelize.transaction((_) async {
+            // Created in managed (inherited)
+            await Users.model.create(
+              CreateUsers(
+                  email: emailManaged, firstName: 'Managed', lastName: 'Mix'),
+            );
 
-          // Created in unmanaged (explicit passing)
-          await Users.model.create(
-            CreateUsers(
-                email: emailUnmanaged, firstName: 'Unmanaged', lastName: 'Mix'),
-            transaction: txUn,
-          );
+            // Created in unmanaged (explicit passing)
+            await Users.model.create(
+              CreateUsers(
+                  email: emailUnmanaged,
+                  firstName: 'Unmanaged',
+                  lastName: 'Mix'),
+              transaction: txUn,
+            );
 
-          // Force managed to fail — rolling back only emailManaged
-          throw Exception('Managed fails — should only affect managed records');
-        });
-      } catch (_) {
-        // Expected
-      }
+            // Force managed to fail — rolling back only emailManaged
+            throw Exception(
+                'Managed fails — should only affect managed records');
+          });
+        } catch (_) {
+          // Expected
+        }
 
-      // Managed was rolled back
-      final foundManaged =
-          await Users.model.findOne(where: (u) => u.email.eq(emailManaged));
-      expect(foundManaged, isNull,
-          reason: 'Managed record should be rolled back');
+        // Managed was rolled back
+        final foundManaged =
+            await Users.model.findOne(where: (u) => u.email.eq(emailManaged));
+        expect(foundManaged, isNull,
+            reason: 'Managed record should be rolled back');
 
-      // Unmanaged: not yet committed — not visible outside it
-      final foundUnBeforeCommit =
-          await Users.model.findOne(where: (u) => u.email.eq(emailUnmanaged));
-      expect(foundUnBeforeCommit, isNull,
-          reason: 'Unmanaged record not yet committed');
+        // Unmanaged: not yet committed — not visible outside it
+        final foundUnBeforeCommit =
+            await Users.model.findOne(where: (u) => u.email.eq(emailUnmanaged));
+        expect(foundUnBeforeCommit, isNull,
+            reason: 'Unmanaged record not yet committed');
 
-      // Commit unmanaged tx
-      await txUn.commit();
+        // Commit unmanaged tx
+        await txUn.commit();
 
-      // Now it should be visible
-      final foundUnAfterCommit =
-          await Users.model.findOne(where: (u) => u.email.eq(emailUnmanaged));
-      expect(foundUnAfterCommit, isNotNull,
-          reason: 'Unmanaged record should exist after commit');
-    });
+        // Now it should be visible
+        final foundUnAfterCommit =
+            await Users.model.findOne(where: (u) => u.email.eq(emailUnmanaged));
+        expect(foundUnAfterCommit, isNotNull,
+            reason: 'Unmanaged record should exist after commit');
+      },
+      skip: isSqlite
+          ? 'SQLite locks the entire database and does not support concurrent write transactions easily'
+          : null,
+    );
   });
 }

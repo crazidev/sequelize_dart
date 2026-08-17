@@ -85,14 +85,25 @@ void main() {
       'should order in nested include with hoistIncludeOptions = true',
       () async {
         // Close the default bridge first to ensure fresh state for hoist test
+        await sequelize.close();
         await cleanupTestEnvironment();
         clearCapturedSql();
 
         final hoistSequelize = Sequelize().createInstance(
-          connection: PostgresConnection(
-            url: postgresUrl,
-            hoistIncludeOptions: true,
-          ),
+          connection: isSqlite
+              ? SqliteConnection(
+                  storage: sqliteStorage,
+                  hoistIncludeOptions: true,
+                )
+              : isMysqlFamily
+                  ? MysqlConnection(
+                      url: mysqlUrl,
+                      hoistIncludeOptions: true,
+                    )
+                  : PostgresConnection(
+                      url: postgresUrl,
+                      hoistIncludeOptions: true,
+                    ),
           logging: (String sql) {
             capturedSql.add(sql);
           },
@@ -101,6 +112,10 @@ void main() {
         await hoistSequelize.initialize(
           models: [Users.model, Post.model, PostDetails.model],
         );
+
+        if (isSqlite) {
+          await hoistSequelize.sync(alter: true);
+        }
 
         await Users.model.findAll(
           include: (include) => [

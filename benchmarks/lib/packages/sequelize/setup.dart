@@ -74,8 +74,19 @@ Future<void> setupAndSeedDatabase({
 }
 
 Future<void> _initServerpodMetadataTables() async {
-  final migrationFile = File('migrations/20260816191505752/migration.sql');
-  if (!migrationFile.existsSync()) return;
+  // First try relative to current directory
+  var migrationFile = File('migrations/20260816191505752/migration.sql');
+  
+  if (!migrationFile.existsSync()) {
+    // Try relative to the script path
+    final scriptDir = File(Platform.script.toFilePath()).parent.parent.parent.parent.parent.path;
+    migrationFile = File('$scriptDir/benchmarks/migrations/20260816191505752/migration.sql');
+  }
+
+  if (!migrationFile.existsSync()) {
+    print('WARNING: Serverpod migration file not found! Serverpod benchmark might fail.');
+    return;
+  }
 
   final sql = migrationFile.readAsStringSync();
   final statements = sql

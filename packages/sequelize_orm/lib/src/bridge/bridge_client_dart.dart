@@ -44,11 +44,22 @@ class BridgeClient implements BridgeClientInterface {
   }
 
   static BridgeClient? _instance;
+  static BridgeClientInterface? _customInstance;
 
-  /// Get the singleton instance
-  static BridgeClient get instance {
-    _instance ??= BridgeClient._();
-    return _instance!;
+  /// Override the active BridgeClient singleton with a custom implementation
+  /// (such as QuickJsBridgeClient).
+  static void overrideWith(BridgeClientInterface client) {
+    _customInstance = client;
+  }
+
+  /// Reset any custom bridge override to the default stdio bridge.
+  static void resetOverride() {
+    _customInstance = null;
+  }
+
+  /// Get the active bridge client instance
+  static BridgeClientInterface get instance {
+    return _customInstance ?? (_instance ??= BridgeClient._());
   }
 
   @override

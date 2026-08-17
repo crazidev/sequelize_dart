@@ -7,6 +7,7 @@ import 'dart:js_interop_unsafe';
 
 import 'package:sequelize_orm/src/bridge/bridge_client_interface.dart';
 import 'package:sequelize_orm/src/bridge/bridge_exception.dart';
+import 'package:sequelize_orm/src/bridge/bridge_latency.dart';
 import 'package:sequelize_orm/src/core/global.dart';
 
 /// JS interop bindings for Node.js worker_threads module
@@ -41,6 +42,9 @@ class BridgeClient implements BridgeClientInterface {
   /// Callback for SQL logging
   Function(String sql)? _loggingCallback;
 
+  @override
+  void Function(BridgeLatencyInfo info)? latencyCallback;
+
   BridgeClient._();
 
   @override
@@ -49,11 +53,21 @@ class BridgeClient implements BridgeClientInterface {
   }
 
   static BridgeClient? _instance;
+  static BridgeClientInterface? _customInstance;
+
+  /// Override the active BridgeClient singleton with a custom implementation.
+  static void overrideWith(BridgeClientInterface client) {
+    _customInstance = client;
+  }
+
+  /// Reset any custom bridge override.
+  static void resetOverride() {
+    _customInstance = null;
+  }
 
   /// Get the singleton instance
-  static BridgeClient get instance {
-    _instance ??= BridgeClient._();
-    return _instance!;
+  static BridgeClientInterface get instance {
+    return _customInstance ?? (_instance ??= BridgeClient._());
   }
 
   @override

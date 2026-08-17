@@ -1,4 +1,4 @@
-import { Op, sql, Sequelize } from '@sequelize/core';
+import { Op, sql, Sequelize } from './sequelizeExports';
 import { getOptions, getTransaction } from './state';
 
 export function convertSqlExpression(expr: any): any {

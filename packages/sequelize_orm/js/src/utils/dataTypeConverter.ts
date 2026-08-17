@@ -1,27 +1,11 @@
-import { DataTypes } from '@sequelize/core';
-import { getOptions } from './state';
+import { DataTypes, Sequelize } from './sequelizeExports';
+import { getOptions, getSequelize } from './state';
 
-const dataTypeMap: Record<string, any> = {
-  STRING: DataTypes.STRING,
-  CHAR: DataTypes.CHAR,
-  TEXT: DataTypes.TEXT,
-  TINYINT: DataTypes.TINYINT,
-  SMALLINT: DataTypes.SMALLINT,
-  MEDIUMINT: DataTypes.MEDIUMINT,
-  INTEGER: DataTypes.INTEGER,
-  BIGINT: DataTypes.BIGINT,
-  FLOAT: DataTypes.FLOAT,
-  DOUBLE: DataTypes.DOUBLE,
-  DECIMAL: DataTypes.DECIMAL,
-  BOOLEAN: DataTypes.BOOLEAN,
-  DATE: DataTypes.DATE,
-  DATEONLY: DataTypes.DATEONLY,
-  UUID: DataTypes.UUID,
-  JSON: DataTypes.JSON,
-  JSONB: DataTypes.JSONB,
-  BLOB: DataTypes.BLOB,
-  NOW: DataTypes.NOW,
-};
+function getDataType(name: string): any {
+  const seq = getSequelize();
+  const dt = (seq ? (seq.constructor as any).DataTypes : null) || (Sequelize as any).DataTypes || DataTypes || (Sequelize as any);
+  return dt?.[name] || dt?.default?.[name];
+}
 
 function buildSequelizeType(attrDef: any): any {
   const opts = getOptions();
@@ -32,9 +16,10 @@ function buildSequelizeType(attrDef: any): any {
     const values = Array.isArray(attrDef.values) ? attrDef.values : [];
     // SQLite has no native ENUM; Sequelize uses TEXT. Use STRING for sqlite so we don't rely on ENUM.
     if (dialect === 'sqlite') {
-      return DataTypes.STRING;
+      return getDataType('STRING');
     }
-    return values.length > 0 ? DataTypes.ENUM(...values) : DataTypes.STRING;
+    const enumFn = getDataType('ENUM');
+    return values.length > 0 && typeof enumFn === 'function' ? enumFn(...values) : getDataType('STRING');
   }
 
   // sqlite3 in Sequelize v7 rejects BIGINT, so map it to INTEGER for this dialect.
@@ -52,7 +37,7 @@ function buildSequelizeType(attrDef: any): any {
     }
   }
 
-  const baseType = dataTypeMap[attrDef.type];
+  const baseType = getDataType(attrDef.type);
   if (!baseType) {
     throw new Error(`Unknown data type: ${attrDef.type}`);
   }

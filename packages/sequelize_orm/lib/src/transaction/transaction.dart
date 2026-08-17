@@ -13,7 +13,7 @@ class Transaction {
 
   /// The unique ID of the transaction in the bridge.
   final String transactionId;
-  final BridgeClient _bridge;
+  final BridgeClientInterface _bridge;
   bool _finished = false;
 
   Transaction(this.transactionId, this._bridge);

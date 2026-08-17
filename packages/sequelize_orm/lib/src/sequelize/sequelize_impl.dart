@@ -9,11 +9,14 @@ import 'package:sequelize_orm/src/sequelize/sequelize_interface.dart';
 ///
 /// {@category Get Started}
 class Sequelize extends SequelizeInterface {
-  final BridgeClient _bridge = BridgeClient.instance;
+  final BridgeClientInterface _bridge = BridgeClient.instance;
   final Map<String, Model> _models = {};
   Map<String, dynamic>? _connectionConfig;
   Function(String message)? _logging;
   bool _debug = false;
+
+  /// The active bridge client used by this Sequelize instance.
+  BridgeClientInterface get bridge => _bridge;
 
   @override
   bool get debug => _debug;
@@ -159,9 +162,6 @@ class Sequelize extends SequelizeInterface {
       print('[Sequelize] Failed to define model "$name": $error');
     });
   }
-
-  /// Get the bridge client (for QueryEngine and Model)
-  BridgeClient get bridge => _bridge;
 
   /// Get a registered model by name
   Model? getModel(String name) => _models[name];

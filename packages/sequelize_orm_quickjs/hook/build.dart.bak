@@ -1,0 +1,52 @@
+// Native Assets build hook for sequelize_orm_quickjs.
+//
+// Compiles the vendored QuickJS C sources (in native/quickjs/) into a
+// platform-native shared library (libquickjs_dart.dylib / .so / .dll) that
+// is loaded at runtime by dart:ffi via QuickJsBindings.
+//
+// Run this automatically when you build / run the package with:
+//   dart --enable-experiment=native-assets run <entry-point>
+//   dart build <entry-point>
+
+import 'package:logging/logging.dart';
+import 'package:native_assets_cli/native_assets_cli.dart';
+import 'package:native_toolchain_c/native_toolchain_c.dart';
+
+void main(List<String> args) async {
+  await build(args, (config, output) async {
+    final cBuilder = CBuilder.library(
+      name: 'quickjs_dart',
+      assetName: 'lib/src/quickjs_bindings.dart',
+      sources: [
+        'native/quickjs/quickjs.c',
+        'native/quickjs/cutils.c',
+        'native/quickjs/dtoa.c',
+        'native/quickjs/libregexp.c',
+        'native/quickjs/libunicode.c',
+        'native/quickjs/quickjs_dart_bridge.c',
+      ],
+      includes: [
+        'native/quickjs',
+      ],
+      flags: [
+        // Enable BigInt support (required by many JS libraries).
+        '-DCONFIG_BIGNUM',
+        '-D_GNU_SOURCE',
+        // Embed the version string.
+        '-DCONFIG_VERSION=\\"2024-01-13\\"',
+        // Use bytecode interpreter (no JIT) — Apple App Store compliant.
+        '-O2',
+        // Prevent signed integer overflow UB.
+        '-fwrapv',
+      ],
+    );
+
+    await cBuilder.run(
+      config: config,
+      output: output,
+      logger: Logger('')
+        ..level = Level.ALL
+        ..onRecord.listen((record) => print(record.message)),
+    );
+  });
+}
