@@ -1,7 +1,13 @@
+import 'step_profiler.dart';
+
 /// Standard interface that every ORM benchmark implementation must satisfy.
 abstract class OrmBenchmark {
   /// Name of the ORM package (e.g., 'Sequelize ORM', 'Drift', 'Serverpod')
   String get name;
+
+  /// Optional step-level profiler for detailed per-step timing.
+  /// Override in implementations that instrument internal steps.
+  StepProfiler? get stepProfiler => null;
 
   /// Initialize database connection / client pool
   Future<void> init();

@@ -119,7 +119,9 @@ class BridgeClient implements BridgeClientInterface {
         .transform(const LineSplitter())
         .listen(
       (line) {
-        _responseController.add(line);
+        if (_isInitializing) {
+          _responseController.add(line);
+        }
         _handleResponse(line);
       },
       onError: (error) {

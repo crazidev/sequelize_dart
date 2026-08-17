@@ -20,6 +20,9 @@ export async function handleFindAll(params: FindAllParams): Promise<ModelRespons
   const model = getModels().get(modelName);
   checkModelDefinition(model, modelName);
 
-  const results: Model[] = await model.findAll({ ...options, mapToModel: false });
+  const hasInclude = options.include && (Array.isArray(options.include) ? options.include.length > 0 : true);
+  const findOptions = hasInclude ? { ...options, mapToModel: false } : { ...options, raw: true };
+
+  const results: any[] = await model.findAll(findOptions);
   return toModelResponseArray(results);
 }

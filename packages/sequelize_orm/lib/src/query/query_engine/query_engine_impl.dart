@@ -24,6 +24,10 @@ dynamic _deepConvert(dynamic value) {
 
 /// Converts a bridge response to ModelInstanceData
 ModelInstanceData _toModelInstanceData(dynamic item) {
+  if (item is Map<String, dynamic>) {
+    final data = item['data'] as Map<String, dynamic>? ?? item;
+    return ModelInstanceData(data: data);
+  }
   final converted = _deepConvert(item) as Map<String, dynamic>;
   return ModelInstanceData.fromBridgeResponse(converted);
 }

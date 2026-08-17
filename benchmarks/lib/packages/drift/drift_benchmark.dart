@@ -1,4 +1,5 @@
 import '../../utils/base_benchmark.dart';
+import '../../utils/step_profiler.dart';
 import 'connection.dart';
 import 'models/database.dart';
 import 'queries.dart';
@@ -12,6 +13,11 @@ class DriftBenchmark implements OrmBenchmark {
 
   @override
   String get name => 'Drift';
+
+  /// Drift uses a direct PgDatabase connection — no intermediate serialization
+  /// layer to profile, so stepProfiler is null.
+  @override
+  StepProfiler? get stepProfiler => null;
 
   @override
   Future<void> init() async {

@@ -1,4 +1,5 @@
 import '../../utils/base_benchmark.dart';
+import '../../utils/step_profiler.dart';
 import 'connection.dart';
 import 'queries.dart';
 
@@ -10,6 +11,11 @@ class ServerpodOrmBenchmark implements OrmBenchmark {
 
   @override
   String get name => 'Serverpod';
+
+  /// Serverpod uses a direct Postgres pool — no intermediate serialization
+  /// layer to profile, so stepProfiler is null.
+  @override
+  StepProfiler? get stepProfiler => null;
 
   @override
   Future<void> init() async {

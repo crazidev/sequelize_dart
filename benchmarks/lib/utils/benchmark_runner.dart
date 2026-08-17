@@ -1,5 +1,6 @@
 import 'package:benchmark_harness/benchmark_harness.dart';
 import 'base_benchmark.dart';
+import 'step_profiler.dart';
 
 /// Holds the benchmark result for a single query test measured via [AsyncBenchmarkBase]
 class QueryBenchmarkResult {
@@ -9,12 +10,17 @@ class QueryBenchmarkResult {
   final int iterations;
   final double opsPerSecond;
 
+  /// Optional per-step average timings in milliseconds (e.g. query_build, bridge_call).
+  /// Only populated for ORMs that provide a [StepProfiler].
+  final Map<String, double>? stepBreakdownMs;
+
   const QueryBenchmarkResult({
     required this.testName,
     required this.durationMs,
     required this.rowCount,
     required this.iterations,
     required this.opsPerSecond,
+    this.stepBreakdownMs,
   });
 }
 
@@ -23,6 +29,10 @@ class OrmQueryAsyncBenchmark extends AsyncBenchmarkBase {
   final Future<int> Function() queryFn;
   final int warmupMillis;
   final int exerciseMillis;
+
+  /// Optional step profiler to mark iterations.
+  final StepProfiler? stepProfiler;
+
   int lastRowCount = 0;
   int exerciseRuns = 0;
 
@@ -31,6 +41,7 @@ class OrmQueryAsyncBenchmark extends AsyncBenchmarkBase {
     this.queryFn, {
     this.warmupMillis = 200,
     this.exerciseMillis = 1000,
+    this.stepProfiler,
   });
 
   @override
@@ -47,6 +58,7 @@ class OrmQueryAsyncBenchmark extends AsyncBenchmarkBase {
   Future<void> exercise() async {
     await run();
     exerciseRuns++;
+    stepProfiler?.markIteration();
   }
 
   @override
@@ -57,6 +69,9 @@ class OrmQueryAsyncBenchmark extends AsyncBenchmarkBase {
       if (warmupMillis > 0) {
         await AsyncBenchmarkBase.measureFor(warmup, warmupMillis);
       }
+      // Reset the step profiler after warmup so we only capture exercise data
+      stepProfiler?.reset();
+
       // Measure phase (executes continuously over exerciseMillis window)
       exerciseRuns = 0;
       final avgMicros =
@@ -91,17 +106,28 @@ class BenchmarkRunner {
     Future<int> Function() queryFn, {
     int warmupMillis = 200,
     int exerciseMillis = 800,
+    StepProfiler? stepProfiler,
   }) async {
+    // Reset the step profiler before each test
+    stepProfiler?.reset();
+
     final bench = OrmQueryAsyncBenchmark(
       testName,
       queryFn,
       warmupMillis: warmupMillis,
       exerciseMillis: exerciseMillis,
+      stepProfiler: stepProfiler,
     );
 
     final avgMicros = await bench.measure();
     final durationMs = avgMicros / 1000.0;
     final opsPerSec = avgMicros > 0 ? (1000000.0 / avgMicros) : 0.0;
+
+    // Collect step breakdown from profiler (if any)
+    final Map<String, double>? stepBreakdown =
+        (stepProfiler != null && stepProfiler.hasData)
+            ? stepProfiler.averageMs
+            : null;
 
     return QueryBenchmarkResult(
       testName: testName,
@@ -109,6 +135,7 @@ class BenchmarkRunner {
       rowCount: bench.lastRowCount,
       iterations: bench.exerciseRuns,
       opsPerSecond: opsPerSec,
+      stepBreakdownMs: stepBreakdown,
     );
   }
 
@@ -129,6 +156,7 @@ class BenchmarkRunner {
     print('Warming up connection pool...');
     await benchmark.warmup();
 
+    final profiler = benchmark.stepProfiler;
     final results = <QueryBenchmarkResult>[];
 
     // 1. findAll (all posts)
@@ -138,6 +166,7 @@ class BenchmarkRunner {
       () => benchmark.findAllPosts(),
       warmupMillis: warmupMillis,
       exerciseMillis: exerciseMillis,
+      stepProfiler: profiler,
     ));
 
     // 2. findAll (limit 10)
@@ -147,6 +176,7 @@ class BenchmarkRunner {
       () => benchmark.findAllPostsWithLimit(10),
       warmupMillis: warmupMillis,
       exerciseMillis: exerciseMillis,
+      stepProfiler: profiler,
     ));
 
     // 3. findOne
@@ -156,6 +186,7 @@ class BenchmarkRunner {
       () => benchmark.findOnePost(1),
       warmupMillis: warmupMillis,
       exerciseMillis: exerciseMillis,
+      stepProfiler: profiler,
     ));
 
     // 4. count
@@ -165,6 +196,7 @@ class BenchmarkRunner {
       () => benchmark.countPosts(),
       warmupMillis: warmupMillis,
       exerciseMillis: exerciseMillis,
+      stepProfiler: profiler,
     ));
 
     // 5. findAll (where id < 50)
@@ -174,6 +206,7 @@ class BenchmarkRunner {
       () => benchmark.findPostsWhereIdLessThan(50),
       warmupMillis: warmupMillis,
       exerciseMillis: exerciseMillis,
+      stepProfiler: profiler,
     ));
 
     // 6. findAll with include (join)
@@ -183,6 +216,7 @@ class BenchmarkRunner {
       () => benchmark.findPostsWithDetails(10),
       warmupMillis: warmupMillis,
       exerciseMillis: exerciseMillis,
+      stepProfiler: profiler,
     ));
 
     // 7. 5 sequential findOnes
@@ -192,6 +226,7 @@ class BenchmarkRunner {
       () => benchmark.sequentialFindPosts(5),
       warmupMillis: warmupMillis,
       exerciseMillis: exerciseMillis,
+      stepProfiler: profiler,
     ));
 
     // 8. findAll (complex where)
@@ -201,6 +236,7 @@ class BenchmarkRunner {
       () => benchmark.complexWhere(10, 50, 20),
       warmupMillis: warmupMillis,
       exerciseMillis: exerciseMillis,
+      stepProfiler: profiler,
     ));
 
     await benchmark.close();

@@ -21,6 +21,9 @@ export async function handleFindOne(params: FindOneParams): Promise<ModelRespons
   const model = models.get(modelName);
   checkModelDefinition(model, modelName);
 
-  const result: Model = await model.findOne(options);
+  const hasInclude = options.include && (Array.isArray(options.include) ? options.include.length > 0 : true);
+  const findOptions = hasInclude ? options : { ...options, raw: true };
+
+  const result: any = await model.findOne(findOptions);
   return result ? toModelResponse(result) : null;
 }
