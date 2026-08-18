@@ -19,7 +19,8 @@ void main() {
     });
 
     test('eval string and json manipulation', () {
-      final result = runtime.eval('JSON.stringify({ hello: "world", count: 42 })');
+      final result =
+          runtime.eval('JSON.stringify({ hello: "world", count: 42 })');
       expect(result, equals('{"hello":"world","count":42}'));
     });
 
@@ -29,9 +30,13 @@ void main() {
     });
 
     test('polyfilled crypto.createHash works', () {
-      final hash = runtime.eval('crypto.createHash("sha256").update("hello").digest("hex")');
+      final hash = runtime
+          .eval('crypto.createHash("sha256").update("hello").digest("hex")');
       // sha256("hello") = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
-      expect(hash, equals('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'));
+      expect(
+          hash,
+          equals(
+              '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'));
     });
 
     test('polyfilled Buffer works', () {
@@ -48,7 +53,8 @@ void main() {
         };
       ''');
 
-      final result = await runtime.callAsync('testAsyncAdd', {'a': 15, 'b': 27});
+      final result =
+          await runtime.callAsync('testAsyncAdd', {'a': 15, 'b': 27});
       expect(result, isA<Map>());
       expect(result['sum'], equals(42));
       expect(result['message'], equals('ok'));

@@ -10,7 +10,9 @@ void main() {
       expect(identical(client1, client2), isTrue);
     });
 
-    test('initializes and executes in-process bridge with typed SequelizeException', () async {
+    test(
+        'initializes and executes in-process bridge with typed SequelizeException',
+        () async {
       final client = QuickJsBridgeClient.instance;
 
       // SQLite3 triggers our custom SequelizeConnectionError explaining the driver requirement

@@ -83,30 +83,92 @@ DynamicLibrary _loadLibrary() {
     return DynamicLibrary.process();
   }
 
-  // 1. Try standard dynamic library open (works when Native Assets or system path provides it)
-  try {
-    return DynamicLibrary.open(libName);
-  } catch (_) {}
-
-  // 2. Search common build / output locations
-  final candidatePaths = [
-    '/tmp/$libName',
-    libName,
-    'native/quickjs/$libName',
-    'packages/sequelize_orm_quickjs/native/quickjs/$libName',
-    '../packages/sequelize_orm_quickjs/native/quickjs/$libName',
-    '../../packages/sequelize_orm_quickjs/native/quickjs/$libName',
-  ];
-
-  for (final path in candidatePaths) {
-    if (File(path).existsSync()) {
+  // 1. Check environment variable override
+  final envLib = Platform.environment['QUICKJS_DART_LIB'] ??
+      Platform.environment['LIBQUICKJS_PATH'];
+  if (envLib != null && envLib.isNotEmpty) {
+    final envFile = File(envLib);
+    if (envFile.existsSync()) {
       try {
-        return DynamicLibrary.open(File(path).absolute.path);
+        return DynamicLibrary.open(envFile.absolute.path);
       } catch (_) {}
     }
   }
 
-  // Final attempt: throws dynamic library error if not found
+  // 2. Try standard dynamic library open (works when Native Assets or system path provides it)
+  try {
+    return DynamicLibrary.open(libName);
+  } catch (_) {}
+
+  // 3. Collect candidate search paths across bundle, script, CWD, and build locations
+  final candidatePaths = <String>[];
+
+  // Paths relative to executable (crucial for AOT bundles built via `dart build cli`)
+  try {
+    final exeFile = File(Platform.resolvedExecutable);
+    final exeDir = exeFile.parent;
+    final exeParent = exeDir.parent;
+
+    // Standard `dart build cli` layout: <bundle>/bin/<exe> and <bundle>/lib/<dylib>
+    candidatePaths.add('${exeParent.path}/lib/$libName');
+    candidatePaths.add('${exeParent.path}/$libName');
+    candidatePaths.add('${exeParent.path}/Frameworks/$libName');
+    candidatePaths.add('${exeDir.path}/$libName');
+    candidatePaths.add('${exeDir.path}/lib/$libName');
+    candidatePaths.add('${exeDir.path}/Frameworks/$libName');
+  } catch (_) {}
+
+  // Paths relative to script (when running via JIT / dart run)
+  try {
+    if (Platform.script.scheme == 'file') {
+      final scriptDir = File.fromUri(Platform.script).parent;
+      candidatePaths.add('${scriptDir.path}/$libName');
+      candidatePaths.add('${scriptDir.path}/lib/$libName');
+      candidatePaths.add('${scriptDir.path}/../lib/$libName');
+      candidatePaths.add('${scriptDir.path}/../native/quickjs/$libName');
+      candidatePaths.add('${scriptDir.path}/../../native/quickjs/$libName');
+      candidatePaths.add('${scriptDir.path}/../../../native/quickjs/$libName');
+      candidatePaths.add(
+          '${scriptDir.path}/../../packages/sequelize_orm_quickjs/native/quickjs/$libName');
+      candidatePaths.add(
+          '${scriptDir.path}/../../../packages/sequelize_orm_quickjs/native/quickjs/$libName');
+    }
+  } catch (_) {}
+
+  // Paths relative to current working directory & common package layouts
+  final cwd = Directory.current.path;
+  candidatePaths.addAll([
+    '/tmp/$libName',
+    libName,
+    '$cwd/$libName',
+    '$cwd/lib/$libName',
+    '$cwd/native/quickjs/$libName',
+    '$cwd/packages/sequelize_orm_quickjs/native/quickjs/$libName',
+    '$cwd/../packages/sequelize_orm_quickjs/native/quickjs/$libName',
+    '$cwd/../../packages/sequelize_orm_quickjs/native/quickjs/$libName',
+    // Bundle directories from CLI builds
+    '$cwd/build/cli/macos_x64/bundle/lib/$libName',
+    '$cwd/build/cli/macos_arm64/bundle/lib/$libName',
+    '$cwd/build/cli/linux_x64/bundle/lib/$libName',
+    '$cwd/build/cli/linux_arm64/bundle/lib/$libName',
+    '$cwd/build/cli/windows_x64/bundle/lib/$libName',
+    '$cwd/benchmarks/build/cli/macos_x64/bundle/lib/$libName',
+    '$cwd/benchmarks/build/cli/macos_arm64/bundle/lib/$libName',
+    '$cwd/benchmarks/build/cli/linux_x64/bundle/lib/$libName',
+    '$cwd/benchmarks/build/cli/linux_arm64/bundle/lib/$libName',
+    '$cwd/benchmarks/build/cli/windows_x64/bundle/lib/$libName',
+  ]);
+
+  for (final path in candidatePaths) {
+    final file = File(path);
+    if (file.existsSync()) {
+      try {
+        return DynamicLibrary.open(file.absolute.path);
+      } catch (_) {}
+    }
+  }
+
+  // Final attempt: throws dynamic library error with system dlopen details
   return DynamicLibrary.open(libName);
 }
 
@@ -135,12 +197,8 @@ class QuickJsBindings {
     _setCallback = _lib
         .lookup<NativeFunction<_SetCallbackC>>('qjs_dart_set_callback')
         .asFunction();
-    _eval = _lib
-        .lookup<NativeFunction<_EvalC>>('qjs_dart_eval')
-        .asFunction();
-    _pump = _lib
-        .lookup<NativeFunction<_PumpC>>('qjs_dart_pump')
-        .asFunction();
+    _eval = _lib.lookup<NativeFunction<_EvalC>>('qjs_dart_eval').asFunction();
+    _pump = _lib.lookup<NativeFunction<_PumpC>>('qjs_dart_pump').asFunction();
     _freeString = _lib
         .lookup<NativeFunction<_FreeStringC>>('qjs_dart_free_string')
         .asFunction();

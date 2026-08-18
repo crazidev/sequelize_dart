@@ -2,26 +2,144 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch Sequelize Dart Tools Extension",
-      "type": "extensionHost",
+      "name": "Node.js: All Tests (PostgreSQL)",
+      "type": "dart",
       "request": "launch",
-      "runtimeExecutable": "${execPath}",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/tools/vscode/sequelize-dart-tools",
-        "${workspaceFolder}"
-      ]
+      "program": "test/",
+      "cwd": "${workspaceFolder}",
+      "console": "debugConsole",
+      "env": {
+        "DB_TYPE": "postgres"
+      },
+      "presentation": {
+        "group": "1 - Node.js Tests",
+        "order": 1
+      }
     },
     {
-      "name": "Debug Dart Server",
+      "name": "Node.js: All Tests (MySQL)",
+      "type": "dart",
+      "request": "launch",
+      "program": "test/",
+      "cwd": "${workspaceFolder}",
+      "console": "debugConsole",
+      "env": {
+        "DB_TYPE": "mysql"
+      },
+      "presentation": {
+        "group": "1 - Node.js Tests",
+        "order": 2
+      }
+    },
+    {
+      "name": "Node.js: All Tests (MariaDB)",
+      "type": "dart",
+      "request": "launch",
+      "program": "test/",
+      "cwd": "${workspaceFolder}",
+      "console": "debugConsole",
+      "env": {
+        "DB_TYPE": "mariadb"
+      },
+      "presentation": {
+        "group": "1 - Node.js Tests",
+        "order": 3
+      }
+    },
+    {
+      "name": "Node.js: Active File Test (PostgreSQL)",
+      "type": "dart",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "console": "debugConsole",
+      "env": {
+        "DB_TYPE": "postgres"
+      },
+      "presentation": {
+        "group": "1 - Node.js Tests",
+        "order": 4
+      }
+    },
+    {
+      "name": "QuickJS: All Tests (PostgreSQL)",
+      "type": "dart",
+      "request": "launch",
+      "program": "test/",
+      "cwd": "${workspaceFolder}",
+      "console": "debugConsole",
+      "env": {
+        "DB_TYPE": "postgres",
+        "USE_QUICKJS": "true"
+      },
+      "presentation": {
+        "group": "2 - QuickJS Tests",
+        "order": 1
+      }
+    },
+    {
+      "name": "QuickJS: All Tests (MySQL)",
+      "type": "dart",
+      "request": "launch",
+      "program": "test/",
+      "cwd": "${workspaceFolder}",
+      "console": "debugConsole",
+      "env": {
+        "DB_TYPE": "mysql",
+        "USE_QUICKJS": "true"
+      },
+      "presentation": {
+        "group": "2 - QuickJS Tests",
+        "order": 2
+      }
+    },
+    {
+      "name": "QuickJS: All Tests (MariaDB)",
+      "type": "dart",
+      "request": "launch",
+      "program": "test/",
+      "cwd": "${workspaceFolder}",
+      "console": "debugConsole",
+      "env": {
+        "DB_TYPE": "mariadb",
+        "USE_QUICKJS": "true"
+      },
+      "presentation": {
+        "group": "2 - QuickJS Tests",
+        "order": 3
+      }
+    },
+    {
+      "name": "QuickJS: Active File Test (PostgreSQL)",
+      "type": "dart",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "console": "debugConsole",
+      "env": {
+        "DB_TYPE": "postgres",
+        "USE_QUICKJS": "true"
+      },
+      "presentation": {
+        "group": "2 - QuickJS Tests",
+        "order": 4
+      }
+    },
+    {
+      "name": "App: Debug Dart Server",
       "type": "dart",
       "request": "launch",
       "program": "${workspaceFolder}/example/lib/main.dart",
       "cwd": "${workspaceFolder}/example",
       "vmAdditionalArgs": ["--enable-asserts"],
-      "console": "debugConsole"
+      "console": "debugConsole",
+      "presentation": {
+        "group": "3 - Development & Apps",
+        "order": 1
+      }
     },
     {
-      "name": "Debug Node.js (dart2js)",
+      "name": "App: Debug Node.js (dart2js)",
       "type": "node",
       "request": "launch",
       "program": "${workspaceFolder}/example/build/index.js",
@@ -29,32 +147,25 @@
       "sourceMaps": true,
       "preLaunchTask": "Build: dart2js",
       "outFiles": ["${workspaceFolder}/example/build/**/*.js"],
-      "skipFiles": ["<node_internals>/**"]
+      "skipFiles": ["<node_internals>/**"],
+      "presentation": {
+        "group": "3 - Development & Apps",
+        "order": 2
+      }
     },
     {
-      "cwd": "${workspaceFolder}",
-      "console": "debugConsole",
-      "name": "Dart: Run all Tests",
-      "type": "dart",
+      "name": "Tools: Launch VS Code Extension",
+      "type": "extensionHost",
       "request": "launch",
-      "program": "./test/"
-    },
-    {
-      "cwd": "${workspaceFolder}",
-      "console": "debugConsole",
-      "name": "Dart: Run Test",
-      "type": "dart",
-      "request": "launch",
-      "program": "./test/"
-    },
-    {
-      "name": "Run Tests (tools)",
-      "type": "dart",
-      "request": "launch",
-      "program": "${workspaceFolder}/tools/run.dart",
-      "args": ["test"],
-      "cwd": "${workspaceFolder}",
-      "console": "debugConsole"
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/tools/vscode/sequelize-dart-tools",
+        "${workspaceFolder}"
+      ],
+      "presentation": {
+        "group": "3 - Development & Apps",
+        "order": 3
+      }
     }
   ]
 }

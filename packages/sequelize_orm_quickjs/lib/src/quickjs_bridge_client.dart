@@ -146,7 +146,8 @@ class QuickJsBridgeClient implements BridgeClientInterface {
       _isInitializing = false;
       _isClosed = true;
       _isConnected = false;
-      if (_initializationCompleter != null && !_initializationCompleter!.isCompleted) {
+      if (_initializationCompleter != null &&
+          !_initializationCompleter!.isCompleted) {
         _initializationCompleter!.completeError(e);
       }
       _initializationCompleter = null;
@@ -175,7 +176,11 @@ class QuickJsBridgeClient implements BridgeClientInterface {
       {'requestJson': requestJson},
     );
 
-    stopwatch.stop();
+    final callTime = stopwatch.elapsedMilliseconds;
+    // ignore: avoid_print
+    print(
+        '[QuickJsBridgeClient] _runtime.callAsync("$method") took $callTime ms');
+    stopwatch.reset();
 
     // response is the decoded JS object (Map).
     Map<String, dynamic> responseMap;
@@ -183,6 +188,11 @@ class QuickJsBridgeClient implements BridgeClientInterface {
       responseMap = Map<String, dynamic>.from(response);
     } else {
       responseMap = jsonDecode(response.toString()) as Map<String, dynamic>;
+    }
+    final decodeTime = stopwatch.elapsedMilliseconds;
+    if (decodeTime > 2) {
+      // ignore: avoid_print
+      print('[QuickJsBridgeClient] response decode took $decodeTime ms');
     }
 
     // Handle SQL logging notifications.
@@ -199,8 +209,7 @@ class QuickJsBridgeClient implements BridgeClientInterface {
       cb(BridgeLatencyInfo(
         method: method,
         roundTrip: stopwatch.elapsed,
-        serverTime:
-            serverMs != null ? Duration(milliseconds: serverMs) : null,
+        serverTime: serverMs != null ? Duration(milliseconds: serverMs) : null,
       ));
     }
 
@@ -211,8 +220,7 @@ class QuickJsBridgeClient implements BridgeClientInterface {
           // ignore: avoid_print
           print('[QuickJS Error Stack]\n${error['stack']}');
         }
-        throw SequelizeException.fromBridge(
-            Map<String, dynamic>.from(error));
+        throw SequelizeException.fromBridge(Map<String, dynamic>.from(error));
       }
       throw BridgeException(
           error?.toString() ?? 'Unknown QuickJS bridge error');
@@ -248,8 +256,7 @@ class QuickJsBridgeClient implements BridgeClientInterface {
     if (result is Map && result['connected'] == true) {
       _isConnected = true;
     } else {
-      throw BridgeException(
-          'QuickJS bridge: failed to connect to database');
+      throw BridgeException('QuickJS bridge: failed to connect to database');
     }
   }
 
@@ -299,7 +306,8 @@ class QuickJsBridgeClient implements BridgeClientInterface {
       // Walk up from current dir.
       var dir = Directory.current;
       for (var i = 0; i < 5; i++) {
-        final probe = File(p.join(dir.path, 'packages/sequelize_orm/lib/src/bridge/$name'));
+        final probe = File(
+            p.join(dir.path, 'packages/sequelize_orm/lib/src/bridge/$name'));
         if (probe.existsSync()) return probe.absolute.path;
         if (dir.parent.path == dir.path) break;
         dir = dir.parent;

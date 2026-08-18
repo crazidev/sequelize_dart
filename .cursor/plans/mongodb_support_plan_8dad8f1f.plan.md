@@ -270,15 +270,15 @@ When `dialect: mongodb` in `sequelize.yaml`:
 
 Minimal -- MongoDB is very permissive. Only a few rules needed:
 
-`**mongodb_no_schema_sync`**
+`**mongodb_no_schema_sync`\*\*
 
 - Warn if `sync()` is called when dialect is `mongodb`
 
-`**mongodb_match_not_supported`**
+`**mongodb_match_not_supported`\*\*
 
 - Flag `match()` usage (PostgreSQL full-text search, not available in MongoDB -- suggest `$text` index + `$search` as alternative)
 
-`**mongodb_id_convention`**
+`**mongodb_id_convention`\*\*
 
 - Info hint if primary key is not named `_id` (MongoDB convention, though custom PKs work)
 

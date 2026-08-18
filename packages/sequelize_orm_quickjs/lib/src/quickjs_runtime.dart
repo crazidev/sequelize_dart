@@ -22,13 +22,29 @@ import 'package:sequelize_orm_quickjs/src/quickjs_bindings.dart';
 /// final result = await rt.callAsync('findAll', {'modelName': 'Post', ...});
 /// rt.dispose();
 /// ```
+///
+/// ## Performance notes
+///
+/// All binary payloads that cross the Dart <-> JS boundary (socket bytes,
+/// hash/HMAC/PBKDF2 inputs and outputs, random bytes) are exchanged as
+/// **base64 strings**, never as JSON arrays of integers. A JSON int array is
+/// both far larger on the wire (each byte becomes 1-3 decimal digits plus a
+/// comma, vs. 4/3 bytes for base64) and far more expensive for the embedded
+/// JS engine to *parse*: `[12,54,3,...]` requires lexing one token per byte,
+/// while `'aGVsbG8='` is a single string-literal token. Keep this convention
+/// when adding new bridge calls — always base64-encode binary data before
+/// calling `_ffiNotify`, and base64-decode on the way back.
 class QuickJsRuntime {
   final QuickJsBindings _bindings;
   late final QjsDartRuntimePtr _handle;
   bool _disposed = false;
 
   /// Pending Dart Completers for JS Promises, keyed by promise-id.
-  final Map<int, Completer<String>> _pendingPromises = {};
+  ///
+  /// Holds the already-decoded result value (Map/List/String/num/bool/null)
+  /// — see [callAsync] for why the result only crosses the bridge
+  /// JSON-encoded once instead of twice.
+  final Map<int, Completer<dynamic>> _pendingPromises = {};
   int _promiseIdCounter = 0;
 
   /// Active Dart TCP socket contexts, keyed by socket-id.
@@ -51,7 +67,8 @@ class QuickJsRuntime {
     rt._handle = rt._bindings.createRuntime();
     if (rt._handle == nullptr) {
       throw StateError(
-          'Failed to create QuickJS runtime — native library may not be loaded');
+        'Failed to create QuickJS runtime — native library may not be loaded',
+      );
     }
     rt._installCallback();
     rt._installJsPolyfillLayer();
@@ -90,6 +107,7 @@ class QuickJsRuntime {
   }
 
   Pointer<Utf8> _handleBridgeCall(String name, String argsJson) {
+    final sw = Stopwatch()..start();
     try {
       Map<String, dynamic> args = {};
       try {
@@ -100,8 +118,10 @@ class QuickJsRuntime {
       switch (name) {
         case '_dart_promise_resolve':
           final id = (args['id'] as num).toInt();
-          final value = args['value'] as String? ?? 'null';
-          _pendingPromises.remove(id)?.complete(value);
+          // 'value' is already the decoded JSON value (Map/List/String/
+          // num/bool/null) — see callAsync for why this crosses the
+          // bridge JSON-encoded exactly once, not twice.
+          _pendingPromises.remove(id)?.complete(args['value']);
 
         case '_dart_promise_reject':
           final id = (args['id'] as num).toInt();
@@ -112,9 +132,10 @@ class QuickJsRuntime {
           _handleSocketConnect(args);
 
         case '_dart_socket_write':
+          // 'data' arrives as a base64 string (see class-level perf notes).
           final socketId = (args['id'] as num).toInt();
-          final bytes = (args['data'] as List).cast<int>();
-          _sockets[socketId]?.write(Uint8List.fromList(bytes));
+          final b64 = args['data'] as String;
+          _sockets[socketId]?.write(base64Decode(b64));
 
         case '_dart_socket_destroy':
           final socketId = (args['id'] as num).toInt();
@@ -123,7 +144,7 @@ class QuickJsRuntime {
         case '_dart_random_bytes':
           final count = (args['count'] as num).toInt();
           final bytes = _secureRandomBytes(count);
-          final result = jsonEncode(bytes.toList());
+          final result = jsonEncode(base64Encode(bytes));
           return result.toNativeUtf8();
 
         case '_dart_hash':
@@ -137,7 +158,7 @@ class QuickJsRuntime {
           final key = args['key'];
           final data = args['data'];
           final bytes = _computeHmac(algorithm, key, data);
-          return jsonEncode(bytes.toList()).toNativeUtf8();
+          return jsonEncode(base64Encode(bytes)).toNativeUtf8();
 
         case '_dart_subtle_pbkdf2':
           final password = args['password'];
@@ -145,7 +166,7 @@ class QuickJsRuntime {
           final iterations = (args['iterations'] as num?)?.toInt() ?? 4096;
           final lengthBytes = (args['lengthBytes'] as num?)?.toInt() ?? 32;
           final bytes = _pbkdf2(password, salt, iterations, lengthBytes);
-          return jsonEncode(bytes.toList()).toNativeUtf8();
+          return jsonEncode(base64Encode(bytes)).toNativeUtf8();
 
         case '_dart_notification':
           onNotification?.call(args);
@@ -178,6 +199,14 @@ class QuickJsRuntime {
       // ignore: avoid_print
       print('[QuickJsRuntime] Bridge call "$name" error: $e');
     }
+
+    sw.stop();
+    if (sw.elapsedMilliseconds > 2) {
+      // ignore: avoid_print
+      print(
+          '[QuickJsRuntime] _handleBridgeCall("$name") took ${sw.elapsedMilliseconds} ms');
+    }
+
     return nullptr;
   }
 
@@ -301,6 +330,30 @@ class QuickJsRuntime {
         }
       }
     };
+  }
+
+  // ── base64 <-> bytes helpers ─────────────────────────────────────────────
+  // Every binary payload crossing the Dart bridge (_ffiNotify) goes through
+  // these. Avoid string concatenation in a loop for large buffers (can be
+  // quadratic on some engines) — build an array of chunks and join once.
+  const _B64_CHUNK = 0x2000;
+  function _bytesToBase64(view) {
+    const arr = view instanceof Uint8Array ? view : new Uint8Array(view);
+    if (arr.length === 0) return '';
+    const parts = new Array(Math.ceil(arr.length / _B64_CHUNK));
+    let pi = 0;
+    for (let i = 0; i < arr.length; i += _B64_CHUNK) {
+      parts[pi++] = String.fromCharCode.apply(null, arr.subarray(i, i + _B64_CHUNK));
+    }
+    return btoa(parts.join(''));
+  }
+  function _base64ToBytes(b64) {
+    if (!b64) return new Uint8Array(0);
+    const bin = atob(b64);
+    const len = bin.length;
+    const out = new Uint8Array(len);
+    for (let i = 0; i < len; i++) out[i] = bin.charCodeAt(i);
+    return out;
   }
 
   // ── Timers polyfills ────────────────────────────────────────────────────
@@ -462,11 +515,9 @@ class QuickJsRuntime {
             return arr;
           }
           if (enc === 'base64') {
-            const bin = atob(data);
-            const arr = new _Buffer(bin.length);
-            for (let i = 0; i < bin.length; i++) {
-              arr[i] = bin.charCodeAt(i);
-            }
+            const bytes = _base64ToBytes(data);
+            const arr = new _Buffer(bytes.length);
+            arr.set(bytes);
             return arr;
           }
           const te = new TextEncoder();
@@ -590,9 +641,7 @@ class QuickJsRuntime {
           return Array.from(sub).map(b => b.toString(16).padStart(2, '0')).join('');
         }
         if (enc === 'base64') {
-          let bin = '';
-          for (let i = 0; i < sub.length; i++) bin += String.fromCharCode(sub[i]);
-          return btoa(bin);
+          return _bytesToBase64(sub);
         }
         return new TextDecoder().decode(sub);
       }
@@ -618,13 +667,13 @@ class QuickJsRuntime {
     }
   };
 
-  globalThis._dart_socket_data = function(id, jsonBytes) {
+  // `b64` is a base64-encoded payload (see class-level perf notes) — decode
+  // straight into a Buffer, no JSON.parse of an integer array required.
+  globalThis._dart_socket_data = function(id, b64) {
     const sock = _socketMap[id];
     if (!sock) return;
     try {
-      const bytes = JSON.parse(jsonBytes);
-      const buf = Buffer.from(bytes);
-      sock.emit('data', buf);
+      sock.emit('data', Buffer.from(b64, 'base64'));
     } catch(e) {
       console.error('[_dart_socket_data error]:', e?.message || e, '\n[Stack]:', e?.stack);
     }
@@ -672,10 +721,10 @@ class QuickJsRuntime {
       return this;
     }
     write(data, encoding, cb) {
-      const bytes = Array.from(
-        Buffer.isBuffer(data) ? data : Buffer.from(data, typeof encoding === 'string' ? encoding : 'utf8')
-      );
-      _ffiNotify('_dart_socket_write', JSON.stringify({ id: this._id, data: bytes }));
+      const buf = Buffer.isBuffer(data)
+        ? data
+        : Buffer.from(data, typeof encoding === 'string' ? encoding : 'utf8');
+      _ffiNotify('_dart_socket_write', JSON.stringify({ id: this._id, data: _bytesToBase64(buf) }));
       if (typeof encoding === 'function') encoding();
       else if (typeof cb === 'function') cb();
       return true;
@@ -755,38 +804,47 @@ class QuickJsRuntime {
   };
 
   // ── btoa / atob polyfills ───────────────────────────────────────────────
+  // Array + single join('') instead of repeated += string concatenation —
+  // avoids potential quadratic-time growth on large buffers.
   const _b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   if (typeof globalThis.btoa === 'undefined') {
     globalThis.btoa = function(str) {
-      let out = '';
-      for (let i = 0; i < str.length; i += 3) {
+      const len = str.length;
+      if (len === 0) return '';
+      const parts = new Array(Math.ceil(len / 3));
+      let pi = 0;
+      for (let i = 0; i < len; i += 3) {
         const a = str.charCodeAt(i);
-        const b = i + 1 < str.length ? str.charCodeAt(i + 1) : 0;
-        const c = i + 2 < str.length ? str.charCodeAt(i + 2) : 0;
+        const b = i + 1 < len ? str.charCodeAt(i + 1) : 0;
+        const c = i + 2 < len ? str.charCodeAt(i + 2) : 0;
         const n = (a << 16) | (b << 8) | c;
-        out += _b64chars[(n >> 18) & 63];
-        out += _b64chars[(n >> 12) & 63];
-        out += (i + 1 < str.length) ? _b64chars[(n >> 6) & 63] : '=';
-        out += (i + 2 < str.length) ? _b64chars[n & 63] : '=';
+        let chunk = _b64chars[(n >> 18) & 63] + _b64chars[(n >> 12) & 63];
+        chunk += (i + 1 < len) ? _b64chars[(n >> 6) & 63] : '=';
+        chunk += (i + 2 < len) ? _b64chars[n & 63] : '=';
+        parts[pi++] = chunk;
       }
-      return out;
+      return parts.join('');
     };
   }
   if (typeof globalThis.atob === 'undefined') {
     globalThis.atob = function(str) {
       const clean = str.replace(/[^A-Za-z0-9+/]/g, '');
-      let out = '';
-      for (let i = 0; i < clean.length; i += 4) {
+      const len = clean.length;
+      if (len === 0) return '';
+      const parts = new Array(Math.ceil(len / 4));
+      let pi = 0;
+      for (let i = 0; i < len; i += 4) {
         const a = _b64chars.indexOf(clean[i]);
         const b = _b64chars.indexOf(clean[i + 1]);
         const c = clean[i + 2] ? _b64chars.indexOf(clean[i + 2]) : 0;
         const d = clean[i + 3] ? _b64chars.indexOf(clean[i + 3]) : 0;
         const n = (a << 18) | (b << 12) | (c << 6) | d;
-        out += String.fromCharCode((n >> 16) & 255);
-        if (clean[i + 2]) out += String.fromCharCode((n >> 8) & 255);
-        if (clean[i + 3]) out += String.fromCharCode(n & 255);
+        let chunk = String.fromCharCode((n >> 16) & 255);
+        if (clean[i + 2]) chunk += String.fromCharCode((n >> 8) & 255);
+        if (clean[i + 3]) chunk += String.fromCharCode(n & 255);
+        parts[pi++] = chunk;
       }
-      return out;
+      return parts.join('');
     };
   }
 
@@ -802,14 +860,13 @@ class QuickJsRuntime {
   globalThis.crypto.getRandomValues = function(typedArray) {
     if (!typedArray || !typedArray.length) return typedArray;
     const jsonResult = _ffiNotify('_dart_random_bytes', JSON.stringify({ count: typedArray.length }));
-    const bytes = JSON.parse(jsonResult);
+    const bytes = _base64ToBytes(JSON.parse(jsonResult));
     typedArray.set(bytes);
     return typedArray;
   };
   globalThis.crypto.randomBytes = function(n) {
     const jsonResult = _ffiNotify('_dart_random_bytes', JSON.stringify({ count: n }));
-    const bytes = JSON.parse(jsonResult);
-    return Buffer.from(bytes);
+    return Buffer.from(JSON.parse(jsonResult), 'base64');
   };
   globalThis.crypto.createHash = function(algorithm) {
     const chunks = [];
@@ -823,10 +880,10 @@ class QuickJsRuntime {
         return this;
       },
       digest(enc) {
-        const allData = Array.from(Buffer.concat(chunks));
+        const allData = Buffer.concat(chunks);
         const jsonResult = _ffiNotify('_dart_hash', JSON.stringify({
           algorithm,
-          data: allData,
+          data: _bytesToBase64(allData),
         }));
         const hex = JSON.parse(jsonResult);
         if (enc === 'hex') return hex;
@@ -847,14 +904,13 @@ class QuickJsRuntime {
         return this;
       },
       digest(enc) {
-        const fullData = Array.from(Buffer.concat(chunks));
+        const fullData = Buffer.concat(chunks);
         const res = _ffiNotify('_dart_subtle_hmac', JSON.stringify({
           algorithm: algorithm || 'sha256',
-          key: Array.from(keyBytes),
-          data: fullData,
+          key: _bytesToBase64(keyBytes),
+          data: _bytesToBase64(fullData),
         }));
-        const bytes = res ? JSON.parse(res) : [];
-        const buf = Buffer.from(bytes);
+        const buf = res ? Buffer.from(JSON.parse(res), 'base64') : Buffer.alloc(0);
         if (enc === 'hex') return buf.toString('hex');
         if (enc === 'base64') return buf.toString('base64');
         return buf;
@@ -869,7 +925,7 @@ class QuickJsRuntime {
       const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
       const res = _ffiNotify('_dart_hash', JSON.stringify({
         algorithm: algoName,
-        data: Array.from(bytes),
+        data: _bytesToBase64(bytes),
       }));
       const hex = res ? JSON.parse(res) : '';
       const buf = Buffer.from(hex, 'hex');
@@ -885,11 +941,10 @@ class QuickJsRuntime {
       const algoName = typeof algorithm === 'string' ? algorithm : (algorithm?.name || 'SHA-256');
       const res = _ffiNotify('_dart_subtle_hmac', JSON.stringify({
         algorithm: algoName,
-        key: Array.from(keyBytes),
-        data: Array.from(dataBytes),
+        key: _bytesToBase64(keyBytes),
+        data: _bytesToBase64(dataBytes),
       }));
-      const bytes = res ? JSON.parse(res) : [];
-      const buf = Buffer.from(bytes);
+      const buf = res ? Buffer.from(JSON.parse(res), 'base64') : Buffer.alloc(0);
       return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
     },
     async deriveBits(params, key, length) {
@@ -898,13 +953,12 @@ class QuickJsRuntime {
       const iterations = Number(params.iterations) || 4096;
       const lengthBytes = Math.floor(Number(length) / 8) || 32;
       const res = _ffiNotify('_dart_subtle_pbkdf2', JSON.stringify({
-        password: Array.from(passwordBytes),
-        salt: Array.from(saltBytes),
+        password: _bytesToBase64(passwordBytes),
+        salt: _bytesToBase64(saltBytes),
         iterations: iterations,
         lengthBytes: lengthBytes,
       }));
-      const bytes = res ? JSON.parse(res) : [];
-      const buf = Buffer.from(bytes);
+      const buf = res ? Buffer.from(JSON.parse(res), 'base64') : Buffer.alloc(0);
       return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
     },
   };
@@ -1254,13 +1308,29 @@ var __filename = globalThis.__filename;
   /// async function myHandler(params) { return someValue; }
   /// ```
   ///
-  /// Returns the JSON-decoded result when the Promise resolves.
+  /// Returns the decoded result when the Promise resolves.
+  ///
+  /// ## Why the result crosses the bridge JSON-encoded only once
+  ///
+  /// The result travels back as `{"id":<id>,"value":<result>}`, with
+  /// `result` nested directly as JSON rather than pre-stringified into a
+  /// string field. That means exactly one `JSON.stringify` on the JS side
+  /// and one `jsonDecode` on the Dart side for the whole envelope.
+  ///
+  /// An earlier version did `JSON.stringify({id, value: JSON.stringify(result)})`
+  /// — stringifying `result`, then stringifying the wrapper *around* that
+  /// already-stringified text. Every quote character in the result got
+  /// escaped a second time (inflating payload size), and the Dart side had
+  /// to `jsonDecode` twice to unwrap it. For a query returning a few
+  /// thousand rows that's a real, measurable tax paid on every call — keep
+  /// nesting JSON values directly rather than stringifying-then-embedding
+  /// when adding new bridge calls.
   Future<dynamic> callAsync(
     String functionName,
     Map<String, dynamic> params,
   ) {
     final id = _promiseIdCounter++;
-    final completer = Completer<String>();
+    final completer = Completer<dynamic>();
     _pendingPromises[id] = completer;
 
     final paramsJson = jsonEncode(params);
@@ -1268,7 +1338,7 @@ var __filename = globalThis.__filename;
       '(async () => {'
       '  try {'
       '    const result = await $functionName($paramsJson);'
-      '    _ffiNotify("_dart_promise_resolve", JSON.stringify({id:$id,value:JSON.stringify(result)}));'
+      '    _ffiNotify("_dart_promise_resolve", JSON.stringify({id:$id,value:result}));'
       '  } catch(e) {'
       '    _ffiNotify("_dart_promise_reject", JSON.stringify({id:$id,error:String(e.message||e)}));'
       '  }'
@@ -1278,7 +1348,7 @@ var __filename = globalThis.__filename;
     // Pump the microtask queue to let the Promise chain start executing.
     _bindings.pump(_handle);
 
-    return completer.future.then((s) => jsonDecode(s));
+    return completer.future;
   }
 
   /// Dispose the runtime and release all native QuickJS resources.
@@ -1309,11 +1379,29 @@ var __filename = globalThis.__filename;
   // ────────────────────────────────────────────────────────────────────────
 
   void _onSocketData(int socketId, Uint8List data) {
-    // ignore: avoid_print
-    // print('[Socket onData] socketId: $socketId len: ${data.length}');
-    final jsonBytes = jsonEncode(data.toList());
-    _evalAsync('_dart_socket_data($socketId, ${_jsString(jsonBytes)});');
+    final sw = Stopwatch()..start();
+    // Base64, embedded directly as a JS string literal — no JSON int-array
+    // encoding/parsing, and no character escaping needed (base64's alphabet
+    // is A-Za-z0-9+/=, none of which need quoting inside a single-quoted
+    // JS string).
+    final b64 = base64Encode(data);
+    final encodeTime = sw.elapsedMilliseconds;
+    sw.reset();
+    sw.start();
+
+    _evalAsync("_dart_socket_data($socketId, '$b64');");
+    final evalTime = sw.elapsedMilliseconds;
+    sw.reset();
+    sw.start();
+
     _bindings.pump(_handle);
+    final pumpTime = sw.elapsedMilliseconds;
+
+    if (encodeTime > 1 || evalTime > 1 || pumpTime > 1) {
+      // ignore: avoid_print
+      print(
+          '[QuickJsRuntime] _onSocketData [${data.length} bytes]: base64Encode=$encodeTime ms, _evalAsync=$evalTime ms, pump=$pumpTime ms');
+    }
   }
 
   void _onSocketClose(int socketId) {
@@ -1341,9 +1429,16 @@ var __filename = globalThis.__filename;
   // Crypto helpers
   // ────────────────────────────────────────────────────────────────────────
 
+  /// Decode a value coming from the JS bridge into raw bytes.
+  ///
+  /// By convention (see class-level perf notes) the JS side always sends
+  /// binary payloads as base64 strings, never as JSON int arrays — decoding
+  /// a base64 string is O(n) with no JSON tokenization overhead, unlike the
+  /// previous `List<int>` protocol which required parsing one JSON number
+  /// per byte on both ends.
   static Uint8List _toUint8List(dynamic data) {
     if (data is List) return Uint8List.fromList(data.cast<int>());
-    if (data is String) return Uint8List.fromList(utf8.encode(data));
+    if (data is String) return base64Decode(data);
     return Uint8List(0);
   }
 
@@ -1413,14 +1508,7 @@ var __filename = globalThis.__filename;
   }
 
   static String _computeHash(String algorithm, dynamic data) {
-    Uint8List bytes;
-    if (data is List) {
-      bytes = Uint8List.fromList(data.cast<int>());
-    } else if (data is String) {
-      bytes = Uint8List.fromList(data.codeUnits);
-    } else {
-      bytes = Uint8List(0);
-    }
+    final bytes = _toUint8List(data);
 
     switch (algorithm.toLowerCase()) {
       case 'sha256':
