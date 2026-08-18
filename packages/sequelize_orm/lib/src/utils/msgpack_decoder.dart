@@ -67,6 +67,25 @@ class FastMsgPackDecoder {
       return _readBin(len);
     }
 
+    // Ext 8, 16, 32
+    if (b == 0xc7) {
+      final len = _bytes[_offset++];
+      final type = _bd.getInt8(_offset++);
+      return _readExt(type, len);
+    }
+    if (b == 0xc8) {
+      final len = _bd.getUint16(_offset);
+      _offset += 2;
+      final type = _bd.getInt8(_offset++);
+      return _readExt(type, len);
+    }
+    if (b == 0xc9) {
+      final len = _bd.getUint32(_offset);
+      _offset += 4;
+      final type = _bd.getInt8(_offset++);
+      return _readExt(type, len);
+    }
+
     // Float 32 / Float 64
     if (b == 0xca) {
       final v = _bd.getFloat32(_offset);
@@ -113,6 +132,28 @@ class FastMsgPackDecoder {
       final v = _bd.getInt64(_offset);
       _offset += 8;
       return v;
+    }
+
+    // FixExt 1, 2, 4, 8, 16
+    if (b == 0xd4) {
+      final type = _bd.getInt8(_offset++);
+      return _readExt(type, 1);
+    }
+    if (b == 0xd5) {
+      final type = _bd.getInt8(_offset++);
+      return _readExt(type, 2);
+    }
+    if (b == 0xd6) {
+      final type = _bd.getInt8(_offset++);
+      return _readExt(type, 4);
+    }
+    if (b == 0xd7) {
+      final type = _bd.getInt8(_offset++);
+      return _readExt(type, 8);
+    }
+    if (b == 0xd8) {
+      final type = _bd.getInt8(_offset++);
+      return _readExt(type, 16);
     }
 
     // Str 8, 16, 32
@@ -192,5 +233,38 @@ class FastMsgPackDecoder {
         utf8.decode(Uint8List.sublistView(_bytes, _offset, _offset + len));
     _offset += len;
     return str;
+  }
+
+  dynamic _readExt(int type, int len) {
+    if (type == -1) {
+      // Timestamp extension (-1) in MessagePack spec
+      if (len == 4) {
+        final sec = _bd.getUint32(_offset);
+        _offset += 4;
+        return DateTime.fromMillisecondsSinceEpoch(sec * 1000, isUtc: true)
+            .toIso8601String();
+      } else if (len == 8) {
+        final data64 = _bd.getUint64(_offset);
+        _offset += 8;
+        final nsec = (data64 >> 34) & 0x3fffffff;
+        final sec = data64 & 0x00000003ffffffff;
+        return DateTime.fromMillisecondsSinceEpoch(
+                sec * 1000 + (nsec ~/ 1000000),
+                isUtc: true)
+            .toIso8601String();
+      } else if (len == 12) {
+        final nsec = _bd.getUint32(_offset);
+        _offset += 4;
+        final sec = _bd.getInt64(_offset);
+        _offset += 8;
+        return DateTime.fromMillisecondsSinceEpoch(
+                sec * 1000 + (nsec ~/ 1000000),
+                isUtc: true)
+            .toIso8601String();
+      }
+    }
+    final slice = Uint8List.sublistView(_bytes, _offset, _offset + len);
+    _offset += len;
+    return slice;
   }
 }

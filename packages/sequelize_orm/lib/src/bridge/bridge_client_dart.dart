@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 import 'package:sequelize_orm/src/bridge/bridge_client_interface.dart';
 import 'package:sequelize_orm/src/bridge/bridge_exception.dart';
 import 'package:sequelize_orm/src/bridge/bridge_latency.dart';
 import 'package:sequelize_orm/src/bridge/sequelize_exceptions.dart';
+import 'package:sequelize_orm/src/utils/msgpack_decoder.dart';
 import 'package:sequelize_orm/src/utils/parse_helpers.dart';
 
 /// Client for communicating with the Node.js Sequelize bridge server.
@@ -125,16 +127,44 @@ class BridgeClient implements BridgeClientInterface {
 
     _isClosed = false;
 
-    // Listen to stdout for responses
-    _process!.stdout
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen(
-      (line) {
-        if (_isInitializing) {
-          _responseController.add(line);
+    // Listen to stdout for MessagePack binary responses
+    final builder = BytesBuilder(copy: false);
+
+    _process!.stdout.listen(
+      (chunk) {
+        builder.add(chunk);
+        var bytes = builder.takeBytes();
+        var offset = 0;
+
+        while (bytes.length - offset >= 4) {
+          final bd = ByteData.sublistView(bytes, offset, offset + 4);
+          final frameLen = bd.getUint32(0, Endian.big);
+
+          if (bytes.length - offset < 4 + frameLen) {
+            break;
+          }
+
+          final frameBytes =
+              Uint8List.sublistView(bytes, offset + 4, offset + 4 + frameLen);
+          offset += 4 + frameLen;
+
+          try {
+            final decoded = FastMsgPackDecoder.decode(frameBytes);
+            if (decoded is Map) {
+              if (_isInitializing) {
+                _responseController.add(jsonEncode(decoded));
+              }
+              _handleDecodedResponse(decoded);
+            }
+          } catch (e) {
+            // ignore: avoid_print
+            print('[BridgeClient] Failed to decode MsgPack frame: $e');
+          }
         }
-        _handleResponse(line);
+
+        if (offset < bytes.length) {
+          builder.add(Uint8List.sublistView(bytes, offset));
+        }
       },
       onError: (error) {
         // ignore: avoid_print
@@ -318,11 +348,9 @@ class BridgeClient implements BridgeClientInterface {
     }
   }
 
-  /// Handle a response from the bridge server
-  void _handleResponse(String line) {
+  /// Handle a decoded MessagePack response map from the bridge server
+  void _handleDecodedResponse(Map response) {
     try {
-      final response = jsonDecode(line);
-
       // Handle SQL log notifications
       if (response['notification'] == 'sql_log') {
         final sql = response['sql'] as String?;

@@ -5,6 +5,7 @@
  * 2. worker mode: Runs in a Worker Thread, communicates via postMessage (dart2js)
  */
 import { parentPort } from 'worker_threads';
+import { encode } from '@msgpack/msgpack';
 import {
   processRequest,
   cleanup,
@@ -89,13 +90,20 @@ if (isWorkerThread) {
   });
 } else {
   // stdio mode (Dart VM)
-  sendResponse = (response: JsonRpcResponse) => {
-    process.stdout.write(JSON.stringify(response) + '\n');
+  const writeMsgPackFrame = (data: any) => {
+    const packed = encode(data);
+    const lenBuf = Buffer.allocUnsafe(4);
+    lenBuf.writeUInt32BE(packed.length, 0);
+    process.stdout.write(Buffer.concat([lenBuf, packed]));
   };
 
-  // Set up notification callback for SQL logging (uses same stdout channel)
+  sendResponse = (response: JsonRpcResponse) => {
+    writeMsgPackFrame(response);
+  };
+
+  // Set up notification callback for SQL logging (uses same stdout MsgPack channel)
   setNotificationCallback((notification) => {
-    process.stdout.write(JSON.stringify(notification) + '\n');
+    writeMsgPackFrame(notification);
   });
 
   // Send ready signal

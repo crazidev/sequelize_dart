@@ -9,9 +9,11 @@ const postgresConnectionString =
     'postgresql://postgres:postgres@localhost:5432/postgres';
 
 final sequelize = Sequelize().createInstance(
-  // connection: SequelizeConnection.postgres(url: postgresConnectionString),
-  connection: SequelizeConnection.mysql(url: connectionString),
+  connection: SequelizeConnection.postgres(url: postgresConnectionString),
+  // connection: SequelizeConnection.mysql(url: connectionString),
   normalizeJsonTypes: false,
+  debug: true,
+  logging: SqlFormatter.printFormatted,
 );
 
 /// Main entry point - handles database setup and initialization
@@ -24,15 +26,15 @@ Future<void> main() async {
 
   // await sequelize.sync(alter: true);
 
-  // await sequelize.seed(
-  //   seeders: Db.allSeeders(),
-  //   syncTableMode: SyncTableMode.alter,
-  // );
+  await sequelize.seed(
+    seeders: Db.allSeeders(),
+    syncTableMode: SyncTableMode.alter,
+  );
 
   // Run queries - all query logic is in queries.dart
-  Timer.periodic(const Duration(seconds: 1), (timer) {
-    runQueries();
-  });
+  // Timer.periodic(const Duration(seconds: 1), (timer) {
+  runQueries();
+  // });
 
   // Close the connection to free up resources
   // await sequelize.close();
