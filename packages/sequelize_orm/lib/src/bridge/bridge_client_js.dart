@@ -9,6 +9,7 @@ import 'package:sequelize_orm/src/bridge/bridge_client_interface.dart';
 import 'package:sequelize_orm/src/bridge/bridge_exception.dart';
 import 'package:sequelize_orm/src/bridge/bridge_latency.dart';
 import 'package:sequelize_orm/src/core/global.dart';
+import 'package:sequelize_orm/src/utils/parse_helpers.dart';
 
 /// JS interop bindings for Node.js worker_threads module
 @JS('Object')
@@ -239,7 +240,7 @@ class BridgeClient implements BridgeClientInterface {
         } else {
           // Use Future.delayed to ensure proper async context in dart2js
           Future.delayed(Duration.zero, () {
-            completer.complete(result);
+            completer.complete(unpackTabularResult(result));
           });
         }
       }

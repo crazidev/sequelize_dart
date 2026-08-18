@@ -9,6 +9,7 @@ import 'package:sequelize_orm/src/bridge/bridge_client_interface.dart';
 import 'package:sequelize_orm/src/bridge/bridge_exception.dart';
 import 'package:sequelize_orm/src/bridge/bridge_latency.dart';
 import 'package:sequelize_orm/src/bridge/sequelize_exceptions.dart';
+import 'package:sequelize_orm/src/utils/parse_helpers.dart';
 import 'package:sequelize_orm_quickjs/src/quickjs_runtime.dart';
 
 /// An in-process Sequelize bridge client powered by an embedded QuickJS engine.
@@ -210,7 +211,7 @@ class QuickJsBridgeClient implements BridgeClientInterface {
           error?.toString() ?? 'Unknown QuickJS bridge error');
     }
 
-    return responseMap['result'];
+    return unpackTabularResult(responseMap['result']);
   }
 
   @override

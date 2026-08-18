@@ -8,6 +8,7 @@ import 'package:sequelize_orm/src/bridge/bridge_client_interface.dart';
 import 'package:sequelize_orm/src/bridge/bridge_exception.dart';
 import 'package:sequelize_orm/src/bridge/bridge_latency.dart';
 import 'package:sequelize_orm/src/bridge/sequelize_exceptions.dart';
+import 'package:sequelize_orm/src/utils/parse_helpers.dart';
 
 /// Client for communicating with the Node.js Sequelize bridge server.
 /// Uses stdio (stdin/stdout) for Dart VM environments.
@@ -361,7 +362,7 @@ class BridgeClient implements BridgeClientInterface {
             );
           }
         } else {
-          completer.complete(response['result']);
+          completer.complete(unpackTabularResult(response['result']));
         }
       }
     } catch (e) {

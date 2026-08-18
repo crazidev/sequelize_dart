@@ -208,10 +208,40 @@ export async function processRequest(
         throw new Error(`Unknown method: ${method}`);
     }
 
-    sendResponse({ id, result, _serverMs: Date.now() - _startMs });
+    sendResponse({ id, result: compactResult(result), _serverMs: Date.now() - _startMs });
   } catch (error: any) {
     sendResponse({ id, error: formatError(error), _serverMs: Date.now() - _startMs });
   }
+}
+
+function compactResult(result: any): any {
+  if (!Array.isArray(result) || result.length <= 1) {
+    return result;
+  }
+  const first = result[0];
+  if (first === null || typeof first !== 'object' || Array.isArray(first)) {
+    return result;
+  }
+  const keys = Object.keys(first);
+  if (keys.length === 0) return result;
+
+  const keyLen = keys.length;
+  const len = result.length;
+  const rows: any[][] = new Array(len);
+
+  for (let i = 0; i < len; i++) {
+    const item = result[i];
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+      return result; // fallback to uncompressed array if non-object found
+    }
+    const row = new Array(keyLen);
+    for (let j = 0; j < keyLen; j++) {
+      row[j] = item[keys[j]];
+    }
+    rows[i] = row;
+  }
+
+  return { __tab: true, k: keys, v: rows };
 }
 
 /**

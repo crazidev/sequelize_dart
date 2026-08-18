@@ -156,3 +156,30 @@ StackTrace _filterStack(StackTrace stack) {
   }).toList();
   return StackTrace.fromString(renumbered.join('\n'));
 }
+
+/// Unpacks tabular encoded response data ({__tab: true, k: keys, v: rows})
+/// back into List<Map<String, dynamic>>. Returns data as-is if not tabular.
+dynamic unpackTabularResult(dynamic data) {
+  if (data is Map && data['__tab'] == true) {
+    final keysList = data['k'];
+    final rowsList = data['v'];
+    if (keysList is List && rowsList is List) {
+      final keys = keysList.cast<String>();
+      final len = rowsList.length;
+      final keyLen = keys.length;
+      return List<Map<String, dynamic>>.generate(
+        len,
+        (i) {
+          final row = rowsList[i] as List;
+          final map = <String, dynamic>{};
+          for (var j = 0; j < keyLen; j++) {
+            map[keys[j]] = row[j];
+          }
+          return map;
+        },
+        growable: false,
+      );
+    }
+  }
+  return data;
+}
