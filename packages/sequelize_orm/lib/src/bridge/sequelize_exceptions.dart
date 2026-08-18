@@ -67,6 +67,7 @@ class SequelizeException implements Exception {
     String? context,
   }) {
     switch (name) {
+      case 'DatabaseError':
       case 'SequelizeDatabaseError':
         return SequelizeDatabaseError(
           message,
@@ -76,6 +77,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'ValidationError':
       case 'SequelizeValidationError':
         return SequelizeValidationError(
           message,
@@ -85,6 +87,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'UniqueConstraintError':
       case 'SequelizeUniqueConstraintError':
         return SequelizeUniqueConstraintError(
           message,
@@ -94,6 +97,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'ForeignKeyConstraintError':
       case 'SequelizeForeignKeyConstraintError':
         return SequelizeForeignKeyConstraintError(
           message,
@@ -103,6 +107,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'EagerLoadingError':
       case 'SequelizeEagerLoadingError':
         return SequelizeEagerLoadingError(
           message,
@@ -112,6 +117,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'ConnectionError':
       case 'SequelizeConnectionError':
         return SequelizeConnectionError(
           message,
@@ -121,6 +127,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'TimeoutError':
       case 'SequelizeTimeoutError':
         return SequelizeTimeoutError(
           message,
@@ -130,6 +137,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'HostNotFoundError':
       case 'SequelizeHostNotFoundError':
         return SequelizeHostNotFoundError(
           message,
@@ -139,6 +147,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'HostNotReachableError':
       case 'SequelizeHostNotReachableError':
         return SequelizeHostNotReachableError(
           message,
@@ -148,6 +157,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'InvalidConnectionError':
       case 'SequelizeInvalidConnectionError':
         return SequelizeInvalidConnectionError(
           message,
@@ -157,6 +167,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'ConnectionRefusedError':
       case 'SequelizeConnectionRefusedError':
         return SequelizeConnectionRefusedError(
           message,
@@ -166,6 +177,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'EmptyResultError':
       case 'SequelizeEmptyResultError':
         return SequelizeEmptyResultError(
           message,
@@ -175,6 +187,7 @@ class SequelizeException implements Exception {
           original: original,
           context: context,
         );
+      case 'OptimisticLockError':
       case 'SequelizeOptimisticLockError':
         return SequelizeOptimisticLockError(
           message,

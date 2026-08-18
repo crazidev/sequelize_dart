@@ -31,7 +31,7 @@ Future<void> cmdSetupBridge(Directory root, List<String> args) async {
     cmdlog('Dependencies installed.');
   }
 
-  cmdlog('Building bridge bundle...');
+  cmdlog('Building bridge bundles (Node.js & QuickJS)...');
   final res = await Process.run(
     pm,
     ['run', 'build'],
@@ -44,11 +44,30 @@ Future<void> cmdSetupBridge(Directory root, List<String> args) async {
     exit(res.exitCode);
   }
 
+  final resQuickJs = await Process.run(
+    pm,
+    ['run', 'build:quickjs'],
+    workingDirectory: bridgeDir.path,
+    runInShell: true,
+  );
+  if (resQuickJs.exitCode != 0) {
+    stdout.write(resQuickJs.stdout);
+    stderr.write(resQuickJs.stderr);
+    exit(resQuickJs.exitCode);
+  }
+
   final bundle = File(
     '${root.path}/packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
   );
   if (!await bundle.exists()) {
     throw StateError('Bridge bundle was not created.');
+  }
+
+  final bundleQuickJs = File(
+    '${root.path}/packages/sequelize_orm/lib/src/bridge/bridge_server_quickjs.bundle.js',
+  );
+  if (!await bundleQuickJs.exists()) {
+    throw StateError('QuickJS bridge bundle was not created.');
   }
 
   if (!skipCleanup && !skipInstall) {

@@ -3,13 +3,13 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+// ignore_for_file: implementation_imports
 import 'package:path/path.dart' as p;
 import 'package:sequelize_orm/src/bridge/bridge_client_interface.dart';
 import 'package:sequelize_orm/src/bridge/bridge_exception.dart';
 import 'package:sequelize_orm/src/bridge/bridge_latency.dart';
 import 'package:sequelize_orm/src/bridge/sequelize_exceptions.dart';
-
-import 'quickjs_runtime.dart';
+import 'package:sequelize_orm_quickjs/src/quickjs_runtime.dart';
 
 /// An in-process Sequelize bridge client powered by an embedded QuickJS engine.
 ///
@@ -26,15 +26,6 @@ import 'quickjs_runtime.dart';
 /// // Set before calling sequelize.connect()
 /// BridgeClient.overrideWith(QuickJsBridgeClient.instance);
 /// ```
-///
-/// ## How it works
-///
-/// 1. On [start], the QuickJS runtime is created and the bundled Sequelize
-///    bridge JavaScript (`bridge_server.bundle.js`) is evaluated inside it.
-/// 2. [call] invocations dispatch directly to the in-process JS
-///    `_dart_handleRequest()` function — no subprocess, no IPC overhead.
-/// 3. TCP connections to PostgreSQL/MySQL are routed through Dart's
-///    `dart:io` [Socket] and bridged back into the QuickJS context.
 class QuickJsBridgeClient implements BridgeClientInterface {
   QuickJsRuntime? _runtime;
   bool _isConnected = false;
@@ -46,6 +37,7 @@ class QuickJsBridgeClient implements BridgeClientInterface {
   Function(String sql)? _loggingCallback;
 
   /// Optional latency callback for benchmarking.
+  @override
   void Function(BridgeLatencyInfo info)? latencyCallback;
 
   QuickJsBridgeClient._();
@@ -99,7 +91,6 @@ class QuickJsBridgeClient implements BridgeClientInterface {
 
     _isInitializing = true;
     _initializationCompleter = Completer<void>();
-    // Prevent unhandled zone error if completeError is called without external listeners
     _initializationCompleter!.future.catchError((_) {});
 
     try {
@@ -110,19 +101,26 @@ class QuickJsBridgeClient implements BridgeClientInterface {
       final bundleJs = await _loadBundleJs(bridgePath);
       _runtime!.loadBundle(bundleJs);
 
-      // 3. Install the async dispatch shim so Dart can call handleRequest / processRequest.
+      // 3. Install the direct async dispatch shim.
       _runtime!.eval(r"""
-        globalThis._dart_handleRequest = async function(params) {
-          const req = JSON.parse(params.requestJson);
-          if (typeof globalThis.handleRequest === 'function') {
-            return await globalThis.handleRequest(req.method, req.params);
+        globalThis._dart_handleRequest = async function(promiseId, params) {
+          try {
+            const req = params.requestJson ? JSON.parse(params.requestJson) : params;
+            let response;
+            if (typeof globalThis.handleRequest === 'function') {
+              response = await globalThis.handleRequest(req.method, req.params);
+            } else if (typeof processRequest === 'function') {
+              response = await new Promise((resolve) => {
+                processRequest(req, (res) => resolve(res));
+              });
+            } else {
+              throw new Error('No request handler found in QuickJS bundle');
+            }
+            _ffiNotify('_dart_promise_resolve', JSON.stringify({id: promiseId, value: response}));
+          } catch (err) {
+            console.error('[QuickJS handleRequest Error]:', err, err ? err.stack : '');
+            _ffiNotify('_dart_promise_reject', JSON.stringify({id: promiseId, error: String(err?.message || err)}));
           }
-          if (typeof processRequest === 'function') {
-            return new Promise((resolve) => {
-              processRequest(req, (response) => resolve(response));
-            });
-          }
-          throw new Error('No request handler found in QuickJS bundle');
         };
       """);
 
@@ -165,22 +163,17 @@ class QuickJsBridgeClient implements BridgeClientInterface {
     }
 
     final id = _requestId++;
-    final request = {'id': id, 'method': method, 'params': params};
-    final requestJson = jsonEncode(request);
-
     final stopwatch = Stopwatch()..start();
 
-    // Dispatch into the QuickJS context — runs Sequelize in-process.
+    // Dispatch directly into the QuickJS context without JS eval or double JSON stringification
     final response = await _runtime!.callAsync(
       '_dart_handleRequest',
-      {'requestJson': requestJson},
+      {
+        'id': id,
+        'method': method,
+        'params': params,
+      },
     );
-
-    final callTime = stopwatch.elapsedMilliseconds;
-    // ignore: avoid_print
-    print(
-        '[QuickJsBridgeClient] _runtime.callAsync("$method") took $callTime ms');
-    stopwatch.reset();
 
     // response is the decoded JS object (Map).
     Map<String, dynamic> responseMap;
@@ -188,11 +181,6 @@ class QuickJsBridgeClient implements BridgeClientInterface {
       responseMap = Map<String, dynamic>.from(response);
     } else {
       responseMap = jsonDecode(response.toString()) as Map<String, dynamic>;
-    }
-    final decodeTime = stopwatch.elapsedMilliseconds;
-    if (decodeTime > 2) {
-      // ignore: avoid_print
-      print('[QuickJsBridgeClient] response decode took $decodeTime ms');
     }
 
     // Handle SQL logging notifications.
@@ -216,10 +204,6 @@ class QuickJsBridgeClient implements BridgeClientInterface {
     if (responseMap.containsKey('error')) {
       final error = responseMap['error'];
       if (error is Map) {
-        if (error['stack'] != null && error['stack'].toString().isNotEmpty) {
-          // ignore: avoid_print
-          print('[QuickJS Error Stack]\n${error['stack']}');
-        }
         throw SequelizeException.fromBridge(Map<String, dynamic>.from(error));
       }
       throw BridgeException(
@@ -236,9 +220,7 @@ class QuickJsBridgeClient implements BridgeClientInterface {
     if (_runtime != null) {
       try {
         await call('close', {}).timeout(const Duration(milliseconds: 500));
-      } catch (_) {
-        // Ignore errors during shutdown.
-      }
+      } catch (_) {}
     }
 
     _isClosed = true;
@@ -247,73 +229,68 @@ class QuickJsBridgeClient implements BridgeClientInterface {
     _runtime = null;
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // Internal helpers
-  // ────────────────────────────────────────────────────────────────────────
-
   Future<void> _connectToDatabase(Map<String, dynamic> config) async {
-    final result = await call('connect', {'config': config});
-    if (result is Map && result['connected'] == true) {
+    final response = await call('connect', {'config': config});
+    if (response != null &&
+        response is Map &&
+        (response['connected'] == true || response['authenticated'] == true)) {
       _isConnected = true;
     } else {
-      throw BridgeException('QuickJS bridge: failed to connect to database');
+      _isConnected = false;
+      throw BridgeException('Failed to authenticate with database via QuickJS');
     }
   }
 
-  Future<String> _loadBundleJs(String? customPath) async {
-    final bundlePath = customPath ?? await _findBundlePath();
-    if (!File(bundlePath).existsSync()) {
-      throw BridgeException(
-        'Bridge bundle not found at: $bundlePath\n'
-        'Run: dart run tools/build_js.dart to rebuild it.',
+  Future<String> _loadBundleJs(String? explicitPath) async {
+    if (explicitPath != null && explicitPath.isNotEmpty) {
+      final file = File(explicitPath);
+      if (await file.exists()) {
+        return file.readAsString();
+      }
+    }
+
+    final candidatePaths = <String>[];
+
+    try {
+      final exeDir = File(Platform.resolvedExecutable).parent;
+      final bundleDir = exeDir.parent;
+      candidatePaths.add(
+        p.join(bundleDir.path, 'lib', 'src', 'bridge',
+            'bridge_server_quickjs.bundle.js'),
       );
-    }
-    return File(bundlePath).readAsStringSync();
-  }
+      candidatePaths.add(
+        p.join(bundleDir.path, 'assets', 'bridge_server_quickjs.bundle.js'),
+      );
+    } catch (_) {}
 
-  Future<String> _findBundlePath() async {
-    const bundleNames = [
-      'bridge_server_quickjs.bundle.js',
-      'bridge_server.bundle.js',
-    ];
-
-    for (final name in bundleNames) {
-      // Try package URI resolution first (works in JIT / dev).
-      try {
-        final uri = Uri.parse('package:sequelize_orm/src/bridge/$name');
-        final resolved = await Isolate.resolvePackageUri(uri);
-        if (resolved != null && resolved.scheme == 'file') {
-          final filePath = resolved.toFilePath();
-          if (File(filePath).existsSync()) return p.absolute(filePath);
-        }
-      } catch (_) {}
-
-      // Fallback: search relative paths.
-      final candidates = [
-        'packages/sequelize_orm/lib/src/bridge/$name',
-        '../packages/sequelize_orm/lib/src/bridge/$name',
-        '../../packages/sequelize_orm/lib/src/bridge/$name',
-        p.join(
-          p.dirname(Platform.resolvedExecutable),
-          'packages/sequelize_orm/lib/src/bridge/$name',
-        ),
-      ];
-
-      for (final c in candidates) {
-        if (File(c).existsSync()) return p.absolute(c);
+    try {
+      final pkgUri = Uri.parse(
+          'package:sequelize_orm/src/bridge/bridge_server_quickjs.bundle.js');
+      final resolved = await Isolate.resolvePackageUri(pkgUri);
+      if (resolved != null && resolved.scheme == 'file') {
+        candidatePaths.add(resolved.toFilePath());
       }
+    } catch (_) {}
 
-      // Walk up from current dir.
-      var dir = Directory.current;
-      for (var i = 0; i < 5; i++) {
-        final probe = File(
-            p.join(dir.path, 'packages/sequelize_orm/lib/src/bridge/$name'));
-        if (probe.existsSync()) return probe.absolute.path;
-        if (dir.parent.path == dir.path) break;
-        dir = dir.parent;
+    final cwd = Directory.current.path;
+    candidatePaths.addAll([
+      p.join(cwd, 'packages', 'sequelize_orm', 'lib', 'src', 'bridge',
+          'bridge_server_quickjs.bundle.js'),
+      p.join(cwd, '..', 'sequelize_orm', 'lib', 'src', 'bridge',
+          'bridge_server_quickjs.bundle.js'),
+      p.join(cwd, 'lib', 'src', 'bridge', 'bridge_server_quickjs.bundle.js'),
+    ]);
+
+    for (final path in candidatePaths) {
+      final file = File(path);
+      if (await file.exists()) {
+        return file.readAsString();
       }
     }
 
-    return 'packages/sequelize_orm/lib/src/bridge/bridge_server_quickjs.bundle.js';
+    throw StateError(
+      'Could not find bridge_server_quickjs.bundle.js. Tried:\n'
+      '${candidatePaths.map((e) => ' - $e').join('\n')}',
+    );
   }
 }

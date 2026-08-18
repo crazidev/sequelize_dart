@@ -43,6 +43,16 @@ typedef _SetCallback = void Function(
   Pointer<NativeFunction<DartBridgeCallbackC>>,
 );
 
+// qjs_dart_set_runtime_callback(QjsDartRuntime*, DartBridgeCallback)
+typedef _SetRuntimeCallbackC = Void Function(
+  QjsDartRuntimePtr handle,
+  Pointer<NativeFunction<DartBridgeCallbackC>>,
+);
+typedef _SetRuntimeCallback = void Function(
+  QjsDartRuntimePtr handle,
+  Pointer<NativeFunction<DartBridgeCallbackC>>,
+);
+
 // qjs_dart_eval(QjsDartRuntime*, const char* js) -> char*
 typedef _EvalC = Pointer<Utf8> Function(
   QjsDartRuntimePtr handle,
@@ -53,9 +63,88 @@ typedef _Eval = Pointer<Utf8> Function(
   Pointer<Utf8> jsCode,
 );
 
+// qjs_dart_call_async(QjsDartRuntime*, int promise_id, const char* json_args) -> int
+typedef _CallAsyncC = Int32 Function(
+  QjsDartRuntimePtr handle,
+  Int32 promiseId,
+  Pointer<Utf8> jsonArgs,
+);
+typedef _CallAsync = int Function(
+  QjsDartRuntimePtr handle,
+  int promiseId,
+  Pointer<Utf8> jsonArgs,
+);
+
+// qjs_dart_trigger_timer(QjsDartRuntime*, int timer_id) -> int
+typedef _TriggerTimerC = Int32 Function(
+  QjsDartRuntimePtr handle,
+  Int32 timerId,
+);
+typedef _TriggerTimer = int Function(
+  QjsDartRuntimePtr handle,
+  int timerId,
+);
+
+// qjs_dart_emit_socket_data(QjsDartRuntime*, int socket_id, const uint8_t* bytes, size_t len) -> int
+typedef _EmitSocketDataC = Int32 Function(
+  QjsDartRuntimePtr handle,
+  Int32 socketId,
+  Pointer<Uint8> bytes,
+  IntPtr len,
+);
+typedef _EmitSocketData = int Function(
+  QjsDartRuntimePtr handle,
+  int socketId,
+  Pointer<Uint8> bytes,
+  int len,
+);
+
+// qjs_dart_emit_socket_event(QjsDartRuntime*, int socket_id, const char* event_name) -> int
+typedef _EmitSocketEventC = Int32 Function(
+  QjsDartRuntimePtr handle,
+  Int32 socketId,
+  Pointer<Utf8> eventName,
+);
+typedef _EmitSocketEvent = int Function(
+  QjsDartRuntimePtr handle,
+  int socketId,
+  Pointer<Utf8> eventName,
+);
+
+// qjs_dart_emit_socket_error(QjsDartRuntime*, int socket_id, const char* error_msg) -> int
+typedef _EmitSocketErrorC = Int32 Function(
+  QjsDartRuntimePtr handle,
+  Int32 socketId,
+  Pointer<Utf8> errorMsg,
+);
+typedef _EmitSocketError = int Function(
+  QjsDartRuntimePtr handle,
+  int socketId,
+  Pointer<Utf8> errorMsg,
+);
+
 // qjs_dart_pump(QjsDartRuntime*) -> int
 typedef _PumpC = Int32 Function(QjsDartRuntimePtr handle);
 typedef _Pump = int Function(QjsDartRuntimePtr handle);
+
+// qjs_dart_pump_all(QjsDartRuntime*) -> int
+typedef _PumpAllC = Int32 Function(QjsDartRuntimePtr handle);
+typedef _PumpAll = int Function(QjsDartRuntimePtr handle);
+
+// qjs_dart_set_memory_limit(QjsDartRuntime*, size_t limit)
+typedef _SetMemoryLimitC = Void Function(
+    QjsDartRuntimePtr handle, IntPtr limit);
+typedef _SetMemoryLimit = void Function(QjsDartRuntimePtr handle, int limit);
+
+// qjs_dart_set_gc_threshold(QjsDartRuntime*, size_t threshold)
+typedef _SetGcThresholdC = Void Function(
+    QjsDartRuntimePtr handle, IntPtr threshold);
+typedef _SetGcThreshold = void Function(
+    QjsDartRuntimePtr handle, int threshold);
+
+// qjs_dart_run_gc(QjsDartRuntime*)
+typedef _RunGcC = Void Function(QjsDartRuntimePtr handle);
+typedef _RunGc = void Function(QjsDartRuntimePtr handle);
 
 // qjs_dart_free_string(char*)
 typedef _FreeStringC = Void Function(Pointer<Utf8> str);
@@ -66,11 +155,6 @@ typedef _FreeString = void Function(Pointer<Utf8> str);
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Loads the compiled `quickjs_dart` native library.
-///
-/// The Native Assets build hook (`hook/build.dart`) places the compiled
-/// `.dylib` / `.so` / `.dll` at a standard location known to the Dart
-/// runtime. When native assets are enabled (`--enable-experiment=native-assets`
-/// or Dart 3.7+), `DynamicLibrary.open` resolves the asset name automatically.
 DynamicLibrary _loadLibrary() {
   const assetName = 'quickjs_dart';
   final libName = Platform.isMacOS
@@ -95,7 +179,7 @@ DynamicLibrary _loadLibrary() {
     }
   }
 
-  // 2. Try standard dynamic library open (works when Native Assets or system path provides it)
+  // 2. Try standard dynamic library open
   try {
     return DynamicLibrary.open(libName);
   } catch (_) {}
@@ -103,13 +187,11 @@ DynamicLibrary _loadLibrary() {
   // 3. Collect candidate search paths across bundle, script, CWD, and build locations
   final candidatePaths = <String>[];
 
-  // Paths relative to executable (crucial for AOT bundles built via `dart build cli`)
   try {
     final exeFile = File(Platform.resolvedExecutable);
     final exeDir = exeFile.parent;
     final exeParent = exeDir.parent;
 
-    // Standard `dart build cli` layout: <bundle>/bin/<exe> and <bundle>/lib/<dylib>
     candidatePaths.add('${exeParent.path}/lib/$libName');
     candidatePaths.add('${exeParent.path}/$libName');
     candidatePaths.add('${exeParent.path}/Frameworks/$libName');
@@ -118,7 +200,6 @@ DynamicLibrary _loadLibrary() {
     candidatePaths.add('${exeDir.path}/Frameworks/$libName');
   } catch (_) {}
 
-  // Paths relative to script (when running via JIT / dart run)
   try {
     if (Platform.script.scheme == 'file') {
       final scriptDir = File.fromUri(Platform.script).parent;
@@ -135,7 +216,6 @@ DynamicLibrary _loadLibrary() {
     }
   } catch (_) {}
 
-  // Paths relative to current working directory & common package layouts
   final cwd = Directory.current.path;
   candidatePaths.addAll([
     '/tmp/$libName',
@@ -146,7 +226,6 @@ DynamicLibrary _loadLibrary() {
     '$cwd/packages/sequelize_orm_quickjs/native/quickjs/$libName',
     '$cwd/../packages/sequelize_orm_quickjs/native/quickjs/$libName',
     '$cwd/../../packages/sequelize_orm_quickjs/native/quickjs/$libName',
-    // Bundle directories from CLI builds
     '$cwd/build/cli/macos_x64/bundle/lib/$libName',
     '$cwd/build/cli/macos_arm64/bundle/lib/$libName',
     '$cwd/build/cli/linux_x64/bundle/lib/$libName',
@@ -168,7 +247,6 @@ DynamicLibrary _loadLibrary() {
     }
   }
 
-  // Final attempt: throws dynamic library error with system dlopen details
   return DynamicLibrary.open(libName);
 }
 
@@ -183,8 +261,18 @@ class QuickJsBindings {
   late final _CreateRuntime _createRuntime;
   late final _FreeRuntime _freeRuntime;
   late final _SetCallback _setCallback;
+  late final _SetRuntimeCallback _setRuntimeCallback;
   late final _Eval _eval;
+  late final _CallAsync _callAsync;
+  late final _TriggerTimer _triggerTimer;
+  late final _EmitSocketData _emitSocketData;
+  late final _EmitSocketEvent _emitSocketEvent;
+  late final _EmitSocketError _emitSocketError;
   late final _Pump _pump;
+  late final _PumpAll _pumpAll;
+  late final _SetMemoryLimit _setMemoryLimit;
+  late final _SetGcThreshold _setGcThreshold;
+  late final _RunGc _runGc;
   late final _FreeString _freeString;
 
   QuickJsBindings._(this._lib) {
@@ -197,8 +285,38 @@ class QuickJsBindings {
     _setCallback = _lib
         .lookup<NativeFunction<_SetCallbackC>>('qjs_dart_set_callback')
         .asFunction();
+    _setRuntimeCallback = _lib
+        .lookup<NativeFunction<_SetRuntimeCallbackC>>(
+            'qjs_dart_set_runtime_callback')
+        .asFunction();
     _eval = _lib.lookup<NativeFunction<_EvalC>>('qjs_dart_eval').asFunction();
+    _callAsync = _lib
+        .lookup<NativeFunction<_CallAsyncC>>('qjs_dart_call_async')
+        .asFunction();
+    _triggerTimer = _lib
+        .lookup<NativeFunction<_TriggerTimerC>>('qjs_dart_trigger_timer')
+        .asFunction();
+    _emitSocketData = _lib
+        .lookup<NativeFunction<_EmitSocketDataC>>('qjs_dart_emit_socket_data')
+        .asFunction();
+    _emitSocketEvent = _lib
+        .lookup<NativeFunction<_EmitSocketEventC>>('qjs_dart_emit_socket_event')
+        .asFunction();
+    _emitSocketError = _lib
+        .lookup<NativeFunction<_EmitSocketErrorC>>('qjs_dart_emit_socket_error')
+        .asFunction();
     _pump = _lib.lookup<NativeFunction<_PumpC>>('qjs_dart_pump').asFunction();
+    _pumpAll = _lib
+        .lookup<NativeFunction<_PumpAllC>>('qjs_dart_pump_all')
+        .asFunction();
+    _setMemoryLimit = _lib
+        .lookup<NativeFunction<_SetMemoryLimitC>>('qjs_dart_set_memory_limit')
+        .asFunction();
+    _setGcThreshold = _lib
+        .lookup<NativeFunction<_SetGcThresholdC>>('qjs_dart_set_gc_threshold')
+        .asFunction();
+    _runGc =
+        _lib.lookup<NativeFunction<_RunGcC>>('qjs_dart_run_gc').asFunction();
     _freeString = _lib
         .lookup<NativeFunction<_FreeStringC>>('qjs_dart_free_string')
         .asFunction();
@@ -225,9 +343,15 @@ class QuickJsBindings {
     _setCallback(cb);
   }
 
+  /// Set the runtime-specific Dart callback dispatcher.
+  void setRuntimeCallback(
+    QjsDartRuntimePtr handle,
+    Pointer<NativeFunction<DartBridgeCallbackC>> cb,
+  ) {
+    _setRuntimeCallback(handle, cb);
+  }
+
   /// Evaluate [jsCode] in [handle] and return the JSON-encoded result string.
-  ///
-  /// The returned string must be freed with [freeResultString].
   Pointer<Utf8> evalRaw(QjsDartRuntimePtr handle, Pointer<Utf8> jsCode) {
     return _eval(handle, jsCode);
   }
@@ -243,17 +367,71 @@ class QuickJsBindings {
     return result;
   }
 
-  /// Pump the QuickJS microtask queue until it is empty.
+  /// Directly dispatch an async call into `_dart_handleRequest` with JSON arguments without eval.
+  int callAsync(QjsDartRuntimePtr handle, int promiseId, String jsonArgs) {
+    final argsPtr = jsonArgs.toNativeUtf8();
+    final res = _callAsync(handle, promiseId, argsPtr);
+    calloc.free(argsPtr);
+    return res;
+  }
+
+  /// Directly trigger a JavaScript timer callback by [timerId] without eval.
+  int triggerTimer(QjsDartRuntimePtr handle, int timerId) {
+    return _triggerTimer(handle, timerId);
+  }
+
+  /// Directly push binary bytes into JavaScript context without base64 encoding.
+  int emitSocketData(
+    QjsDartRuntimePtr handle,
+    int socketId,
+    Pointer<Uint8> bytes,
+    int len,
+  ) {
+    return _emitSocketData(handle, socketId, bytes, len);
+  }
+
+  /// Directly emit a socket event (e.g. 'connect', 'close').
+  int emitSocketEvent(
+      QjsDartRuntimePtr handle, int socketId, String eventName) {
+    final namePtr = eventName.toNativeUtf8();
+    final res = _emitSocketEvent(handle, socketId, namePtr);
+    calloc.free(namePtr);
+    return res;
+  }
+
+  /// Directly emit a socket error with [errorMsg].
+  int emitSocketError(QjsDartRuntimePtr handle, int socketId, String errorMsg) {
+    final msgPtr = errorMsg.toNativeUtf8();
+    final res = _emitSocketError(handle, socketId, msgPtr);
+    calloc.free(msgPtr);
+    return res;
+  }
+
+  /// Pump the QuickJS microtask queue in native C until it is empty.
   ///
-  /// Returns the number of pump iterations required.
+  /// Returns the number of pump iterations executed in a single FFI crossing.
+  int pumpAll(QjsDartRuntimePtr handle) {
+    return _pumpAll(handle);
+  }
+
+  /// Single step pump for backward compatibility.
   int pump(QjsDartRuntimePtr handle) {
-    int iterations = 0;
-    int ret;
-    do {
-      ret = _pump(handle);
-      if (ret > 0) iterations++;
-    } while (ret > 0);
-    return iterations;
+    return _pump(handle);
+  }
+
+  /// Set the memory limit for the QuickJS runtime in bytes.
+  void setMemoryLimit(QjsDartRuntimePtr handle, int bytes) {
+    _setMemoryLimit(handle, bytes);
+  }
+
+  /// Set the GC threshold for the QuickJS runtime in bytes.
+  void setGcThreshold(QjsDartRuntimePtr handle, int bytes) {
+    _setGcThreshold(handle, bytes);
+  }
+
+  /// Trigger garbage collection in QuickJS.
+  void runGc(QjsDartRuntimePtr handle) {
+    _runGc(handle);
   }
 
   /// Free a result string returned by [evalRaw].

@@ -5,7 +5,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart' as dartCrypto;
+import 'package:crypto/crypto.dart' as dart_crypto;
 import 'package:ffi/ffi.dart';
 import 'package:sequelize_orm_quickjs/src/quickjs_bindings.dart';
 
@@ -22,28 +22,12 @@ import 'package:sequelize_orm_quickjs/src/quickjs_bindings.dart';
 /// final result = await rt.callAsync('findAll', {'modelName': 'Post', ...});
 /// rt.dispose();
 /// ```
-///
-/// ## Performance notes
-///
-/// All binary payloads that cross the Dart <-> JS boundary (socket bytes,
-/// hash/HMAC/PBKDF2 inputs and outputs, random bytes) are exchanged as
-/// **base64 strings**, never as JSON arrays of integers. A JSON int array is
-/// both far larger on the wire (each byte becomes 1-3 decimal digits plus a
-/// comma, vs. 4/3 bytes for base64) and far more expensive for the embedded
-/// JS engine to *parse*: `[12,54,3,...]` requires lexing one token per byte,
-/// while `'aGVsbG8='` is a single string-literal token. Keep this convention
-/// when adding new bridge calls — always base64-encode binary data before
-/// calling `_ffiNotify`, and base64-decode on the way back.
 class QuickJsRuntime {
   final QuickJsBindings _bindings;
   late final QjsDartRuntimePtr _handle;
   bool _disposed = false;
 
   /// Pending Dart Completers for JS Promises, keyed by promise-id.
-  ///
-  /// Holds the already-decoded result value (Map/List/String/num/bool/null)
-  /// — see [callAsync] for why the result only crosses the bridge
-  /// JSON-encoded once instead of twice.
   final Map<int, Completer<dynamic>> _pendingPromises = {};
   int _promiseIdCounter = 0;
 
@@ -56,10 +40,13 @@ class QuickJsRuntime {
   /// Callback for notifications dispatched from JavaScript (e.g. SQL logging).
   void Function(Map<String, dynamic>)? onNotification;
 
-  /// Native function pointer we must keep alive for the lifetime of the runtime.
+  /// Native function pointer kept alive for the lifetime of this runtime.
   Pointer<NativeFunction<DartBridgeCallbackC>>? _nativeCb;
 
   QuickJsRuntime._(this._bindings);
+
+  /// Mapping of active runtimes by handle address to support multi-runtime isolation.
+  static final Map<int, QuickJsRuntime> _runtimesByHandle = {};
 
   /// Create and initialise a new QuickJS runtime with all polyfills installed.
   static Future<QuickJsRuntime> create() async {
@@ -80,14 +67,12 @@ class QuickJsRuntime {
   // ────────────────────────────────────────────────────────────────────────
 
   void _installCallback() {
-    // Use a top-level static function converted to a C pointer.
-    // We keep the pointer alive as a field to prevent GC.
+    _runtimesByHandle[_handle.address] = this;
     _nativeCb = Pointer.fromFunction<DartBridgeCallbackC>(
       _dispatchFromJs,
-      // No exceptional return needed — Pointer.fromFunction handles Pointer
-      // return types without an exceptionalReturn argument.
     );
     _bindings.setCallback(_nativeCb!);
+    _bindings.setRuntimeCallback(_handle, _nativeCb!);
   }
 
   /// Static dispatcher called from C when `_ffiNotify(name, argsJson)` is
@@ -99,15 +84,15 @@ class QuickJsRuntime {
     final name = namePtr.toDartString();
     final argsJson = argsPtr.toDartString();
 
-    // Get the currently active runtime (registered below in _installCallback).
-    final rt = _activeRuntime;
+    final rt = _runtimesByHandle.values.isNotEmpty
+        ? _runtimesByHandle.values.first
+        : null;
     if (rt == null) return nullptr;
 
     return rt._handleBridgeCall(name, argsJson);
   }
 
   Pointer<Utf8> _handleBridgeCall(String name, String argsJson) {
-    final sw = Stopwatch()..start();
     try {
       Map<String, dynamic> args = {};
       try {
@@ -118,9 +103,6 @@ class QuickJsRuntime {
       switch (name) {
         case '_dart_promise_resolve':
           final id = (args['id'] as num).toInt();
-          // 'value' is already the decoded JSON value (Map/List/String/
-          // num/bool/null) — see callAsync for why this crosses the
-          // bridge JSON-encoded exactly once, not twice.
           _pendingPromises.remove(id)?.complete(args['value']);
 
         case '_dart_promise_reject':
@@ -132,7 +114,6 @@ class QuickJsRuntime {
           _handleSocketConnect(args);
 
         case '_dart_socket_write':
-          // 'data' arrives as a base64 string (see class-level perf notes).
           final socketId = (args['id'] as num).toInt();
           final b64 = args['data'] as String;
           _sockets[socketId]?.write(base64Decode(b64));
@@ -195,16 +176,8 @@ class QuickJsRuntime {
           }
       }
     } catch (e) {
-      // Best-effort — log but don't crash the JS context.
       // ignore: avoid_print
       print('[QuickJsRuntime] Bridge call "$name" error: $e');
-    }
-
-    sw.stop();
-    if (sw.elapsedMilliseconds > 2) {
-      // ignore: avoid_print
-      print(
-          '[QuickJsRuntime] _handleBridgeCall("$name") took ${sw.elapsedMilliseconds} ms');
     }
 
     return nullptr;
@@ -216,7 +189,6 @@ class QuickJsRuntime {
     final port = (args['port'] as num).toInt();
     final useTls = args['tls'] as bool? ?? false;
 
-    // Connect asynchronously; deliver events back to JS via eval.
     _DartSocketContext.connect(
       socketId: socketId,
       host: host,
@@ -227,32 +199,19 @@ class QuickJsRuntime {
       onError: (e) => _onSocketError(socketId, e.toString()),
     ).then((ctx) {
       _sockets[socketId] = ctx;
-      _evalAsync("_dart_emit_socket($socketId, 'connect');");
-      _bindings.pump(_handle);
+      _bindings.emitSocketEvent(_handle, socketId, 'connect');
+      _bindings.pumpAll(_handle);
     }).catchError((e) {
-      _evalAsync(
-        "_dart_emit_socket($socketId, 'error', new Error(${_jsString(e.toString())}));",
-      );
-      _bindings.pump(_handle);
+      _bindings.emitSocketError(_handle, socketId, e.toString());
+      _bindings.pumpAll(_handle);
     });
   }
-
-  // ────────────────────────────────────────────────────────────────────────
-  // Active runtime registry (needed for static callback dispatch)
-  // ────────────────────────────────────────────────────────────────────────
-
-  // NOTE: This is intentionally a simple static reference. In real use
-  // there will typically be one QuickJsRuntime per Dart isolate. For
-  // multi-instance scenarios, promote this to a Map<int, QuickJsRuntime>.
-  static QuickJsRuntime? _activeRuntime;
 
   // ────────────────────────────────────────────────────────────────────────
   // JS polyfill layer
   // ────────────────────────────────────────────────────────────────────────
 
   void _installJsPolyfillLayer() {
-    _activeRuntime = this;
-
     // language=javascript
     const polyfill = r"""
 (function() {
@@ -264,52 +223,71 @@ class QuickJsRuntime {
 
   // ── EventEmitter ─────────────────────────────────────────────────────────
   class EventEmitter {
-    constructor() { this._events = {}; }
+    constructor() { this._events = Object.create(null); }
     on(event, fn) {
-      (this._events[event] = this._events[event] || []).push(fn);
+      const e = this._events[event];
+      if (!e) this._events[event] = fn;
+      else if (typeof e === 'function') this._events[event] = [e, fn];
+      else e.push(fn);
       return this;
     }
     addListener(event, fn) { return this.on(event, fn); }
     once(event, fn) {
-      const wrapper = (...args) => { this.off(event, wrapper); fn(...args); };
+      const wrapper = (...args) => { this.off(event, wrapper); fn.apply(this, args); };
+      wrapper._orig = fn;
       return this.on(event, wrapper);
     }
     off(event, fn) {
-      if (this._events[event])
-        this._events[event] = this._events[event].filter(f => f !== fn);
+      const e = this._events[event];
+      if (!e) return this;
+      if (e === fn || e._orig === fn) {
+        delete this._events[event];
+      } else if (Array.isArray(e)) {
+        this._events[event] = e.filter(f => f !== fn && f._orig !== fn);
+        if (this._events[event].length === 1) this._events[event] = this._events[event][0];
+      }
       return this;
     }
     removeListener(event, fn) { return this.off(event, fn); }
     emit(event, ...args) {
-      (this._events[event] || []).slice().forEach(fn => fn(...args));
+      const e = this._events[event];
+      if (!e) return false;
+      if (typeof e === 'function') {
+        e.apply(this, args);
+      } else {
+        const copy = e.slice();
+        for (let i = 0; i < copy.length; i++) copy[i].apply(this, args);
+      }
+      return true;
     }
     removeAllListeners(event) {
       if (event) delete this._events[event];
-      else this._events = {};
+      else this._events = Object.create(null);
       return this;
     }
     listenerCount(event) {
-      return (this._events[event] || []).length;
+      const e = this._events[event];
+      if (!e) return 0;
+      return typeof e === 'function' ? 1 : e.length;
     }
     listeners(event) {
-      return (this._events[event] || []).slice();
+      const e = this._events[event];
+      if (!e) return [];
+      return typeof e === 'function' ? [e] : e.slice();
     }
-    rawListeners(event) {
-      return (this._events[event] || []).slice();
-    }
+    rawListeners(event) { return this.listeners(event); }
     setMaxListeners() { return this; }
     getMaxListeners() { return 10; }
   }
-  // ── TextEncoder / TextDecoder polyfills ──────────────────────────────────
+
+  // ── TextEncoder / TextDecoder singletons ──────────────────────────────────
   if (typeof TextEncoder === 'undefined') {
     globalThis.TextEncoder = class {
       encode(str) {
         if (!str) return new Uint8Array(0);
         const utf8 = unescape(encodeURIComponent(str));
         const arr = new Uint8Array(utf8.length);
-        for (let i = 0; i < utf8.length; i++) {
-          arr[i] = utf8.charCodeAt(i);
-        }
+        for (let i = 0; i < utf8.length; i++) arr[i] = utf8.charCodeAt(i);
         return arr;
       }
     };
@@ -320,9 +298,7 @@ class QuickJsRuntime {
         if (!arr || arr.length === 0) return '';
         let str = '';
         const len = arr.length;
-        for (let i = 0; i < len; i++) {
-          str += String.fromCharCode(arr[i]);
-        }
+        for (let i = 0; i < len; i++) str += String.fromCharCode(arr[i]);
         try {
           return decodeURIComponent(escape(str));
         } catch (_) {
@@ -331,30 +307,62 @@ class QuickJsRuntime {
       }
     };
   }
+  const _sharedTextEncoder = new TextEncoder();
+  const _sharedTextDecoder = new TextDecoder();
 
   // ── base64 <-> bytes helpers ─────────────────────────────────────────────
-  // Every binary payload crossing the Dart bridge (_ffiNotify) goes through
-  // these. Avoid string concatenation in a loop for large buffers (can be
-  // quadratic on some engines) — build an array of chunks and join once.
-  const _B64_CHUNK = 0x2000;
+  const _B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   function _bytesToBase64(view) {
     const arr = view instanceof Uint8Array ? view : new Uint8Array(view);
-    if (arr.length === 0) return '';
-    const parts = new Array(Math.ceil(arr.length / _B64_CHUNK));
-    let pi = 0;
-    for (let i = 0; i < arr.length; i += _B64_CHUNK) {
-      parts[pi++] = String.fromCharCode.apply(null, arr.subarray(i, i + _B64_CHUNK));
+    const len = arr.length;
+    if (len === 0) return '';
+    let res = '';
+    let i = 0;
+    for (; i + 2 < len; i += 3) {
+      const n = (arr[i] << 16) | (arr[i + 1] << 8) | arr[i + 2];
+      res += _B64_CHARS[(n >> 18) & 63] + _B64_CHARS[(n >> 12) & 63] + _B64_CHARS[(n >> 6) & 63] + _B64_CHARS[n & 63];
     }
-    return btoa(parts.join(''));
+    if (i < len) {
+      if (len - i === 1) {
+        const n = arr[i] << 16;
+        res += _B64_CHARS[(n >> 18) & 63] + _B64_CHARS[(n >> 12) & 63] + '==';
+      } else {
+        const n = (arr[i] << 16) | (arr[i + 1] << 8);
+        res += _B64_CHARS[(n >> 18) & 63] + _B64_CHARS[(n >> 12) & 63] + _B64_CHARS[(n >> 6) & 63] + '=';
+      }
+    }
+    return res;
+  }
+
+  const _B64_LOOKUP = new Uint8Array(256);
+  for (let i = 0; i < _B64_CHARS.length; i++) {
+    _B64_LOOKUP[_B64_CHARS.charCodeAt(i)] = i;
   }
   function _base64ToBytes(b64) {
-    if (!b64) return new Uint8Array(0);
-    const bin = atob(b64);
-    const len = bin.length;
-    const out = new Uint8Array(len);
-    for (let i = 0; i < len; i++) out[i] = bin.charCodeAt(i);
+    if (!b64 || typeof b64 !== 'string') return new Uint8Array(0);
+    const len = b64.length;
+    let validLen = len;
+    while (validLen > 0 && b64[validLen - 1] === '=') validLen--;
+    const outLen = Math.floor((validLen * 3) / 4);
+    const out = new Uint8Array(outLen);
+    let outIdx = 0;
+    let i = 0;
+    while (i < validLen) {
+      const c0 = _B64_LOOKUP[b64.charCodeAt(i++)];
+      const c1 = i < validLen ? _B64_LOOKUP[b64.charCodeAt(i++)] : 0;
+      const c2 = i < validLen ? _B64_LOOKUP[b64.charCodeAt(i++)] : 0;
+      const c3 = i < validLen ? _B64_LOOKUP[b64.charCodeAt(i++)] : 0;
+      const n = (c0 << 18) | (c1 << 12) | (c2 << 6) | c3;
+      if (outIdx < outLen) out[outIdx++] = (n >> 16) & 255;
+      if (outIdx < outLen) out[outIdx++] = (n >> 8) & 255;
+      if (outIdx < outLen) out[outIdx++] = n & 255;
+    }
     return out;
   }
+  globalThis.btoa = _bytesToBase64;
+  globalThis.atob = function(str) {
+    return _sharedTextDecoder.decode(_base64ToBytes(str));
+  };
 
   // ── Timers polyfills ────────────────────────────────────────────────────
   let _timerIdGen = 0;
@@ -501,7 +509,7 @@ class QuickJsRuntime {
     globalThis.URLSearchParams = URLSearchParams;
   }
 
-  // ── Complete Buffer polyfill ───────────────────────────────────────────────
+  // ── Buffer polyfill ───────────────────────────────────────────────────────
   if (typeof Buffer === 'undefined') {
     class _Buffer extends Uint8Array {
       static from(data, encodingOrOffset, length) {
@@ -520,8 +528,7 @@ class QuickJsRuntime {
             arr.set(bytes);
             return arr;
           }
-          const te = new TextEncoder();
-          const bytes = te.encode(data);
+          const bytes = _sharedTextEncoder.encode(data);
           const buf = new _Buffer(bytes.length);
           buf.set(bytes);
           return buf;
@@ -543,12 +550,8 @@ class QuickJsRuntime {
         if (fill !== 0) buf.fill(fill);
         return buf;
       }
-      static allocUnsafe(size) {
-        return new _Buffer(size);
-      }
-      static allocUnsafeSlow(size) {
-        return new _Buffer(size);
-      }
+      static allocUnsafe(size) { return new _Buffer(size); }
+      static allocUnsafeSlow(size) { return new _Buffer(size); }
       static concat(bufs, totalLength) {
         if (!Array.isArray(bufs) || bufs.length === 0) return new _Buffer(0);
         const len = totalLength !== undefined ? totalLength : bufs.reduce((s, b) => s + b.length, 0);
@@ -568,7 +571,7 @@ class QuickJsRuntime {
       static byteLength(string, encoding = 'utf8') {
         if (typeof string !== 'string') return string ? string.length : 0;
         if (encoding === 'hex') return Math.floor(string.length / 2);
-        return new TextEncoder().encode(string).length;
+        return _sharedTextEncoder.encode(string).length;
       }
       copy(target, targetStart = 0, sourceStart = 0, sourceEnd) {
         const end = sourceEnd !== undefined ? sourceEnd : this.length;
@@ -584,21 +587,12 @@ class QuickJsRuntime {
       }
       write(string, offset, length, encoding) {
         if (typeof string !== 'string') return 0;
-        let off = 0;
-        let len = undefined;
-        let enc = 'utf8';
+        let off = 0, len = undefined;
         if (typeof offset === 'number') {
           off = offset;
-          if (typeof length === 'number') {
-            len = length;
-            if (typeof encoding === 'string') enc = encoding;
-          } else if (typeof length === 'string') {
-            enc = length;
-          }
-        } else if (typeof offset === 'string') {
-          enc = offset;
+          if (typeof length === 'number') len = length;
         }
-        const bytes = new TextEncoder().encode(string);
+        const bytes = _sharedTextEncoder.encode(string);
         const writeLen = len !== undefined ? Math.min(len, bytes.length) : bytes.length;
         const available = Math.max(0, Math.min(writeLen, this.length - off));
         this.set(bytes.subarray(0, available), off);
@@ -643,7 +637,7 @@ class QuickJsRuntime {
         if (enc === 'base64') {
           return _bytesToBase64(sub);
         }
-        return new TextDecoder().decode(sub);
+        return _sharedTextDecoder.decode(sub);
       }
       equals(other) {
         if (!other || this.length !== other.length) return false;
@@ -653,6 +647,7 @@ class QuickJsRuntime {
         return true;
       }
     }
+    _Buffer.Buffer = _Buffer;
     globalThis.Buffer = _Buffer;
   }
 
@@ -667,15 +662,21 @@ class QuickJsRuntime {
     }
   };
 
-  // `b64` is a base64-encoded payload (see class-level perf notes) — decode
-  // straight into a Buffer, no JSON.parse of an integer array required.
-  globalThis._dart_socket_data = function(id, b64) {
+  globalThis._dart_socket_data = function(id, data) {
     const sock = _socketMap[id];
     if (!sock) return;
     try {
-      sock.emit('data', Buffer.from(b64, 'base64'));
+      if (typeof data === 'string') {
+        sock.emit('data', Buffer.from(data, 'base64'));
+      } else if (data instanceof ArrayBuffer) {
+        sock.emit('data', Buffer.from(data));
+      } else if (data instanceof Uint8Array) {
+        sock.emit('data', Buffer.from(data.buffer, data.byteOffset, data.byteLength));
+      } else {
+        sock.emit('data', Buffer.from(data));
+      }
     } catch(e) {
-      console.error('[_dart_socket_data error]:', e?.message || e, '\n[Stack]:', e?.stack);
+      console.error('[_dart_socket_data error]:', e?.message || e);
     }
   };
 
@@ -748,13 +749,6 @@ class QuickJsRuntime {
     setKeepAlive() { return this; }
     ref() { return this; }
     unref() { return this; }
-    get destroyed() { return this._destroyed; }
-    get pending() { return this.connecting; }
-    get readyState() {
-      if (this.connecting) return 'opening';
-      if (this._destroyed) return 'closed';
-      return 'open';
-    }
   }
   DartSocket._idGen = 0;
 
@@ -765,14 +759,6 @@ class QuickJsRuntime {
       if (typeof args[0] === 'object' && args[0] !== null) {
         options = Object.assign({}, args[0]);
         if (typeof args[1] === 'function') cb = args[1];
-      } else if (typeof args[0] === 'number' || typeof args[0] === 'string') {
-        options.port = Number(args[0]);
-        if (typeof args[1] === 'string') {
-          options.host = args[1];
-          if (typeof args[2] === 'function') cb = args[2];
-        } else if (typeof args[1] === 'function') {
-          cb = args[1];
-        }
       }
       this.remoteAddress = options.host || 'localhost';
       this.remotePort = Number(options.port) || 5432;
@@ -788,14 +774,15 @@ class QuickJsRuntime {
       }));
       return this;
     }
-    get encrypted() { return true; }
-    get authorized() { return true; }
   }
 
   globalThis.net = {
     Socket: DartSocket,
-    createConnection: (options, cb) => new DartSocket().connect(options, cb),
-    connect: (options, cb) => new DartSocket().connect(options, cb),
+    createConnection: (...args) => new DartSocket().connect(...args),
+    connect: (...args) => new DartSocket().connect(...args),
+    isIP: (s) => (typeof s === 'string' && /^\d+\.\d+\.\d+\.\d+$/.test(s)) ? 4 : 0,
+    isIPv4: (s) => (typeof s === 'string' && /^\d+\.\d+\.\d+\.\d+$/.test(s)),
+    isIPv6: () => false,
   };
 
   globalThis.tls = {
@@ -803,73 +790,37 @@ class QuickJsRuntime {
     connect: (options, cb) => new TlsSocket().connect(options, cb),
   };
 
-  // ── btoa / atob polyfills ───────────────────────────────────────────────
-  // Array + single join('') instead of repeated += string concatenation —
-  // avoids potential quadratic-time growth on large buffers.
-  const _b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  if (typeof globalThis.btoa === 'undefined') {
-    globalThis.btoa = function(str) {
-      const len = str.length;
-      if (len === 0) return '';
-      const parts = new Array(Math.ceil(len / 3));
-      let pi = 0;
-      for (let i = 0; i < len; i += 3) {
-        const a = str.charCodeAt(i);
-        const b = i + 1 < len ? str.charCodeAt(i + 1) : 0;
-        const c = i + 2 < len ? str.charCodeAt(i + 2) : 0;
-        const n = (a << 16) | (b << 8) | c;
-        let chunk = _b64chars[(n >> 18) & 63] + _b64chars[(n >> 12) & 63];
-        chunk += (i + 1 < len) ? _b64chars[(n >> 6) & 63] : '=';
-        chunk += (i + 2 < len) ? _b64chars[n & 63] : '=';
-        parts[pi++] = chunk;
-      }
-      return parts.join('');
-    };
-  }
-  if (typeof globalThis.atob === 'undefined') {
-    globalThis.atob = function(str) {
-      const clean = str.replace(/[^A-Za-z0-9+/]/g, '');
-      const len = clean.length;
-      if (len === 0) return '';
-      const parts = new Array(Math.ceil(len / 4));
-      let pi = 0;
-      for (let i = 0; i < len; i += 4) {
-        const a = _b64chars.indexOf(clean[i]);
-        const b = _b64chars.indexOf(clean[i + 1]);
-        const c = clean[i + 2] ? _b64chars.indexOf(clean[i + 2]) : 0;
-        const d = clean[i + 3] ? _b64chars.indexOf(clean[i + 3]) : 0;
-        const n = (a << 18) | (b << 12) | (c << 6) | d;
-        let chunk = String.fromCharCode((n >> 16) & 255);
-        if (clean[i + 2]) chunk += String.fromCharCode((n >> 8) & 255);
-        if (clean[i + 3]) chunk += String.fromCharCode(n & 255);
-        parts[pi++] = chunk;
-      }
-      return parts.join('');
-    };
-  }
+  // ── Native C Crypto Integration with Fallback ────────────────────────────
+  const _nativeCrypto = globalThis._native_crypto;
 
-  // ── Dart-backed crypto ────────────────────────────────────────────────────
   globalThis.crypto = globalThis.crypto || {};
+  globalThis.crypto.randomBytes = function(n) {
+    if (_nativeCrypto && typeof _nativeCrypto.randomBytes === 'function') {
+      const u8 = _nativeCrypto.randomBytes(n);
+      return Buffer.from(u8.buffer || u8);
+    }
+    const jsonResult = _ffiNotify('_dart_random_bytes', JSON.stringify({ count: n }));
+    return Buffer.from(JSON.parse(jsonResult), 'base64');
+  };
+
   globalThis.crypto.randomUUID = function() {
-    const bytes = crypto.randomBytes(16);
+    const bytes = globalThis.crypto.randomBytes(16);
     bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
     bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant
     const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
     return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
   };
+
   globalThis.crypto.getRandomValues = function(typedArray) {
     if (!typedArray || !typedArray.length) return typedArray;
-    const jsonResult = _ffiNotify('_dart_random_bytes', JSON.stringify({ count: typedArray.length }));
-    const bytes = _base64ToBytes(JSON.parse(jsonResult));
+    const bytes = globalThis.crypto.randomBytes(typedArray.length);
     typedArray.set(bytes);
     return typedArray;
   };
-  globalThis.crypto.randomBytes = function(n) {
-    const jsonResult = _ffiNotify('_dart_random_bytes', JSON.stringify({ count: n }));
-    return Buffer.from(JSON.parse(jsonResult), 'base64');
-  };
+
   globalThis.crypto.createHash = function(algorithm) {
     const chunks = [];
+    const algo = (algorithm || 'sha256').toLowerCase().replace('-', '');
     return {
       update(chunk, enc) {
         if (typeof chunk === 'string') {
@@ -881,6 +832,12 @@ class QuickJsRuntime {
       },
       digest(enc) {
         const allData = Buffer.concat(chunks);
+        if (algo === 'sha256' && _nativeCrypto && typeof _nativeCrypto.sha256Digest === 'function') {
+          const hex = _nativeCrypto.sha256Digest(allData, 'hex');
+          if (enc === 'hex') return hex;
+          if (enc === 'base64') return _bytesToBase64(Buffer.from(hex, 'hex'));
+          return Buffer.from(hex, 'hex');
+        }
         const jsonResult = _ffiNotify('_dart_hash', JSON.stringify({
           algorithm,
           data: _bytesToBase64(allData),
@@ -891,9 +848,11 @@ class QuickJsRuntime {
       },
     };
   };
+
   globalThis.crypto.createHmac = function(algorithm, key) {
     const chunks = [];
     const keyBytes = typeof key === 'string' ? Buffer.from(key, 'utf8') : (key instanceof Uint8Array ? key : Buffer.from(key));
+    const algo = (algorithm || 'sha256').toLowerCase().replace('-', '');
     return {
       update(chunk, enc) {
         if (typeof chunk === 'string') {
@@ -905,8 +864,15 @@ class QuickJsRuntime {
       },
       digest(enc) {
         const fullData = Buffer.concat(chunks);
+        if (algo === 'sha256' && _nativeCrypto && typeof _nativeCrypto.hmacSha256 === 'function') {
+          const ab = _nativeCrypto.hmacSha256(keyBytes, fullData);
+          const b = Buffer.from(ab);
+          if (enc === 'hex') return b.toString('hex');
+          if (enc === 'base64') return b.toString('base64');
+          return b;
+        }
         const res = _ffiNotify('_dart_subtle_hmac', JSON.stringify({
-          algorithm: algorithm || 'sha256',
+          algorithm: algo,
           key: _bytesToBase64(keyBytes),
           data: _bytesToBase64(fullData),
         }));
@@ -918,11 +884,34 @@ class QuickJsRuntime {
     };
   };
 
+  globalThis.crypto.pbkdf2Sync = function(password, salt, iterations, keylen, digest) {
+    const passwordBytes = typeof password === 'string' ? _sharedTextEncoder.encode(password) : (password instanceof Uint8Array ? password : new Uint8Array(password));
+    const saltBytes = typeof salt === 'string' ? _sharedTextEncoder.encode(salt) : (salt instanceof Uint8Array ? salt : new Uint8Array(salt));
+    const iter = Number(iterations) || 1000;
+    const len = Number(keylen) || 32;
+    if (_nativeCrypto && typeof _nativeCrypto.pbkdf2Sync === 'function') {
+      const ab = _nativeCrypto.pbkdf2Sync(passwordBytes.buffer || passwordBytes, saltBytes.buffer || saltBytes, iter, len);
+      return Buffer.from(ab);
+    }
+    const res = _ffiNotify('_dart_subtle_pbkdf2', JSON.stringify({
+      password: _bytesToBase64(passwordBytes),
+      salt: _bytesToBase64(saltBytes),
+      iterations: iter,
+      lengthBytes: len,
+    }));
+    return res ? Buffer.from(JSON.parse(res), 'base64') : Buffer.alloc(0);
+  };
+
   // ── WebCrypto subtle shim (for Postgres SCRAM-SHA-256 SASL auth) ────────
   const subtle = {
     async digest(algorithm, data) {
       const algoName = typeof algorithm === 'string' ? algorithm : (algorithm?.name || 'SHA-256');
       const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+      if (algoName.toLowerCase().replace('-', '') === 'sha256' && _nativeCrypto && typeof _nativeCrypto.sha256Digest === 'function') {
+        const hex = _nativeCrypto.sha256Digest(bytes, 'hex');
+        const buf = Buffer.from(hex, 'hex');
+        return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+      }
       const res = _ffiNotify('_dart_hash', JSON.stringify({
         algorithm: algoName,
         data: _bytesToBase64(bytes),
@@ -939,6 +928,11 @@ class QuickJsRuntime {
       const keyBytes = key.raw || key;
       const dataBytes = data instanceof Uint8Array ? data : new Uint8Array(data);
       const algoName = typeof algorithm === 'string' ? algorithm : (algorithm?.name || 'SHA-256');
+      if (algoName.toLowerCase().replace('-', '') === 'sha256' && _nativeCrypto && typeof _nativeCrypto.hmacSha256 === 'function') {
+        const ab = _nativeCrypto.hmacSha256(keyBytes, dataBytes);
+        const buf = Buffer.from(ab);
+        return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+      }
       const res = _ffiNotify('_dart_subtle_hmac', JSON.stringify({
         algorithm: algoName,
         key: _bytesToBase64(keyBytes),
@@ -952,6 +946,11 @@ class QuickJsRuntime {
       const saltBytes = params.salt instanceof Uint8Array ? params.salt : new Uint8Array(params.salt);
       const iterations = Number(params.iterations) || 4096;
       const lengthBytes = Math.floor(Number(length) / 8) || 32;
+      if (_nativeCrypto && typeof _nativeCrypto.pbkdf2Sync === 'function') {
+        const ab = _nativeCrypto.pbkdf2Sync(passwordBytes, saltBytes, iterations, lengthBytes);
+        const buf = Buffer.from(ab);
+        return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+      }
       const res = _ffiNotify('_dart_subtle_pbkdf2', JSON.stringify({
         password: _bytesToBase64(passwordBytes),
         salt: _bytesToBase64(saltBytes),
@@ -976,9 +975,9 @@ class QuickJsRuntime {
       nextTick: (fn, ...args) => Promise.resolve().then(() => fn(...args)),
       on: () => {},
       removeListener: () => {},
-      stdout: { isTTY: false, write: (s) => console.log(s) },
-      stderr: { isTTY: false, write: (s) => console.error(s) },
-      stdin: { on: () => {} },
+      stdout: { isTTY: false, fd: 1, write: (s) => console.log(s) },
+      stderr: { isTTY: false, fd: 2, write: (s) => console.error(s) },
+      stdin: { isTTY: false, fd: 0, on: () => {} },
       hrtime: Object.assign((time) => {
         const now = Date.now();
         if (time) return [Math.floor(now / 1000) - time[0], 0];
@@ -988,56 +987,16 @@ class QuickJsRuntime {
       exit: () => {},
     };
   }
-  const _process = globalThis.process;
 
-  // ── require() shim ────────────────────────────────────────────────────────
-  const _path = {
-    join: (...parts) => parts.filter(Boolean).join('/').replace(/\/+/g, '/'),
-    dirname: (p) => (p ? p.replace(/\/[^/]*$/, '') : '') || '.',
-    resolve: (...parts) => parts.join('/'),
-    extname: (p) => { const m = p ? p.match(/\.[^.]*$/) : null; return m ? m[0] : ''; },
-    basename: (p, ext) => {
-      const base = p ? p.split('/').pop() : '';
-      return ext && base.endsWith(ext) ? base.slice(0, -ext.length) : base;
-    },
-    sep: '/',
-    delimiter: ':',
+  // ── tty polyfill ──────────────────────────────────────────────────────────
+  const _tty = {
+    isatty: (fd) => false,
+    ReadStream: class extends EventEmitter { constructor() { super(); this.isTTY = false; } },
+    WriteStream: class extends EventEmitter { constructor() { super(); this.isTTY = false; } },
   };
-  _path.posix = _path;
-  _path.win32 = _path;
-  const _assert = function(value, message) {
-    if (!value) throw new Error(message || 'Assertion failed');
-  };
-  _assert.ok = _assert;
-  _assert.strictEqual = (a, b, msg) => { if (a !== b) throw new Error(msg || `${a} !== ${b}`); };
-  _assert.deepStrictEqual = (a, b, msg) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(msg || 'Not deep equal'); };
-  _assert.default = _assert;
+  _tty.default = _tty;
 
-  const _util = {
-    format: (...args) => args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '),
-    inherits: (ctor, superCtor) => { ctor.prototype = Object.create(superCtor.prototype); },
-    promisify: (fn) => (...args) => new Promise((res, rej) => fn(...args, (err, val) => err ? rej(err) : res(val))),
-    callbackify: (fn) => (...args) => {
-      const cb = args.pop();
-      fn(...args).then(val => cb(null, val), err => cb(err));
-    },
-    inspect: Object.assign((obj) => typeof obj === 'string' ? obj : JSON.stringify(obj), {
-      custom: Symbol.for('nodejs.util.inspect.custom'),
-      defaultOptions: {},
-    }),
-    types: {
-      isDate: (v) => v instanceof Date,
-      isPromise: (v) => v instanceof Promise,
-    },
-    deprecate: (fn) => fn,
-    default: null,
-  };
-  _util.default = _util;
-
-  const _crypto = Object.assign(globalThis.crypto, { default: globalThis.crypto });
-  const _events = Object.assign(EventEmitter, { EventEmitter, default: EventEmitter });
-  const _buffer = Object.assign(globalThis.Buffer, { Buffer: globalThis.Buffer, default: globalThis.Buffer });
-
+  // ── Native SQLite Module Shim ─────────────────────────────────────────────
   const _sqlite = globalThis._native_sqlite;
   class SqliteDatabase extends EventEmitter {
     constructor(filename, mode, callback) {
@@ -1091,8 +1050,14 @@ class QuickJsRuntime {
         params = [];
       }
       try {
-        const rows = _sqlite ? _sqlite.query(this._handle, sql, params || []) : [];
-        const row = rows && rows.length > 0 ? rows[0] : undefined;
+        let row;
+        if (_sqlite && typeof _sqlite.get === 'function') {
+          row = _sqlite.get(this._handle, sql, params || []);
+          if (row === null) row = undefined;
+        } else {
+          const rows = _sqlite ? _sqlite.query(this._handle, sql, params || []) : [];
+          row = rows && rows.length > 0 ? rows[0] : undefined;
+        }
         if (callback) queueMicrotask(() => callback.call(this, null, row));
       } catch (err) {
         if (callback) queueMicrotask(() => callback.call(this, err));
@@ -1104,258 +1069,311 @@ class QuickJsRuntime {
         callback = params;
         params = [];
       }
-      const self = { lastID: 0, changes: 0 };
       try {
         const res = _sqlite ? _sqlite.run(this._handle, sql, params || []) : { lastID: 0, changes: 0 };
-        self.lastID = res.lastID;
-        self.changes = res.changes;
-        if (callback) queueMicrotask(() => callback.call(self, null));
+        const ctx = { lastID: res.lastID, changes: res.changes };
+        if (callback) queueMicrotask(() => callback.call(ctx, null));
       } catch (err) {
-        if (callback) queueMicrotask(() => callback.call(self, err));
+        if (callback) queueMicrotask(() => callback.call(this, err));
       }
       return this;
     }
     exec(sql, callback) {
       try {
         if (_sqlite) _sqlite.exec(this._handle, sql);
-        if (callback) queueMicrotask(() => callback(null));
+        if (callback) queueMicrotask(() => callback.call(this, null));
       } catch (err) {
-        if (callback) queueMicrotask(() => callback(err));
+        if (callback) queueMicrotask(() => callback.call(this, err));
       }
       return this;
     }
-    serialize(callback) {
-      if (callback) callback();
-    }
-    parallelize(callback) {
-      if (callback) callback();
-    }
-    configure() {}
-    interrupt() {}
   }
 
-  const _sqlite3Module = {
+  const _sqlite3 = {
     Database: SqliteDatabase,
     OPEN_READONLY: 1,
     OPEN_READWRITE: 2,
     OPEN_CREATE: 4,
-    verbose: () => _sqlite3Module,
+    OPEN_FULLMUTEX: 0x00010000,
+    OPEN_URI: 0x00000040,
+    OPEN_SHAREDCACHE: 0x00020000,
+    OPEN_PRIVATECACHE: 0x00040000,
+    verbose: () => _sqlite3,
     default: null,
   };
-  _sqlite3Module.default = _sqlite3Module;
+  _sqlite3.default = _sqlite3;
 
-  const _fsPromises = {
-    access: async (path) => true,
-    stat: async (path) => ({ isDirectory: () => false, isFile: () => true }),
-    lstat: async (path) => ({ isDirectory: () => false, isFile: () => true }),
-    mkdir: async (path, options) => undefined,
-    readFile: async (path) => '',
-    writeFile: async (path, data) => undefined,
-    readdir: async (path) => [],
-    unlink: async (path) => undefined,
-    default: null,
+  // ── util polyfill ────────────────────────────────────────────────────────
+  const _customInspect = Symbol.for('nodejs.util.inspect.custom');
+  const _inspect = function(obj, options) {
+    if (obj === null) return 'null';
+    if (obj === undefined) return 'undefined';
+    if (typeof obj === 'object' && typeof obj[_customInspect] === 'function') {
+      try { return obj[_customInspect](2, options || {}); } catch(_) {}
+    }
+    try { return JSON.stringify(obj); } catch(_) { return String(obj); }
   };
-  _fsPromises.default = _fsPromises;
+  _inspect.custom = _customInspect;
 
-  const _fs = {
-    promises: _fsPromises,
-    access: (p, cb) => cb(null),
-    accessSync: (p) => {},
-    mkdir: (p, opts, cb) => { if (typeof opts === 'function') opts(null); else cb(null); },
-    mkdirSync: (p) => {},
-    readFile: (p, e, cb) => { if (typeof e === 'function') e(new Error('fs not available')); else cb(new Error('fs not available')); },
-    writeFile: (p, d, e, cb) => { if (typeof e === 'function') e(new Error('fs not available')); else cb(new Error('fs not available')); },
-    stat: (p, cb) => cb(null, { isDirectory: () => false, isFile: () => true }),
-    statSync: () => ({ isDirectory: () => false, isFile: () => true }),
-    lstat: (p, cb) => cb(null, { isDirectory: () => false, isFile: () => true }),
-    lstatSync: () => ({ isDirectory: () => false, isFile: () => true }),
-    readdir: (p, cb) => cb(null, []),
-    readdirSync: () => [],
-    existsSync: () => true,
-    default: null,
+  const _util = {
+    inspect: _inspect,
+    promisify: (fn) => (...args) => new Promise((resolve, reject) => fn(...args, (err, res) => err ? reject(err) : resolve(res))),
+    inherits: (ctor, superCtor) => { if (superCtor) { ctor.super_ = superCtor; Object.setPrototypeOf(ctor.prototype, superCtor.prototype); } },
+    types: { isUint8Array: (v) => v instanceof Uint8Array },
+    format: (...args) => args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '),
+    deprecate: (fn) => fn,
+    TextEncoder: globalThis.TextEncoder,
+    TextDecoder: globalThis.TextDecoder,
   };
-  _fs.default = _fs;
+  _util.default = _util;
 
+  // ── string_decoder polyfill ───────────────────────────────────────────────
+  class _StringDecoder {
+    constructor(enc) { this.enc = enc || 'utf8'; }
+    write(buf) { return _sharedTextDecoder.decode(buf); }
+    end(buf) { return buf ? _sharedTextDecoder.decode(buf) : ''; }
+  }
+
+  // ── path polyfill ─────────────────────────────────────────────────────────
+  const _path = {
+    join: (...parts) => parts.filter(Boolean).join('/'),
+    resolve: (...parts) => parts.filter(Boolean).join('/'),
+    dirname: (p) => p.split('/').slice(0, -1).join('/') || '.',
+    basename: (p) => p.split('/').pop() || '',
+    extname: (p) => { const b = p.split('/').pop() || ''; const idx = b.lastIndexOf('.'); return idx >= 0 ? b.slice(idx) : ''; },
+    sep: '/',
+    delimiter: ':',
+  };
+  _path.posix = _path;
+  _path.win32 = _path;
+  _path.default = _path;
+
+  // ── async_hooks polyfill ──────────────────────────────────────────────────
+  class _AsyncLocalStorage {
+    constructor() { this._store = undefined; }
+    getStore() { return this._store; }
+    run(store, callback, ...args) {
+      const prev = this._store;
+      this._store = store;
+      try {
+        return callback(...args);
+      } finally {
+        this._store = prev;
+      }
+    }
+    enterWith(store) { this._store = store; }
+    exit(callback, ...args) {
+      const prev = this._store;
+      this._store = undefined;
+      try {
+        return callback(...args);
+      } finally {
+        this._store = prev;
+      }
+    }
+  }
+
+  const _asyncHooks = {
+    AsyncLocalStorage: _AsyncLocalStorage,
+    AsyncResource: class {
+      constructor(name) { this.name = name; }
+      runInAsyncScope(fn, thisArg, ...args) { return fn.apply(thisArg, args); }
+      emitDestroy() {}
+      asyncId() { return 1; }
+      triggerAsyncId() { return 1; }
+    },
+    createHook: () => ({ enable: () => {}, disable: () => {} }),
+    executionAsyncId: () => 1,
+    triggerAsyncId: () => 1,
+    default: { AsyncLocalStorage: _AsyncLocalStorage },
+  };
+
+  // ── require() shim with Cache Dictionary ──────────────────────────────────
+  const _moduleCache = Object.create(null);
   const _modules = {
-    process: _process,
-    'node:process': _process,
-    'process/browser': _process,
-    net: globalThis.net,
-    'node:net': globalThis.net,
-    tls: globalThis.tls,
-    'node:tls': globalThis.tls,
-    crypto: _crypto,
-    'node:crypto': _crypto,
-    events: _events,
-    'node:events': _events,
-    buffer: _buffer,
-    'node:buffer': _buffer,
-    path: _path,
-    'node:path': _path,
-    'path/posix': _path,
-    'path/win32': _path,
-    assert: _assert,
-    'node:assert': _assert,
-    'node:assert/strict': _assert,
+    crypto: Object.assign(globalThis.crypto, { default: globalThis.crypto }),
+    events: Object.assign(EventEmitter, { EventEmitter, default: EventEmitter }),
+    buffer: Object.assign(globalThis.Buffer, { Buffer: globalThis.Buffer, default: globalThis.Buffer }),
+    net: Object.assign(globalThis.net, { default: globalThis.net }),
+    tls: Object.assign(globalThis.tls, { default: globalThis.tls }),
+    sqlite3: _sqlite3,
+    url: Object.assign(globalThis.URL, { URL: globalThis.URL, URLSearchParams: globalThis.URLSearchParams, default: globalThis.URL }),
     util: _util,
-    'node:util': _util,
-    'node:util/types': _util.types,
+    string_decoder: { StringDecoder: _StringDecoder, default: { StringDecoder: _StringDecoder } },
+    path: _path,
+    async_hooks: _asyncHooks,
+    fs: {
+      readFileSync: () => '',
+      existsSync: () => false,
+      promises: { readFile: async () => '', access: async () => {} },
+      default: { readFileSync: () => '', existsSync: () => false },
+    },
     os: {
       platform: () => 'linux',
-      EOL: '\n',
-      tmpdir: () => '/tmp',
-      cpus: () => [{ model: 'QuickJS Virtual CPU', speed: 2000, times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 } }],
-      homedir: () => '/tmp',
-      hostname: () => 'localhost',
-      release: () => '1.0.0',
       type: () => 'Linux',
-      arch: () => 'x64',
-      totalmem: () => 1024 * 1024 * 1024,
-      freemem: () => 512 * 1024 * 1024,
+      release: () => '5.15.0',
+      tmpdir: () => '/tmp',
+      homedir: () => '/root',
+      cpus: () => [{ model: 'QuickJS Virtual CPU', speed: 2000 }],
+      endianness: () => 'LE',
+      default: { platform: () => 'linux' },
+    },
+    timers: {
+      setTimeout: globalThis.setTimeout,
+      clearTimeout: globalThis.clearTimeout,
+      setInterval: globalThis.setInterval,
+      clearInterval: globalThis.clearInterval,
+      setImmediate: globalThis.setImmediate,
+      clearImmediate: globalThis.clearImmediate,
     },
     stream: {
-      Transform: EventEmitter,
       Readable: EventEmitter,
       Writable: EventEmitter,
+      Transform: EventEmitter,
+      Duplex: DartSocket,
       PassThrough: EventEmitter,
-      pipeline: () => {},
+      pipeline: (...args) => { const cb = args[args.length - 1]; if (typeof cb === 'function') cb(null); },
+      default: { Readable: EventEmitter, Writable: EventEmitter },
     },
-    string_decoder: {
-      StringDecoder: class {
-        write(b) { return new TextDecoder().decode(b); }
-        end() { return ''; }
-      },
+    assert: Object.assign((val, msg) => { if (!val) throw new Error(msg || 'Assertion failed'); }, {
+      ok: (val, msg) => { if (!val) throw new Error(msg || 'Assertion failed'); },
+      strictEqual: (a, b, msg) => { if (a !== b) throw new Error(msg || `${a} !== ${b}`); },
+    }),
+    zlib: {
+      gzipSync: (b) => b,
+      gunzipSync: (b) => b,
+      deflateSync: (b) => b,
+      inflateSync: (b) => b,
+      default: {},
     },
-    sqlite3: _sqlite3Module,
-    'node:sqlite3': _sqlite3Module,
     dns: {
-      lookup: (host, opts, cb) => {
-        if (typeof opts === 'function') { cb = opts; }
-        cb(null, host, 4);
-      },
+      lookup: (host, cb) => cb(null, '127.0.0.1', 4),
+      promises: { lookup: async () => ({ address: '127.0.0.1', family: 4 }) },
+      default: {},
     },
-    child_process: { spawn: () => null, exec: () => null },
-    worker_threads: { isMainThread: true, parentPort: null, workerData: null },
-    fs: _fs,
-    'node:fs': _fs,
-    'fs/promises': _fsPromises,
-    'node:fs/promises': _fsPromises,
-    tty: { isatty: () => false },
-    v8: { getHeapStatistics: () => ({}) },
-    perf_hooks: { performance: { now: () => Date.now() } },
-    async_hooks: { AsyncLocalStorage: class { run(store, fn, ...args) { return fn(...args); } getStore() { return undefined; } } },
-    zlib: {},
-    http: {},
-    https: {},
-    url: { URL: class { constructor(u) { this.href = u; } } },
+    tty: _tty,
+    process: globalThis.process,
   };
 
-  globalThis.require = function(mod) {
-    if (typeof mod === 'string' && mod.startsWith('node:')) {
-      mod = mod.slice(5);
+  globalThis._js_require = function(mod) {
+    if (!mod || typeof mod !== 'string') {
+      throw new Error(`Cannot find module '${mod}'`);
     }
-    if (_modules[mod]) return _modules[mod];
-    // Dynamic subpath: try stripping to base module name.
-    const base = mod.split('/')[0];
-    if (_modules[base]) return _modules[base];
-    throw new Error(`[sequelize-quickjs] Module "${mod}" is not polyfilled.`);
+    const normalized = mod.startsWith('node:') ? mod.slice(5) : mod;
+    if (_moduleCache[normalized]) return _moduleCache[normalized];
+    if (_modules[normalized]) {
+      _moduleCache[normalized] = _modules[normalized];
+      return _modules[normalized];
+    }
+    const base = normalized.split('/')[0];
+    if (_modules[base]) {
+      _moduleCache[normalized] = _modules[base];
+      return _modules[base];
+    }
+    throw new Error(`Cannot find module '${mod}'`);
   };
-  globalThis._js_require = globalThis.require;
-  globalThis.require.resolve = () => '';
-  globalThis.module = { exports: {} };
-  globalThis.exports = globalThis.module.exports;
-  globalThis.__dirname = '/';
-  globalThis.__filename = '/index.js';
+
+  // ── Direct Async Request Dispatcher Shim ─────────────────────────────────
+  globalThis._dart_handleRequest = async function(promiseId, params) {
+    try {
+      let result;
+      const fnName = params.functionName || params.method;
+      if (typeof globalThis.handleRequest === 'function') {
+        const req = params.requestJson ? JSON.parse(params.requestJson) : params;
+        result = await globalThis.handleRequest(req.method, req.params);
+      } else if (typeof globalThis[fnName] === 'function') {
+        result = await globalThis[fnName](params);
+      } else if (typeof processRequest === 'function') {
+        const req = params.requestJson ? JSON.parse(params.requestJson) : params;
+        result = await new Promise((resolve) => {
+          processRequest(req, (res) => resolve(res));
+        });
+      } else {
+        throw new Error('Function not found: ' + fnName);
+      }
+      _ffiNotify('_dart_promise_resolve', JSON.stringify({id: promiseId, value: result}));
+    } catch(e) {
+      _ffiNotify('_dart_promise_reject', JSON.stringify({id: promiseId, error: String(e?.message || e)}));
+    }
+  };
+
 })();
-function require(mod) {
-  return globalThis.require(mod);
-}
-var module = globalThis.module;
-var exports = globalThis.exports;
-var __dirname = globalThis.__dirname;
-var __filename = globalThis.__filename;
 """;
 
     eval(polyfill);
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // Public API
-  // ────────────────────────────────────────────────────────────────────────
-
-  /// Evaluate a JavaScript string and return the result as a Dart string.
-  ///
-  /// The result is JSON-encoded by QuickJS then decoded by Dart.
-  String eval(String code) {
-    return _bindings.eval(_handle, code);
+  /// Load and evaluate a JavaScript bundle (e.g. `bridge_server_quickjs.bundle.js`).
+  String loadBundle(String bundleJs) {
+    return eval(bundleJs);
   }
 
-  /// Load a full JavaScript bundle into the runtime context.
-  ///
-  /// Call once after [create] with the Sequelize bridge bundle JS.
-  void loadBundle(String bundleJs) {
-    final res = eval(bundleJs);
-    if (res != 'undefined') {
-      // ignore: avoid_print
-      print('[QuickJS Bundle Load Result]: $res');
-    }
+  /// Evaluate a raw JavaScript string in the QuickJS context.
+  String eval(String jsCode) {
+    if (_disposed) throw StateError('QuickJsRuntime is disposed');
+    return _bindings.eval(_handle, jsCode);
   }
 
-  /// Call a global async JS function and await its Promise result.
+  /// Execute an asynchronous JS function by name with given parameters.
   ///
-  /// The function must be of the form:
-  /// ```js
-  /// async function myHandler(params) { return someValue; }
-  /// ```
-  ///
-  /// Returns the decoded result when the Promise resolves.
-  ///
-  /// ## Why the result crosses the bridge JSON-encoded only once
-  ///
-  /// The result travels back as `{"id":<id>,"value":<result>}`, with
-  /// `result` nested directly as JSON rather than pre-stringified into a
-  /// string field. That means exactly one `JSON.stringify` on the JS side
-  /// and one `jsonDecode` on the Dart side for the whole envelope.
-  ///
-  /// An earlier version did `JSON.stringify({id, value: JSON.stringify(result)})`
-  /// — stringifying `result`, then stringifying the wrapper *around* that
-  /// already-stringified text. Every quote character in the result got
-  /// escaped a second time (inflating payload size), and the Dart side had
-  /// to `jsonDecode` twice to unwrap it. For a query returning a few
-  /// thousand rows that's a real, measurable tax paid on every call — keep
-  /// nesting JSON values directly rather than stringifying-then-embedding
-  /// when adding new bridge calls.
+  /// Dispatches directly into native `qjs_dart_call_async` without generating
+  /// dynamic JS code.
   Future<dynamic> callAsync(
     String functionName,
     Map<String, dynamic> params,
   ) {
+    if (_disposed) throw StateError('QuickJsRuntime is disposed');
     final id = _promiseIdCounter++;
     final completer = Completer<dynamic>();
     _pendingPromises[id] = completer;
 
-    final paramsJson = jsonEncode(params);
-    eval(
-      '(async () => {'
-      '  try {'
-      '    const result = await $functionName($paramsJson);'
-      '    _ffiNotify("_dart_promise_resolve", JSON.stringify({id:$id,value:result}));'
-      '  } catch(e) {'
-      '    _ffiNotify("_dart_promise_reject", JSON.stringify({id:$id,error:String(e.message||e)}));'
-      '  }'
-      '})();',
-    );
+    final argsJson = jsonEncode({
+      'functionName': functionName,
+      ...params,
+    });
 
-    // Pump the microtask queue to let the Promise chain start executing.
-    _bindings.pump(_handle);
+    final res = _bindings.callAsync(_handle, id, argsJson);
+    if (res < 0) {
+      // Fallback if _dart_handleRequest was not registered
+      eval(
+        '(async () => {'
+        '  try {'
+        '    const result = await $functionName($argsJson);'
+        '    _ffiNotify("_dart_promise_resolve", JSON.stringify({id:$id,value:result}));'
+        '  } catch(e) {'
+        '    _ffiNotify("_dart_promise_reject", JSON.stringify({id:$id,error:String(e.message||e)}));'
+        '  }'
+        '})();',
+      );
+    }
 
+    _bindings.pumpAll(_handle);
     return completer.future;
+  }
+
+  /// Trigger garbage collection in the embedded QuickJS runtime.
+  void gc() {
+    if (_disposed) return;
+    _bindings.runGc(_handle);
+  }
+
+  /// Set the memory limit in bytes for this QuickJS runtime.
+  void setMemoryLimit(int bytes) {
+    if (_disposed) return;
+    _bindings.setMemoryLimit(_handle, bytes);
+  }
+
+  /// Set the GC threshold in bytes for this QuickJS runtime.
+  void setGcThreshold(int bytes) {
+    if (_disposed) return;
+    _bindings.setGcThreshold(_handle, bytes);
   }
 
   /// Dispose the runtime and release all native QuickJS resources.
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    if (_activeRuntime == this) _activeRuntime = null;
+    _runtimesByHandle.remove(_handle.address);
     for (final ctx in _sockets.values) {
       ctx.destroy();
     }
@@ -1370,72 +1388,43 @@ var __filename = globalThis.__filename;
 
   void _onTimerTrigger(int timerId) {
     if (_disposed) return;
-    _evalAsync('_dart_trigger_timer($timerId);');
-    _bindings.pump(_handle);
+    _bindings.triggerTimer(_handle, timerId);
+    _bindings.pumpAll(_handle);
   }
 
   // ────────────────────────────────────────────────────────────────────────
-  // Socket event helpers
+  // Socket event helpers with Direct Binary Transport
   // ────────────────────────────────────────────────────────────────────────
 
   void _onSocketData(int socketId, Uint8List data) {
-    final sw = Stopwatch()..start();
-    // Base64, embedded directly as a JS string literal — no JSON int-array
-    // encoding/parsing, and no character escaping needed (base64's alphabet
-    // is A-Za-z0-9+/=, none of which need quoting inside a single-quoted
-    // JS string).
-    final b64 = base64Encode(data);
-    final encodeTime = sw.elapsedMilliseconds;
-    sw.reset();
-    sw.start();
+    if (_disposed) return;
+    final ptr = calloc<Uint8>(data.length);
+    final list = ptr.asTypedList(data.length);
+    list.setAll(0, data);
 
-    _evalAsync("_dart_socket_data($socketId, '$b64');");
-    final evalTime = sw.elapsedMilliseconds;
-    sw.reset();
-    sw.start();
-
-    _bindings.pump(_handle);
-    final pumpTime = sw.elapsedMilliseconds;
-
-    if (encodeTime > 1 || evalTime > 1 || pumpTime > 1) {
-      // ignore: avoid_print
-      print(
-          '[QuickJsRuntime] _onSocketData [${data.length} bytes]: base64Encode=$encodeTime ms, _evalAsync=$evalTime ms, pump=$pumpTime ms');
-    }
+    _bindings.emitSocketData(_handle, socketId, ptr, data.length);
+    calloc.free(ptr);
+    _bindings.pumpAll(_handle);
   }
 
   void _onSocketClose(int socketId) {
+    if (_disposed) return;
     _sockets.remove(socketId);
-    _evalAsync("_dart_emit_socket($socketId, 'close');");
-    _bindings.pump(_handle);
+    _bindings.emitSocketEvent(_handle, socketId, 'close');
+    _bindings.pumpAll(_handle);
   }
 
   void _onSocketError(int socketId, String error) {
-    _sockets.remove(socketId);
-    _evalAsync(
-      "_dart_emit_socket($socketId, 'error', new Error(${_jsString(error)}));",
-    );
-    _bindings.pump(_handle);
-  }
-
-  void _evalAsync(String code) {
     if (_disposed) return;
-    try {
-      eval(code);
-    } catch (_) {}
+    _sockets.remove(socketId);
+    _bindings.emitSocketError(_handle, socketId, error);
+    _bindings.pumpAll(_handle);
   }
 
   // ────────────────────────────────────────────────────────────────────────
-  // Crypto helpers
+  // Crypto helpers (Dart fallback)
   // ────────────────────────────────────────────────────────────────────────
 
-  /// Decode a value coming from the JS bridge into raw bytes.
-  ///
-  /// By convention (see class-level perf notes) the JS side always sends
-  /// binary payloads as base64 strings, never as JSON int arrays — decoding
-  /// a base64 string is O(n) with no JSON tokenization overhead, unlike the
-  /// previous `List<int>` protocol which required parsing one JSON number
-  /// per byte on both ends.
   static Uint8List _toUint8List(dynamic data) {
     if (data is List) return Uint8List.fromList(data.cast<int>());
     if (data is String) return base64Decode(data);
@@ -1445,21 +1434,21 @@ var __filename = globalThis.__filename;
   static Uint8List _computeHmac(String algorithm, dynamic key, dynamic data) {
     final keyBytes = _toUint8List(key);
     final dataBytes = _toUint8List(data);
-    final dartCrypto.Hash hash;
+    final dart_crypto.Hash hash;
     switch (algorithm.toLowerCase().replaceAll('-', '')) {
       case 'sha256':
-        hash = dartCrypto.sha256;
+        hash = dart_crypto.sha256;
         break;
       case 'sha1':
-        hash = dartCrypto.sha1;
+        hash = dart_crypto.sha1;
         break;
       case 'md5':
-        hash = dartCrypto.md5;
+        hash = dart_crypto.md5;
         break;
       default:
-        hash = dartCrypto.sha256;
+        hash = dart_crypto.sha256;
     }
-    final hmac = dartCrypto.Hmac(hash, keyBytes);
+    final hmac = dart_crypto.Hmac(hash, keyBytes);
     return Uint8List.fromList(hmac.convert(dataBytes).bytes);
   }
 
@@ -1471,7 +1460,7 @@ var __filename = globalThis.__filename;
   ) {
     final passwordBytes = _toUint8List(password);
     final saltBytes = _toUint8List(salt);
-    final hmac = dartCrypto.Hmac(dartCrypto.sha256, passwordBytes);
+    final hmac = dart_crypto.Hmac(dart_crypto.sha256, passwordBytes);
     final blocks = (lengthBytes / 32).ceil();
     final out = Uint8List(blocks * 32);
 
@@ -1510,25 +1499,16 @@ var __filename = globalThis.__filename;
   static String _computeHash(String algorithm, dynamic data) {
     final bytes = _toUint8List(data);
 
-    switch (algorithm.toLowerCase()) {
+    switch (algorithm.toLowerCase().replaceAll('-', '')) {
       case 'sha256':
-        return dartCrypto.sha256.convert(bytes).toString();
+        return dart_crypto.sha256.convert(bytes).toString();
       case 'sha1':
-        return dartCrypto.sha1.convert(bytes).toString();
+        return dart_crypto.sha1.convert(bytes).toString();
       case 'md5':
-        return dartCrypto.md5.convert(bytes).toString();
+        return dart_crypto.md5.convert(bytes).toString();
       default:
-        return dartCrypto.sha256.convert(bytes).toString();
+        return dart_crypto.sha256.convert(bytes).toString();
     }
-  }
-
-  static String _jsString(String s) {
-    final escaped = s
-        .replaceAll('\\', '\\\\')
-        .replaceAll("'", "\\'")
-        .replaceAll('\n', '\\n')
-        .replaceAll('\r', '\\r');
-    return "'$escaped'";
   }
 }
 
@@ -1560,7 +1540,7 @@ class _DartSocketContext {
       socket = await SecureSocket.connect(
         host,
         port,
-        onBadCertificate: (_) => true, // Accept self-signed certs for dev
+        onBadCertificate: (_) => true,
       );
     } else {
       socket = await Socket.connect(host, port);

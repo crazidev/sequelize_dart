@@ -17,11 +17,12 @@
     "@sequelize/sqlite3": "^7.0.0-alpha.48",
     "@types/uuid": "^10.0.0",
     "dotenv": "^16.3.1",
+    "lodash": "^4.17.21",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.2",
     "typescript": "^5.3.3"
   }
 }
