@@ -5,6 +5,7 @@
  * It exposes a single `globalThis.handleRequest(method, params)` async
  * function that the Dart QuickJsRuntime calls via `callAsync()`.
  */
+import { encode } from '@msgpack/msgpack';
 import {
   processRequest,
   cleanup,
@@ -12,6 +13,9 @@ import {
   JsonRpcResponse,
 } from './request_handler';
 import { setNotificationCallback } from './utils/state';
+
+// Expose MessagePack encoder globally for FFI direct binary transport
+(globalThis as any)._encodeMsgPack = encode;
 
 // Wire SQL logging and notifications back to Dart via _ffiNotify
 setNotificationCallback((notification) => {

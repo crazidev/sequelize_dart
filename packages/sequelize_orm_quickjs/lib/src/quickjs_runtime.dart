@@ -7,6 +7,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as dart_crypto;
 import 'package:ffi/ffi.dart';
+import 'package:sequelize_orm/src/utils/msgpack_decoder.dart';
 import 'package:sequelize_orm_quickjs/src/quickjs_bindings.dart';
 
 /// High-level wrapper around the embedded QuickJS JavaScript engine.
@@ -66,6 +67,8 @@ class QuickJsRuntime {
   // Dart ↔ JS bridge callback
   // ────────────────────────────────────────────────────────────────────────
 
+  Pointer<NativeFunction<DartBridgeBinaryCallbackC>>? _nativeBinaryCb;
+
   void _installCallback() {
     _runtimesByHandle[_handle.address] = this;
     _nativeCb = Pointer.fromFunction<DartBridgeCallbackC>(
@@ -73,6 +76,43 @@ class QuickJsRuntime {
     );
     _bindings.setCallback(_nativeCb!);
     _bindings.setRuntimeCallback(_handle, _nativeCb!);
+
+    _nativeBinaryCb = Pointer.fromFunction<DartBridgeBinaryCallbackC>(
+      _dispatchBinaryFromJs,
+    );
+    _bindings.setRuntimeBinaryCallback(_handle, _nativeBinaryCb!);
+  }
+
+  /// Static dispatcher called from C when `_ffiNotifyBinary` is invoked in JS context (Option B).
+  static void _dispatchBinaryFromJs(
+    QjsDartRuntimePtr handle,
+    int promiseId,
+    Pointer<Uint8> bytes,
+    int length,
+  ) {
+    final rt = _runtimesByHandle[handle.address];
+    if (rt == null) return;
+    rt._handleBinaryBridgeCall(promiseId, bytes, length);
+  }
+
+  void _handleBinaryBridgeCall(
+      int promiseId, Pointer<Uint8> bytes, int length) {
+    try {
+      final uint8List = bytes.asTypedList(length);
+      final decoded = FastMsgPackDecoder.decode(uint8List);
+      if (decoded is Map && decoded.containsKey('error')) {
+        final err = decoded['error'];
+        _pendingPromises.remove(promiseId)?.completeError(
+              Exception(err?.toString() ?? 'Unknown error'),
+            );
+      } else if (decoded is Map && decoded.containsKey('value')) {
+        _pendingPromises.remove(promiseId)?.complete(decoded['value']);
+      } else {
+        _pendingPromises.remove(promiseId)?.complete(decoded);
+      }
+    } catch (e) {
+      _pendingPromises.remove(promiseId)?.completeError(e);
+    }
   }
 
   /// Static dispatcher called from C when `_ffiNotify(name, argsJson)` is
@@ -1291,7 +1331,12 @@ class QuickJsRuntime {
       } else {
         throw new Error('Function not found: ' + fnName);
       }
-      _ffiNotify('_dart_promise_resolve', JSON.stringify({id: promiseId, value: result}));
+      if (typeof _encodeMsgPack === 'function' && typeof _ffiNotifyBinary === 'function') {
+        const packed = _encodeMsgPack({ id: promiseId, value: result });
+        _ffiNotifyBinary(promiseId, packed);
+      } else {
+        _ffiNotify('_dart_promise_resolve', JSON.stringify({id: promiseId, value: result}));
+      }
     } catch(e) {
       _ffiNotify('_dart_promise_reject', JSON.stringify({id: promiseId, error: String(e?.message || e)}));
     }

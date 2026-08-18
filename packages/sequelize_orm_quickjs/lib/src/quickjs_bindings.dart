@@ -53,6 +53,22 @@ typedef _SetRuntimeCallback = void Function(
   Pointer<NativeFunction<DartBridgeCallbackC>>,
 );
 
+typedef DartBridgeBinaryCallbackC = Void Function(
+  QjsDartRuntimePtr handle,
+  Int32 promiseId,
+  Pointer<Uint8> bytes,
+  Int32 length,
+);
+
+typedef _SetRuntimeBinaryCallbackC = Void Function(
+  QjsDartRuntimePtr handle,
+  Pointer<NativeFunction<DartBridgeBinaryCallbackC>>,
+);
+typedef _SetRuntimeBinaryCallback = void Function(
+  QjsDartRuntimePtr handle,
+  Pointer<NativeFunction<DartBridgeBinaryCallbackC>>,
+);
+
 // qjs_dart_eval(QjsDartRuntime*, const char* js) -> char*
 typedef _EvalC = Pointer<Utf8> Function(
   QjsDartRuntimePtr handle,
@@ -262,6 +278,7 @@ class QuickJsBindings {
   late final _FreeRuntime _freeRuntime;
   late final _SetCallback _setCallback;
   late final _SetRuntimeCallback _setRuntimeCallback;
+  late final _SetRuntimeBinaryCallback _setRuntimeBinaryCallback;
   late final _Eval _eval;
   late final _CallAsync _callAsync;
   late final _TriggerTimer _triggerTimer;
@@ -288,6 +305,10 @@ class QuickJsBindings {
     _setRuntimeCallback = _lib
         .lookup<NativeFunction<_SetRuntimeCallbackC>>(
             'qjs_dart_set_runtime_callback')
+        .asFunction();
+    _setRuntimeBinaryCallback = _lib
+        .lookup<NativeFunction<_SetRuntimeBinaryCallbackC>>(
+            'qjs_dart_set_runtime_binary_callback')
         .asFunction();
     _eval = _lib.lookup<NativeFunction<_EvalC>>('qjs_dart_eval').asFunction();
     _callAsync = _lib
@@ -349,6 +370,14 @@ class QuickJsBindings {
     Pointer<NativeFunction<DartBridgeCallbackC>> cb,
   ) {
     _setRuntimeCallback(handle, cb);
+  }
+
+  /// Set the runtime-specific binary FFI callback dispatcher (Option B).
+  void setRuntimeBinaryCallback(
+    QjsDartRuntimePtr handle,
+    Pointer<NativeFunction<DartBridgeBinaryCallbackC>> cb,
+  ) {
+    _setRuntimeBinaryCallback(handle, cb);
   }
 
   /// Evaluate [jsCode] in [handle] and return the JSON-encoded result string.

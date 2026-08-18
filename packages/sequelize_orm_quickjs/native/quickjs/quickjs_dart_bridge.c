@@ -207,11 +207,13 @@ typedef struct {
 } StmtCache;
 
 typedef const char* (*DartBridgeCallback)(const char* name, const char* argsJson);
+typedef void (*DartBridgeBinaryCallback)(void *handle, int32_t promise_id, const uint8_t *bytes, int32_t len);
 
 typedef struct QjsDartRuntime {
     JSRuntime *rt;
     JSContext *ctx;
     DartBridgeCallback callback;
+    DartBridgeBinaryCallback binary_callback;
     void *userdata;
 
     // Cached JS function values
@@ -863,6 +865,39 @@ static JSValue js_ffi_notify(JSContext *ctx, JSValueConst this_val, int argc, JS
     return JS_UNDEFINED;
 }
 
+static DartBridgeBinaryCallback g_dart_binary_callback = NULL;
+
+static JSValue js_ffi_notify_binary(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+    if (argc < 2) return JS_UNDEFINED;
+    int32_t promise_id = 0;
+    JS_ToInt32(ctx, &promise_id, argv[0]);
+
+    size_t size = 0;
+    uint8_t *buf = JS_GetArrayBuffer(ctx, &size, argv[1]);
+    if (!buf) {
+        size_t byte_offset = 0, byte_length = 0, bytes_per_element = 0;
+        JSValue ab = JS_GetTypedArrayBuffer(ctx, argv[1], &byte_offset, &byte_length, &bytes_per_element);
+        if (!JS_IsException(ab)) {
+            size_t ab_size = 0;
+            uint8_t *ab_buf = JS_GetArrayBuffer(ctx, &ab_size, ab);
+            if (ab_buf) {
+                buf = ab_buf + byte_offset;
+                size = byte_length;
+            }
+            JS_FreeValue(ctx, ab);
+        }
+    }
+
+    if (buf && size > 0) {
+        QjsDartRuntime *rt = (QjsDartRuntime*)JS_GetContextOpaque(ctx);
+        DartBridgeBinaryCallback cb = (rt && rt->binary_callback) ? rt->binary_callback : g_dart_binary_callback;
+        if (cb) {
+            cb(rt, promise_id, buf, (int32_t)size);
+        }
+    }
+    return JS_UNDEFINED;
+}
+
 static JSValue js_print(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
     for (int i = 0; i < argc; i++) {
         const char *str = JS_ToCString(ctx, argv[i]);
@@ -901,6 +936,14 @@ QJS_EXPORT void qjs_dart_set_runtime_callback(QjsDartRuntime *handle, DartBridge
     if (handle) handle->callback = cb;
 }
 
+QJS_EXPORT void qjs_dart_set_binary_callback(DartBridgeBinaryCallback cb) {
+    g_dart_binary_callback = cb;
+}
+
+QJS_EXPORT void qjs_dart_set_runtime_binary_callback(QjsDartRuntime *handle, DartBridgeBinaryCallback cb) {
+    if (handle) handle->binary_callback = cb;
+}
+
 QJS_EXPORT QjsDartRuntime* qjs_dart_create_runtime(void) {
     QjsDartRuntime *handle = (QjsDartRuntime*)calloc(1, sizeof(QjsDartRuntime));
     if (!handle) return NULL;
@@ -925,6 +968,10 @@ QJS_EXPORT QjsDartRuntime* qjs_dart_create_runtime(void) {
     // Register _ffiNotify
     JSValue notify_fn = JS_NewCFunction(handle->ctx, js_ffi_notify, "_ffiNotify", 2);
     JS_SetPropertyStr(handle->ctx, global, "_ffiNotify", notify_fn);
+
+    // Register _ffiNotifyBinary
+    JSValue notify_bin_fn = JS_NewCFunction(handle->ctx, js_ffi_notify_binary, "_ffiNotifyBinary", 2);
+    JS_SetPropertyStr(handle->ctx, global, "_ffiNotifyBinary", notify_bin_fn);
 
     // Register global require
     JSValue req_fn = JS_NewCFunction(handle->ctx, js_require, "require", 1);

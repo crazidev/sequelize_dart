@@ -10,6 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@msgpack/msgpack": "^3.0.0",
     "@sequelize/core": "^7.0.0-alpha.48",
     "@sequelize/mariadb": "^7.0.0-alpha.48",
     "@sequelize/mysql": "^7.0.0-alpha.48",
