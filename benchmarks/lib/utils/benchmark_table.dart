@@ -144,8 +144,9 @@ class BenchmarkTable {
     const valCol = 14;
 
     // Find all package reports for side-by-side comparison
-    final otherReports =
-        reports.where((r) => r.packageName != 'Sequelize').toList();
+    final otherReports = reports
+        .where((r) => r.packageName != 'Sequelize')
+        .toList();
 
     // Build header
     final topParts = StringBuffer('┌${'─' * (testCol + 2)}');
@@ -188,14 +189,16 @@ class BenchmarkTable {
 
       // Sequelize total
       row.write(
-          '│ ${'${seqResult.durationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ');
+        '│ ${'${seqResult.durationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ',
+      );
 
       // Other ORMs
       double bestOtherMs = double.infinity;
       for (final other in otherReports) {
         final otherResult = other.results[i];
         row.write(
-            '│ ${'${otherResult.durationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ');
+          '│ ${'${otherResult.durationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ',
+        );
         if (otherResult.durationMs < bestOtherMs) {
           bestOtherMs = otherResult.durationMs;
         }
@@ -207,8 +210,9 @@ class BenchmarkTable {
       row.write('│ ${ipcStr.padLeft(valCol)} ');
 
       // Slowdown multiplier
-      final multiplier =
-          bestOtherMs > 0 ? seqResult.durationMs / bestOtherMs : 0.0;
+      final multiplier = bestOtherMs > 0
+          ? seqResult.durationMs / bestOtherMs
+          : 0.0;
       final multStr = '${multiplier.toStringAsFixed(1)}x';
       row.write('│ ${multStr.padLeft(valCol)} ');
 
@@ -222,12 +226,14 @@ class BenchmarkTable {
     final summaryRow = StringBuffer('│ ${'TOTAL'.padRight(testCol)} ');
 
     summaryRow.write(
-        '│ ${'${seqReport.totalDurationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ');
+      '│ ${'${seqReport.totalDurationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ',
+    );
 
     double bestOtherTotal = double.infinity;
     for (final other in otherReports) {
       summaryRow.write(
-          '│ ${'${other.totalDurationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ');
+        '│ ${'${other.totalDurationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ',
+      );
       if (other.totalDurationMs < bestOtherTotal) {
         bestOtherTotal = other.totalDurationMs;
       }
@@ -244,12 +250,15 @@ class BenchmarkTable {
       }
     }
     summaryRow.write(
-        '│ ${ipcCount > 0 ? '${totalIpc.toStringAsFixed(2)}ms' : '—'.padLeft(valCol)} ');
+      '│ ${ipcCount > 0 ? '${totalIpc.toStringAsFixed(2)}ms' : '—'.padLeft(valCol)} ',
+    );
 
-    final totalMult =
-        bestOtherTotal > 0 ? seqReport.totalDurationMs / bestOtherTotal : 0.0;
-    summaryRow
-        .write('│ ${'${totalMult.toStringAsFixed(1)}x'.padLeft(valCol)} ');
+    final totalMult = bestOtherTotal > 0
+        ? seqReport.totalDurationMs / bestOtherTotal
+        : 0.0;
+    summaryRow.write(
+      '│ ${'${totalMult.toStringAsFixed(1)}x'.padLeft(valCol)} ',
+    );
     summaryRow.write('│');
     print(summaryRow.toString());
 

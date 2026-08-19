@@ -10,15 +10,18 @@ class DriftQueries {
 
   /// 2. Fetch posts with limit
   static Future<int> findAllPostsWithLimit(
-      DriftAppDatabase db, int limit) async {
+    DriftAppDatabase db,
+    int limit,
+  ) async {
     final posts = await (db.select(db.posts)..limit(limit)).get();
     return posts.length;
   }
 
   /// 3. Fetch single post by ID
   static Future<int> findOnePost(DriftAppDatabase db, int id) async {
-    final post = await (db.select(db.posts)..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final post = await (db.select(
+      db.posts,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     return post != null ? 1 : 0;
   }
 
@@ -32,24 +35,26 @@ class DriftQueries {
 
   /// 5. Filter posts by ID range
   static Future<int> findPostsWhereIdLessThan(
-      DriftAppDatabase db, int id) async {
-    final posts = await (db.select(db.posts)
-          ..where((t) => t.id.isSmallerThanValue(id)))
-        .get();
+    DriftAppDatabase db,
+    int id,
+  ) async {
+    final posts = await (db.select(
+      db.posts,
+    )..where((t) => t.id.isSmallerThanValue(id))).get();
     return posts.length;
   }
 
   /// 6. Fetch posts joined with PostDetails
   static Future<int> findPostsWithDetails(
-      DriftAppDatabase db, int limit) async {
+    DriftAppDatabase db,
+    int limit,
+  ) async {
     final rows = await (db.select(db.posts).join([
       leftOuterJoin(
         db.postDetails,
         db.postDetails.postId.equalsExp(db.posts.id),
-      )
-    ])
-          ..limit(limit))
-        .get();
+      ),
+    ])..limit(limit)).get();
     return rows.length;
   }
 
@@ -57,8 +62,9 @@ class DriftQueries {
   static Future<int> sequentialFindPosts(DriftAppDatabase db, int count) async {
     var found = 0;
     for (var i = 1; i <= count; i++) {
-      final post = await (db.select(db.posts)..where((t) => t.id.equals(i)))
-          .getSingleOrNull();
+      final post = await (db.select(
+        db.posts,
+      )..where((t) => t.id.equals(i))).getSingleOrNull();
       if (post != null) found++;
     }
     return found;
@@ -71,11 +77,15 @@ class DriftQueries {
     int maxId,
     int limit,
   ) async {
-    final posts = await (db.select(db.posts)
-          ..where((t) =>
-              t.id.isBiggerThanValue(minId) & t.id.isSmallerThanValue(maxId))
-          ..limit(limit))
-        .get();
+    final posts =
+        await (db.select(db.posts)
+              ..where(
+                (t) =>
+                    t.id.isBiggerThanValue(minId) &
+                    t.id.isSmallerThanValue(maxId),
+              )
+              ..limit(limit))
+            .get();
     return posts.length;
   }
 }

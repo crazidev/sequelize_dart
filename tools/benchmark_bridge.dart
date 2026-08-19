@@ -77,8 +77,9 @@ Future<void> main(List<String> args) async {
 
     SequelizeCoreOptions connection;
     if (dbType == 'mysql') {
-      connection =
-          MysqlConnection(url: 'mysql://root@localhost:3306/sequelize_orm');
+      connection = MysqlConnection(
+        url: 'mysql://root@localhost:3306/sequelize_orm',
+      );
     } else if (dbType == 'sqlite') {
       connection = SqliteConnection(storage: 'bench.db');
     } else {
@@ -94,8 +95,9 @@ Future<void> main(List<String> args) async {
     };
 
     final sequelize = Sequelize().createInstance(connection: connection);
-    await sequelize
-        .initialize(models: [Users.model, Post.model, PostDetails.model]);
+    await sequelize.initialize(
+      models: [Users.model, Post.model, PostDetails.model],
+    );
 
     int suffix = 0;
     String uid() => '${DateTime.now().millisecondsSinceEpoch}${suffix++}';
@@ -123,16 +125,21 @@ Future<void> main(List<String> args) async {
     }
 
     stdout.writeln();
-    stdout
-        .writeln('┌─────────────────────────────────────────────────────────┐');
-    stdout
-        .writeln('│        Sequelize ORM – Bridge Latency Benchmark         │');
-    stdout
-        .writeln('└─────────────────────────────────────────────────────────┘');
+    stdout.writeln(
+      '┌─────────────────────────────────────────────────────────┐',
+    );
+    stdout.writeln(
+      '│        Sequelize ORM – Bridge Latency Benchmark         │',
+    );
+    stdout.writeln(
+      '└─────────────────────────────────────────────────────────┘',
+    );
     stdout.writeln();
 
-    final s1 =
-        await bench('findAll (limit 10)', () => Users.model.findAll(limit: 10));
+    final s1 = await bench(
+      'findAll (limit 10)',
+      () => Users.model.findAll(limit: 10),
+    );
     final s2 = await bench(
       'findOne (by id)',
       () => Users.model.findOne(where: (u) => u.id.gt(0)),
@@ -187,7 +194,8 @@ Future<void> main(List<String> args) async {
 
     stdout.writeln();
     stdout.writeln(
-        '── Results ───────────────────────────────────────────────────');
+      '── Results ───────────────────────────────────────────────────',
+    );
     s1.print();
     s2.print();
     s3.print();
@@ -197,13 +205,17 @@ Future<void> main(List<String> args) async {
     s7.print();
 
     stdout.writeln(
-        '── Column legend ─────────────────────────────────────────────');
+      '── Column legend ─────────────────────────────────────────────',
+    );
     stdout.writeln(
-        '  Round-trip   = full Dart → stdin → Node.js → stdout → Dart');
-    stdout
-        .writeln('  Server time  = Node.js handler wall-clock (JS + DB query)');
+      '  Round-trip   = full Dart → stdin → Node.js → stdout → Dart',
+    );
     stdout.writeln(
-        '  IPC overhead = Round-trip − Server time (pipe + JSON codec)');
+      '  Server time  = Node.js handler wall-clock (JS + DB query)',
+    );
+    stdout.writeln(
+      '  IPC overhead = Round-trip − Server time (pipe + JSON codec)',
+    );
     stdout.writeln();
 
     await sequelize.close();

@@ -28,48 +28,54 @@ void main() {
     await sequelize.sync(alter: true);
 
     // Seed test data
-    final admin = await Users.model.create(CreateUsers(
-      email: 'jq_admin_$prefix@test.com',
-      firstName: 'Admin',
-      lastName: 'JsonQuery',
-      tags: ['dart', 'flutter', 'sequelize'],
-      scores: [95, 87, 100],
-      metadata: {
-        'role': 'admin',
-        'level': 5,
-        'active': true,
-        'address': {
-          'city': 'Berlin',
-          'zip': '10115',
+    final admin = await Users.model.create(
+      CreateUsers(
+        email: 'jq_admin_$prefix@test.com',
+        firstName: 'Admin',
+        lastName: 'JsonQuery',
+        tags: ['dart', 'flutter', 'sequelize'],
+        scores: [95, 87, 100],
+        metadata: {
+          'role': 'admin',
+          'level': 5,
+          'active': true,
+          'address': {
+            'city': 'Berlin',
+            'zip': '10115',
+          },
         },
-      },
-    ));
+      ),
+    );
     userAdminId = admin.id;
 
-    final moderator = await Users.model.create(CreateUsers(
-      email: 'jq_mod_$prefix@test.com',
-      firstName: 'Mod',
-      lastName: 'JsonQuery',
-      tags: ['dart', 'backend'],
-      scores: [60, 70],
-      metadata: {
-        'role': 'moderator',
-        'level': 3,
-        'active': false,
-        'address': {
-          'city': 'Munich',
-          'zip': '80331',
+    final moderator = await Users.model.create(
+      CreateUsers(
+        email: 'jq_mod_$prefix@test.com',
+        firstName: 'Mod',
+        lastName: 'JsonQuery',
+        tags: ['dart', 'backend'],
+        scores: [60, 70],
+        metadata: {
+          'role': 'moderator',
+          'level': 3,
+          'active': false,
+          'address': {
+            'city': 'Munich',
+            'zip': '80331',
+          },
         },
-      },
-    ));
+      ),
+    );
     userModId = moderator.id;
 
     // User with null JSON columns
-    final nullUser = await Users.model.create(CreateUsers(
-      email: 'jq_null_$prefix@test.com',
-      firstName: 'NullJson',
-      lastName: 'JsonQuery',
-    ));
+    final nullUser = await Users.model.create(
+      CreateUsers(
+        email: 'jq_null_$prefix@test.com',
+        firstName: 'NullJson',
+        lastName: 'JsonQuery',
+      ),
+    );
     userNullId = nullUser.id;
   });
 
@@ -572,14 +578,16 @@ void main() {
     late int? updateUserId;
 
     setUp(() async {
-      final user = await Users.model.create(CreateUsers(
-        email: 'jq_update_${DateTime.now().millisecondsSinceEpoch}@test.com',
-        firstName: 'Update',
-        lastName: 'JsonQuery',
-        tags: ['old'],
-        scores: [1],
-        metadata: {'status': 'pending'},
-      ));
+      final user = await Users.model.create(
+        CreateUsers(
+          email: 'jq_update_${DateTime.now().millisecondsSinceEpoch}@test.com',
+          firstName: 'Update',
+          lastName: 'JsonQuery',
+          tags: ['old'],
+          scores: [1],
+          metadata: {'status': 'pending'},
+        ),
+      );
       updateUserId = user.id;
     });
 
@@ -676,7 +684,7 @@ void main() {
           u.lastName.eq('JsonQuery'),
         ]),
         order: [
-          ['id', 'ASC']
+          ['id', 'ASC'],
         ],
       );
       expect(users.length, greaterThanOrEqualTo(2));

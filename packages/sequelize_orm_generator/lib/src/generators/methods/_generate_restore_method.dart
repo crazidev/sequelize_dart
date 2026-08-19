@@ -28,8 +28,9 @@ void _generateRestoreMethod(
   buffer.writeln(
     '      if (individualHooks != null) \'individualHooks\': individualHooks,',
   );
-  buffer
-      .writeln('      if (transaction != null) \'transaction\': transaction,');
+  buffer.writeln(
+    '      if (transaction != null) \'transaction\': transaction,',
+  );
   buffer.writeln('    };');
   buffer.writeln('    return QueryEngine().restore(');
   buffer.writeln('      modelName: modelName,');

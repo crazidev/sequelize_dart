@@ -11,29 +11,32 @@ void main() {
     });
 
     test(
-        'initializes and executes in-process bridge with typed SequelizeException',
-        () async {
-      final client = QuickJsBridgeClient.instance;
+      'initializes and executes in-process bridge with typed SequelizeException',
+      () async {
+        final client = QuickJsBridgeClient.instance;
 
-      // SQLite3 triggers our custom SequelizeConnectionError explaining the driver requirement
-      await expectLater(
-        client.start(
-          connectionConfig: {
-            'dialect': 'sqlite',
-            'storage': ':memory:',
-            'logging': false,
-          },
-        ),
-        throwsA(isA<SequelizeConnectionError>().having(
-          (e) => e.message,
-          'message',
-          contains('SQLite3 is currently not supported'),
-        )),
-      );
+        // SQLite3 triggers our custom SequelizeConnectionError explaining the driver requirement
+        await expectLater(
+          client.start(
+            connectionConfig: {
+              'dialect': 'sqlite',
+              'storage': ':memory:',
+              'logging': false,
+            },
+          ),
+          throwsA(
+            isA<SequelizeConnectionError>().having(
+              (e) => e.message,
+              'message',
+              contains('SQLite3 is currently not supported'),
+            ),
+          ),
+        );
 
-      expect(client.isClosed, isTrue);
-      expect(client.isConnected, isFalse);
-    });
+        expect(client.isClosed, isTrue);
+        expect(client.isConnected, isFalse);
+      },
+    );
 
     test('re-initialization after close works cleanly', () async {
       final client = QuickJsBridgeClient.instance;

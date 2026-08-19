@@ -195,11 +195,15 @@ class QuickJsBridgeClient implements BridgeClientInterface {
     final serverMs = responseMap['_serverMs'] as int?;
     final cb = latencyCallback;
     if (cb != null) {
-      cb(BridgeLatencyInfo(
-        method: method,
-        roundTrip: stopwatch.elapsed,
-        serverTime: serverMs != null ? Duration(milliseconds: serverMs) : null,
-      ));
+      cb(
+        BridgeLatencyInfo(
+          method: method,
+          roundTrip: stopwatch.elapsed,
+          serverTime: serverMs != null
+              ? Duration(milliseconds: serverMs)
+              : null,
+        ),
+      );
     }
 
     if (responseMap.containsKey('error')) {
@@ -208,7 +212,8 @@ class QuickJsBridgeClient implements BridgeClientInterface {
         throw SequelizeException.fromBridge(Map<String, dynamic>.from(error));
       }
       throw BridgeException(
-          error?.toString() ?? 'Unknown QuickJS bridge error');
+        error?.toString() ?? 'Unknown QuickJS bridge error',
+      );
     }
 
     return unpackTabularResult(responseMap['result']);
@@ -256,8 +261,13 @@ class QuickJsBridgeClient implements BridgeClientInterface {
       final exeDir = File(Platform.resolvedExecutable).parent;
       final bundleDir = exeDir.parent;
       candidatePaths.add(
-        p.join(bundleDir.path, 'lib', 'src', 'bridge',
-            'bridge_server_quickjs.bundle.js'),
+        p.join(
+          bundleDir.path,
+          'lib',
+          'src',
+          'bridge',
+          'bridge_server_quickjs.bundle.js',
+        ),
       );
       candidatePaths.add(
         p.join(bundleDir.path, 'assets', 'bridge_server_quickjs.bundle.js'),
@@ -266,7 +276,8 @@ class QuickJsBridgeClient implements BridgeClientInterface {
 
     try {
       final pkgUri = Uri.parse(
-          'package:sequelize_orm/src/bridge/bridge_server_quickjs.bundle.js');
+        'package:sequelize_orm/src/bridge/bridge_server_quickjs.bundle.js',
+      );
       final resolved = await Isolate.resolvePackageUri(pkgUri);
       if (resolved != null && resolved.scheme == 'file') {
         candidatePaths.add(resolved.toFilePath());
@@ -275,10 +286,24 @@ class QuickJsBridgeClient implements BridgeClientInterface {
 
     final cwd = Directory.current.path;
     candidatePaths.addAll([
-      p.join(cwd, 'packages', 'sequelize_orm', 'lib', 'src', 'bridge',
-          'bridge_server_quickjs.bundle.js'),
-      p.join(cwd, '..', 'sequelize_orm', 'lib', 'src', 'bridge',
-          'bridge_server_quickjs.bundle.js'),
+      p.join(
+        cwd,
+        'packages',
+        'sequelize_orm',
+        'lib',
+        'src',
+        'bridge',
+        'bridge_server_quickjs.bundle.js',
+      ),
+      p.join(
+        cwd,
+        '..',
+        'sequelize_orm',
+        'lib',
+        'src',
+        'bridge',
+        'bridge_server_quickjs.bundle.js',
+      ),
       p.join(cwd, 'lib', 'src', 'bridge', 'bridge_server_quickjs.bundle.js'),
     ]);
 

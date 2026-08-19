@@ -21,7 +21,8 @@ void _generateInstanceMethods(
         dartType == 'int' || dartType == 'double' || dartType == 'num';
     final isNotPrimaryKey = !field.primaryKey;
     final isNotAutoIncrement = !field.autoIncrement;
-    final isNotForeignKey = !field.name.toLowerCase().contains('_id') &&
+    final isNotForeignKey =
+        !field.name.toLowerCase().contains('_id') &&
         !field.name.toLowerCase().endsWith('_id');
     return isNumeric &&
         isNotPrimaryKey &&
@@ -112,8 +113,9 @@ void _generateInstanceMethods(
 
   // Generate save() and update() methods if there are primary keys
   if (primaryKeys.isNotEmpty) {
-    final updateableFields =
-        fields.where((f) => !f.autoIncrement && !f.primaryKey).toList();
+    final updateableFields = fields
+        .where((f) => !f.autoIncrement && !f.primaryKey)
+        .toList();
     buffer.writeln('  /// Saves all changes made to this instance');
     buffer.writeln(
       '  /// Returns the number of affected rows (0 if no changes, 1 if updated/created)',
@@ -322,8 +324,9 @@ void _generateInstanceMethods(
     buffer.writeln(
       '  /// Restores this soft-deleted instance (for paranoid models)',
     );
-    buffer
-        .writeln('  Future<void> restore({Transaction? transaction}) async {');
+    buffer.writeln(
+      '  Future<void> restore({Transaction? transaction}) async {',
+    );
     buffer.writeln('    final pkValues = getPrimaryKeyMap();');
     buffer.writeln('    if (pkValues == null || pkValues.isEmpty) {');
     buffer.writeln(
@@ -364,10 +367,12 @@ void _generateAssociationHelpers(
   GeneratorNamingConfig namingConfig,
 ) {
   for (final assoc in associations) {
-    final isSingular = assoc.associationType == 'hasOne' ||
+    final isSingular =
+        assoc.associationType == 'hasOne' ||
         assoc.associationType == 'belongsTo';
-    final targetValuesClass =
-        namingConfig.getModelValuesClassName(assoc.modelClassName);
+    final targetValuesClass = namingConfig.getModelValuesClassName(
+      assoc.modelClassName,
+    );
     final rawAssocName = assoc.as ?? assoc.singularName ?? assoc.fieldName;
     final methodNamePart = _capitalize(_toCamelCase(rawAssocName));
 
@@ -465,8 +470,9 @@ void _generateAssociationHelpers(
     buffer.writeln();
 
     if (!isSingular) {
-      final singularMethodPart =
-          _capitalize(_toCamelCase(assoc.singularName ?? rawAssocName));
+      final singularMethodPart = _capitalize(
+        _toCamelCase(assoc.singularName ?? rawAssocName),
+      );
 
       // adder
       buffer.writeln('  /// Add an associated $rawAssocName');
@@ -480,8 +486,9 @@ void _generateAssociationHelpers(
       buffer.writeln('    await QueryEngine().associationAdd(');
       buffer.writeln('      sourceModel: $generatedClassName().modelName,');
       buffer.writeln('      primaryKeyValues: pk,');
-      buffer
-          .writeln("      associationName: '${assoc.as ?? assoc.fieldName}',");
+      buffer.writeln(
+        "      associationName: '${assoc.as ?? assoc.fieldName}',",
+      );
       buffer.writeln(
         '      targetOrKey: (targetOrKey is Iterable)',
       );
@@ -492,8 +499,9 @@ void _generateAssociationHelpers(
         '          : (targetOrKey is ReloadableMixin) ? targetOrKey.getPrimaryKeyMap() : targetOrKey,',
       );
       buffer.writeln('      options: options,');
-      buffer
-          .writeln('      sequelize: $generatedClassName().sequelizeInstance,');
+      buffer.writeln(
+        '      sequelize: $generatedClassName().sequelizeInstance,',
+      );
       buffer.writeln('      model: $generatedClassName().sequelizeModel,');
       buffer.writeln('      transaction: transaction,');
       buffer.writeln('    );');
@@ -512,8 +520,9 @@ void _generateAssociationHelpers(
       buffer.writeln('    await QueryEngine().associationRemove(');
       buffer.writeln('      sourceModel: $generatedClassName().modelName,');
       buffer.writeln('      primaryKeyValues: pk,');
-      buffer
-          .writeln("      associationName: '${assoc.as ?? assoc.fieldName}',");
+      buffer.writeln(
+        "      associationName: '${assoc.as ?? assoc.fieldName}',",
+      );
       buffer.writeln(
         '      targetOrKey: (targetOrKey is Iterable)',
       );
@@ -524,8 +533,9 @@ void _generateAssociationHelpers(
         '          : (targetOrKey is ReloadableMixin) ? targetOrKey.getPrimaryKeyMap() : targetOrKey,',
       );
       buffer.writeln('      options: options,');
-      buffer
-          .writeln('      sequelize: $generatedClassName().sequelizeInstance,');
+      buffer.writeln(
+        '      sequelize: $generatedClassName().sequelizeInstance,',
+      );
       buffer.writeln('      model: $generatedClassName().sequelizeModel,');
       buffer.writeln('      transaction: transaction,');
       buffer.writeln('    );');

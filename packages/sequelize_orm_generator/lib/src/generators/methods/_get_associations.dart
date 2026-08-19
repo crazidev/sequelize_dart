@@ -25,8 +25,8 @@ List<_AssociationInfo> _getAssociations(ClassElement element) {
       final annotation = isHasOne
           ? hasOneChecker.firstAnnotationOfExact(field)
           : isHasMany
-              ? hasManyChecker.firstAnnotationOfExact(field)
-              : belongsToChecker.firstAnnotationOfExact(field);
+          ? hasManyChecker.firstAnnotationOfExact(field)
+          : belongsToChecker.firstAnnotationOfExact(field);
 
       if (annotation != null) {
         final reader = ConstantReader(annotation);
@@ -66,8 +66,8 @@ List<_AssociationInfo> _getAssociations(ClassElement element) {
             associationType: isHasOne
                 ? 'hasOne'
                 : isHasMany
-                    ? 'hasMany'
-                    : 'belongsTo',
+                ? 'hasMany'
+                : 'belongsTo',
             modelClassName: modelClassName,
             fieldName: fieldName,
             foreignKey: foreignKey,

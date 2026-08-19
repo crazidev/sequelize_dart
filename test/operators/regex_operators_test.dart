@@ -23,55 +23,58 @@ void main() {
     clearCapturedSql();
   });
 
-  group('Regex Operators',
-      skip: isSqlite ? 'SQLite does not support REGEXP natively' : null, () {
-    test('regexp produces correct SQL', () async {
-      await Users.model.findAll(
-        where: (user) => user.email.regexp('^admin'),
-      );
+  group(
+    'Regex Operators',
+    skip: isSqlite ? 'SQLite does not support REGEXP natively' : null,
+    () {
+      test('regexp produces correct SQL', () async {
+        await Users.model.findAll(
+          where: (user) => user.email.regexp('^admin'),
+        );
 
-      if (isMysqlFamily) {
-        expect(lastSql, containsSql('REGEXP'));
-      } else {
-        expect(lastSql, containsSql('~'));
-      }
-    });
+        if (isMysqlFamily) {
+          expect(lastSql, containsSql('REGEXP'));
+        } else {
+          expect(lastSql, containsSql('~'));
+        }
+      });
 
-    test('notRegexp produces correct SQL', () async {
-      await Users.model.findAll(
-        where: (user) => user.email.notRegexp('^spam'),
-      );
+      test('notRegexp produces correct SQL', () async {
+        await Users.model.findAll(
+          where: (user) => user.email.notRegexp('^spam'),
+        );
 
-      if (isMysqlFamily) {
-        expect(lastSql, containsSql('NOT REGEXP'));
-      } else {
-        expect(lastSql, containsSql('!~'));
-      }
-    });
+        if (isMysqlFamily) {
+          expect(lastSql, containsSql('NOT REGEXP'));
+        } else {
+          expect(lastSql, containsSql('!~'));
+        }
+      });
 
-    test('iRegexp produces correct SQL', () async {
-      // In MySQL, REGEXP is usually case-insensitive depending on collation
-      await Users.model.findAll(
-        where: (user) => user.email.iRegexp('^ADMIN'),
-      );
+      test('iRegexp produces correct SQL', () async {
+        // In MySQL, REGEXP is usually case-insensitive depending on collation
+        await Users.model.findAll(
+          where: (user) => user.email.iRegexp('^ADMIN'),
+        );
 
-      if (isMysqlFamily) {
-        expect(lastSql, containsSql('REGEXP'));
-      } else {
-        expect(lastSql, containsSql('~*'));
-      }
-    });
+        if (isMysqlFamily) {
+          expect(lastSql, containsSql('REGEXP'));
+        } else {
+          expect(lastSql, containsSql('~*'));
+        }
+      });
 
-    test('notIRegexp produces correct SQL', () async {
-      await Users.model.findAll(
-        where: (user) => user.email.notIRegexp('^SPAM'),
-      );
+      test('notIRegexp produces correct SQL', () async {
+        await Users.model.findAll(
+          where: (user) => user.email.notIRegexp('^SPAM'),
+        );
 
-      if (isMysqlFamily) {
-        expect(lastSql, containsSql('NOT REGEXP'));
-      } else {
-        expect(lastSql, containsSql('!~*'));
-      }
-    });
-  });
+        if (isMysqlFamily) {
+          expect(lastSql, containsSql('NOT REGEXP'));
+        } else {
+          expect(lastSql, containsSql('!~*'));
+        }
+      });
+    },
+  );
 }

@@ -4,18 +4,14 @@ import 'package:sequelize_orm_example/db/models/users.model.dart';
 /// This function is called from
 /// main.dart after the database connection is established
 Future<void> runQueries() async {
-  final user = await Users.model.findOne(
+  final user = await Users.model.findAll(
     include: (includeUsers) => [
       includeUsers.post(
         required: true,
         include: (i) => [
-          i.postDetails(
-            required: true,
-          ),
+          i.postDetails(required: true),
         ],
       ),
     ],
   );
-
-  print(user?.toJson());
 }

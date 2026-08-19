@@ -1,38 +1,16 @@
-// Cross-platform tool runner for Sequelize ORM (Windows, macOS, Linux).
-//
-// Usage:
-//   dart run tools/run.dart <command> [options]
-//   dart run tools/run.dart --help
-//
-//   benchmark      Run multi-ORM benchmark suite (options: --seed, --posts=N, --users=N)
-//   benchmark-bridge Measure round-trip latency between Dart and the bridge
-//   build          Compile Dart to JS (optional: --input=, --output=)
-//   setup-bridge   Install and build bridge server bundle
-//   format         Format Dart and JS/JSON/MD with dart format + Prettier
-//   watch-models   Watch model files and run build_runner
-//   watch-dart     Watch Dart files and restart VM server
-//   watch-js       Watch Dart files and recompile to JS
-//   watch-bridge   Watch TypeScript and rebuild bridge
-//   setup-dev      Start PostgreSQL in Docker for development
-//   setup-db       Setup database dialect (postgres, mysql, mariadb) for dev/test
-//   setup-git-hooks  Install git hooks from .github/hooks
-//   test           Run tests (forwards to tools/test.dart)
-//   release        Release/publish (forwards to tools/release_publish.dart)
-//   all-build      Run setup-bridge, then build models, then dart2js (full build)
-
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:path/path.dart' as p;
 
-part 'cmds/benchmark_cmd.dart';
 part 'cmds/benchmark_bridge_cmd.dart';
+part 'cmds/benchmark_cmd.dart';
 part 'cmds/build_all_cmd.dart';
 part 'cmds/build_cmd.dart';
 part 'cmds/format_cmd.dart';
 part 'cmds/release_cmd.dart';
 part 'cmds/setup_bridge_cmd.dart';
 part 'cmds/setup_db_cmd.dart';
-part 'cmds/setup_dev_cmd.dart';
 part 'cmds/setup_git_hook_cmd.dart';
 part 'cmds/test_cmd.dart';
 part 'cmds/watch_bridge_cmd.dart';
@@ -77,11 +55,11 @@ Map<String, String> get _dockerEnv {
 
 /// Run a docker command, returning the [ProcessResult].
 Future<ProcessResult> _docker(List<String> args) =>
-    Process.run(_dockerBin, args, environment: _dockerEnv, runInShell: false);
+    Process.run(_dockerBin, args, environment: _dockerEnv);
 
 /// Start a docker process (streaming I/O), returning the [Process].
 Future<Process> _dockerStart(List<String> args) =>
-    Process.start(_dockerBin, args, environment: _dockerEnv, runInShell: false);
+    Process.start(_dockerBin, args, environment: _dockerEnv);
 
 void main(List<String> args) async {
   final root = _projectRoot;
@@ -127,9 +105,6 @@ void main(List<String> args) async {
         break;
       case 'watch-bridge':
         await cmdWatchBridge(root);
-        break;
-      case 'setup-dev':
-        await cmdSetupDev(root);
         break;
       case 'setup-db':
         await cmdSetupDb(root, rest);
@@ -194,7 +169,8 @@ int _fileHash(Directory root, List<String> relPaths, String extension) {
       if (e is File && e.path.endsWith(extension)) {
         h = 0x1fffffff & (h * 31 + e.path.hashCode);
         try {
-          h = 0x1fffffff &
+          h =
+              0x1fffffff &
               (h * 31 + e.lastModifiedSync().millisecondsSinceEpoch.hashCode);
         } catch (_) {}
       }
@@ -235,18 +211,12 @@ Commands:
   watch-dart       Watch Dart files, restart VM server on change
   watch-js         Watch Dart files, recompile to JS on change
   watch-bridge     Watch TypeScript, rebuild bridge on change
-  setup-dev        Start PostgreSQL in Docker for development
-  setup-db         Start database in Docker (postgres, mysql, mariadb) for dev or testing (options: --dev, --test, --reset)
+  setup-db         Start database in Docker
+                    Dialect: --postgres (default), --mysql, --mariadb
+                    Mode: --dev, --test, --reset
   setup-git-hooks  Install git hooks from .github/hooks
   test             Run tests (pass flags to tools/test.dart)
   release          Release/publish (pass flags to tools/release_publish.dart)
   all-build        Full build: setup-bridge → models → dart2js
-
-Examples:
-  dart run tools/run.dart build
-  dart run tools/run.dart build --input=example/lib/benchmark.dart --output=benchmark
-  dart run tools/run.dart setup-bridge pnpm
-  dart run tools/run.dart watch-models
-  dart run tools/run.dart test --postgres
 ''');
 }

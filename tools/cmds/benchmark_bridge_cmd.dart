@@ -22,16 +22,17 @@ Future<void> cmdBenchmarkBridge(Directory root, List<String> args) async {
   final dbType = args.contains('--mysql')
       ? 'mysql'
       : args.contains('--mariadb')
-          ? 'mariadb'
-          : args.contains('--sqlite')
-              ? 'sqlite'
-              : 'postgres';
+      ? 'mariadb'
+      : args.contains('--sqlite')
+      ? 'sqlite'
+      : 'postgres';
 
   final iterationsArg = args
       .firstWhere((a) => a.startsWith('--iterations='), orElse: () => '')
       .replaceFirst('--iterations=', '');
-  final iterations =
-      iterationsArg.isNotEmpty ? (int.tryParse(iterationsArg) ?? 100) : 100;
+  final iterations = iterationsArg.isNotEmpty
+      ? (int.tryParse(iterationsArg) ?? 100)
+      : 100;
 
   final verbose = args.contains('--verbose');
 

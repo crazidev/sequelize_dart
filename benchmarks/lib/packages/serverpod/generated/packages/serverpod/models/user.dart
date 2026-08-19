@@ -200,19 +200,19 @@ class _UserImpl extends User {
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : super._(
-          id: id,
-          email: email,
-          firstName: firstName,
-          lastName: lastName,
-          phoneNumber: phoneNumber,
-          deletedAt: deletedAt,
-          status: status,
-          tags: tags,
-          scores: scores,
-          metadata: metadata,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
-        );
+         id: id,
+         email: email,
+         firstName: firstName,
+         lastName: lastName,
+         phoneNumber: phoneNumber,
+         deletedAt: deletedAt,
+         status: status,
+         tags: tags,
+         scores: scores,
+         metadata: metadata,
+         createdAt: createdAt,
+         updatedAt: updatedAt,
+       );
 
   /// Returns a shallow copy of this [User]
   /// with some or all fields replaced by the given arguments.
@@ -253,24 +253,24 @@ class UserUpdateTable extends _i1.UpdateTable<UserTable> {
   UserUpdateTable(super.table);
 
   _i1.ColumnValue<String, String> email(String value) => _i1.ColumnValue(
-        table.email,
-        value,
-      );
+    table.email,
+    value,
+  );
 
   _i1.ColumnValue<String, String> firstName(String value) => _i1.ColumnValue(
-        table.firstName,
-        value,
-      );
+    table.firstName,
+    value,
+  );
 
   _i1.ColumnValue<String, String> lastName(String? value) => _i1.ColumnValue(
-        table.lastName,
-        value,
-      );
+    table.lastName,
+    value,
+  );
 
   _i1.ColumnValue<int, int> phoneNumber(int? value) => _i1.ColumnValue(
-        table.phoneNumber,
-        value,
-      );
+    table.phoneNumber,
+    value,
+  );
 
   _i1.ColumnValue<DateTime, DateTime> deletedAt(DateTime? value) =>
       _i1.ColumnValue(
@@ -279,24 +279,24 @@ class UserUpdateTable extends _i1.UpdateTable<UserTable> {
       );
 
   _i1.ColumnValue<String, String> status(String? value) => _i1.ColumnValue(
-        table.status,
-        value,
-      );
+    table.status,
+    value,
+  );
 
   _i1.ColumnValue<String, String> tags(String? value) => _i1.ColumnValue(
-        table.tags,
-        value,
-      );
+    table.tags,
+    value,
+  );
 
   _i1.ColumnValue<String, String> scores(String? value) => _i1.ColumnValue(
-        table.scores,
-        value,
-      );
+    table.scores,
+    value,
+  );
 
   _i1.ColumnValue<String, String> metadata(String? value) => _i1.ColumnValue(
-        table.metadata,
-        value,
-      );
+    table.metadata,
+    value,
+  );
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime? value) =>
       _i1.ColumnValue(
@@ -392,19 +392,19 @@ class UserTable extends _i1.Table<int?> {
 
   @override
   List<_i1.Column> get columns => [
-        id,
-        email,
-        firstName,
-        lastName,
-        phoneNumber,
-        deletedAt,
-        status,
-        tags,
-        scores,
-        metadata,
-        createdAt,
-        updatedAt,
-      ];
+    id,
+    email,
+    firstName,
+    lastName,
+    phoneNumber,
+    deletedAt,
+    status,
+    tags,
+    scores,
+    metadata,
+    createdAt,
+    updatedAt,
+  ];
 }
 
 class UserInclude extends _i1.IncludeObject {

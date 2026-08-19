@@ -211,12 +211,14 @@ void main() {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final tags = ['dart', 'flutter', 'sequelize'];
 
-      final created = await Users.model.create(CreateUsers(
-        email: 'json_tags_$timestamp@test.com',
-        firstName: 'JSON',
-        lastName: 'Tags',
-        tags: tags,
-      ));
+      final created = await Users.model.create(
+        CreateUsers(
+          email: 'json_tags_$timestamp@test.com',
+          firstName: 'JSON',
+          lastName: 'Tags',
+          tags: tags,
+        ),
+      );
 
       expect(created.tags, isNotNull);
       expect(created.tags, isA<List<String>>());
@@ -234,12 +236,14 @@ void main() {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final scores = [100, 200, 300];
 
-      final created = await Users.model.create(CreateUsers(
-        email: 'json_scores_$timestamp@test.com',
-        firstName: 'JSON',
-        lastName: 'Scores',
-        scores: scores,
-      ));
+      final created = await Users.model.create(
+        CreateUsers(
+          email: 'json_scores_$timestamp@test.com',
+          firstName: 'JSON',
+          lastName: 'Scores',
+          scores: scores,
+        ),
+      );
 
       expect(created.scores, isNotNull);
       expect(created.scores, isA<List<int>>());
@@ -257,12 +261,14 @@ void main() {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final metadata = {'role': 'admin', 'level': 5, 'active': true};
 
-      final created = await Users.model.create(CreateUsers(
-        email: 'json_meta_$timestamp@test.com',
-        firstName: 'JSON',
-        lastName: 'Meta',
-        metadata: metadata,
-      ));
+      final created = await Users.model.create(
+        CreateUsers(
+          email: 'json_meta_$timestamp@test.com',
+          firstName: 'JSON',
+          lastName: 'Meta',
+          metadata: metadata,
+        ),
+      );
 
       expect(created.metadata, isNotNull);
       expect(created.metadata, isA<Map<String, dynamic>>());
@@ -280,11 +286,13 @@ void main() {
     test('null JSON columns work', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      final created = await Users.model.create(CreateUsers(
-        email: 'json_null_$timestamp@test.com',
-        firstName: 'JSON',
-        lastName: 'Null',
-      ));
+      final created = await Users.model.create(
+        CreateUsers(
+          email: 'json_null_$timestamp@test.com',
+          firstName: 'JSON',
+          lastName: 'Null',
+        ),
+      );
 
       expect(created.tags, isNull);
       expect(created.scores, isNull);
@@ -294,14 +302,16 @@ void main() {
     test('empty JSON collections work', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      final created = await Users.model.create(CreateUsers(
-        email: 'json_empty_$timestamp@test.com',
-        firstName: 'JSON',
-        lastName: 'Empty',
-        tags: [],
-        scores: [],
-        metadata: {},
-      ));
+      final created = await Users.model.create(
+        CreateUsers(
+          email: 'json_empty_$timestamp@test.com',
+          firstName: 'JSON',
+          lastName: 'Empty',
+          tags: [],
+          scores: [],
+          metadata: {},
+        ),
+      );
 
       expect(created.tags, equals([]));
       expect(created.scores, equals([]));
@@ -311,14 +321,16 @@ void main() {
     test('toJson serializes JSON columns correctly', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      final created = await Users.model.create(CreateUsers(
-        email: 'json_tojson_$timestamp@test.com',
-        firstName: 'JSON',
-        lastName: 'ToJson',
-        tags: ['a', 'b'],
-        scores: [1, 2],
-        metadata: {'key': 'value'},
-      ));
+      final created = await Users.model.create(
+        CreateUsers(
+          email: 'json_tojson_$timestamp@test.com',
+          firstName: 'JSON',
+          lastName: 'ToJson',
+          tags: ['a', 'b'],
+          scores: [1, 2],
+          metadata: {'key': 'value'},
+        ),
+      );
 
       final json = created.toJson();
       expect(json['tags'], equals(['a', 'b']));
@@ -329,20 +341,24 @@ void main() {
     test('findAll returns correct JSON values', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      await Users.model.create(CreateUsers(
-        email: 'json_list_a_$timestamp@test.com',
-        firstName: 'ListA',
-        lastName: 'JSON',
-        tags: ['x'],
-        scores: [10],
-      ));
-      await Users.model.create(CreateUsers(
-        email: 'json_list_b_$timestamp@test.com',
-        firstName: 'ListB',
-        lastName: 'JSON',
-        tags: ['y', 'z'],
-        scores: [20, 30],
-      ));
+      await Users.model.create(
+        CreateUsers(
+          email: 'json_list_a_$timestamp@test.com',
+          firstName: 'ListA',
+          lastName: 'JSON',
+          tags: ['x'],
+          scores: [10],
+        ),
+      );
+      await Users.model.create(
+        CreateUsers(
+          email: 'json_list_b_$timestamp@test.com',
+          firstName: 'ListB',
+          lastName: 'JSON',
+          tags: ['y', 'z'],
+          scores: [20, 30],
+        ),
+      );
 
       final users = await Users.model.findAll(
         where: (u) => u.lastName.eq('JSON'),

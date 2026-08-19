@@ -216,8 +216,10 @@ Future<_FieldInfo?> _extractFromDataTypeField(
     }
   }
 
-  final dartType =
-      _getDartTypeForQuery(dataType, jsonDartTypeHint: jsonDartTypeHint);
+  final dartType = _getDartTypeForQuery(
+    dataType,
+    jsonDartTypeHint: jsonDartTypeHint,
+  );
 
   // Use columnName if provided, otherwise use fieldName (will be converted to snake_case)
   final name = columnName ?? fieldName;

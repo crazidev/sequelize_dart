@@ -154,14 +154,14 @@ class _PostDetailImpl extends PostDetail {
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : super._(
-          id: id,
-          likes: likes,
-          metadata: metadata,
-          postId: postId,
-          userId: userId,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
-        );
+         id: id,
+         likes: likes,
+         metadata: metadata,
+         postId: postId,
+         userId: userId,
+         createdAt: createdAt,
+         updatedAt: updatedAt,
+       );
 
   /// Returns a shallow copy of this [PostDetail]
   /// with some or all fields replaced by the given arguments.
@@ -192,24 +192,24 @@ class PostDetailUpdateTable extends _i1.UpdateTable<PostDetailTable> {
   PostDetailUpdateTable(super.table);
 
   _i1.ColumnValue<int, int> likes(int? value) => _i1.ColumnValue(
-        table.likes,
-        value,
-      );
+    table.likes,
+    value,
+  );
 
   _i1.ColumnValue<String, String> metadata(String? value) => _i1.ColumnValue(
-        table.metadata,
-        value,
-      );
+    table.metadata,
+    value,
+  );
 
   _i1.ColumnValue<int, int> postId(int? value) => _i1.ColumnValue(
-        table.postId,
-        value,
-      );
+    table.postId,
+    value,
+  );
 
   _i1.ColumnValue<int, int> userId(int? value) => _i1.ColumnValue(
-        table.userId,
-        value,
-      );
+    table.userId,
+    value,
+  );
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime? value) =>
       _i1.ColumnValue(
@@ -273,14 +273,14 @@ class PostDetailTable extends _i1.Table<int?> {
 
   @override
   List<_i1.Column> get columns => [
-        id,
-        likes,
-        metadata,
-        postId,
-        userId,
-        createdAt,
-        updatedAt,
-      ];
+    id,
+    likes,
+    metadata,
+    postId,
+    userId,
+    createdAt,
+    updatedAt,
+  ];
 }
 
 class PostDetailInclude extends _i1.IncludeObject {

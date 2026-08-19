@@ -56,7 +56,8 @@ void _generateNumericOperationMethod(
         dartType == 'int' || dartType == 'double' || dartType == 'num';
     final isNotPrimaryKey = !field.primaryKey;
     final isNotAutoIncrement = !field.autoIncrement;
-    final isNotForeignKey = !field.name.toLowerCase().contains('_id') &&
+    final isNotForeignKey =
+        !field.name.toLowerCase().contains('_id') &&
         !field.name.toLowerCase().endsWith('_id');
     return isNumeric &&
         isNotPrimaryKey &&

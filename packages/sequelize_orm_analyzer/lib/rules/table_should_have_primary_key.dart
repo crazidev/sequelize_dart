@@ -23,11 +23,11 @@ class TableShouldHavePrimaryKey extends AnalysisRule {
   );
 
   TableShouldHavePrimaryKey()
-      : super(
-          name: 'table_should_have_primary_key',
-          description:
-              'Ensures that any class with @Table annotation has at least one field annotated with @PrimaryKey.',
-        );
+    : super(
+        name: 'table_should_have_primary_key',
+        description:
+            'Ensures that any class with @Table annotation has at least one field annotated with @PrimaryKey.',
+      );
 
   @override
   LintCode get diagnosticCode => code;

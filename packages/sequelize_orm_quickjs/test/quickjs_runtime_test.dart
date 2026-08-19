@@ -21,8 +21,9 @@ void main() {
     });
 
     test('eval string and json manipulation', () {
-      final result =
-          runtime.eval('JSON.stringify({ hello: "world", count: 42 })');
+      final result = runtime.eval(
+        'JSON.stringify({ hello: "world", count: 42 })',
+      );
       expect(result, equals('{"hello":"world","count":42}'));
     });
 
@@ -36,8 +37,9 @@ void main() {
     });
 
     test('polyfilled crypto.createHash works for SHA-256 and MD5', () {
-      final sha256 = runtime
-          .eval('crypto.createHash("sha256").update("hello").digest("hex")');
+      final sha256 = runtime.eval(
+        'crypto.createHash("sha256").update("hello").digest("hex")',
+      );
       // sha256("hello") = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
       expect(
         sha256,
@@ -46,8 +48,9 @@ void main() {
         ),
       );
 
-      final md5 = runtime
-          .eval('crypto.createHash("md5").update("hello").digest("hex")');
+      final md5 = runtime.eval(
+        'crypto.createHash("md5").update("hello").digest("hex")',
+      );
       // md5("hello") = 5d41402abc4b2a76b9719d911017c592
       expect(md5, equals('5d41402abc4b2a76b9719d911017c592'));
     });
@@ -82,12 +85,14 @@ void main() {
       final result = runtime.eval('Buffer.from("abc").toString()');
       expect(result, contains('abc'));
 
-      final base64 =
-          runtime.eval('Buffer.from("hello world").toString("base64")');
+      final base64 = runtime.eval(
+        'Buffer.from("hello world").toString("base64")',
+      );
       expect(base64, equals('aGVsbG8gd29ybGQ='));
 
-      final fromBase64 = runtime
-          .eval('Buffer.from("aGVsbG8gd29ybGQ=", "base64").toString("utf8")');
+      final fromBase64 = runtime.eval(
+        'Buffer.from("aGVsbG8gd29ybGQ=", "base64").toString("utf8")',
+      );
       expect(fromBase64, equals('hello world'));
     });
 
@@ -100,8 +105,10 @@ void main() {
         };
       ''');
 
-      final result =
-          await runtime.callAsync('testAsyncAdd', {'a': 15, 'b': 27});
+      final result = await runtime.callAsync('testAsyncAdd', {
+        'a': 15,
+        'b': 27,
+      });
       expect(result, isA<Map>());
       expect(result['sum'], equals(42));
       expect(result['message'], equals('ok'));
@@ -116,17 +123,20 @@ void main() {
 
       expect(
         () => runtime.callAsync('testFailingAsync', {}),
-        throwsA(isA<Exception>().having(
-          (e) => e.toString(),
-          'error message',
-          contains('Intentional async test error'),
-        )),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'error message',
+            contains('Intentional async test error'),
+          ),
+        ),
       );
     });
 
-    test('native SQLite prepared statement caching and single-row query work',
-        () {
-      runtime.eval(r'''
+    test(
+      'native SQLite prepared statement caching and single-row query work',
+      () {
+        runtime.eval(r'''
         const dbId = _native_sqlite.open(":memory:");
         _native_sqlite.exec(dbId, "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, score REAL);");
         _native_sqlite.run(dbId, "INSERT INTO users (name, score) VALUES (?, ?);", ["Alice", 95.5]);
@@ -147,19 +157,21 @@ void main() {
         };
       ''');
 
-      final jsonResult =
-          runtime.eval('JSON.stringify(globalThis.sqliteTestResult)');
-      final data = jsonDecode(jsonResult) as Map<String, dynamic>;
+        final jsonResult = runtime.eval(
+          'JSON.stringify(globalThis.sqliteTestResult)',
+        );
+        final data = jsonDecode(jsonResult) as Map<String, dynamic>;
 
-      expect(data['row1']['name'], equals('Alice'));
-      expect(data['row1']['score'], equals(95.5));
+        expect(data['row1']['name'], equals('Alice'));
+        expect(data['row1']['score'], equals(95.5));
 
-      final allRows = (data['allRows'] as List).cast<Map<String, dynamic>>();
-      expect(allRows.length, equals(3));
-      expect(allRows[0]['name'], equals('Alice'));
-      expect(allRows[1]['name'], equals('Bob'));
-      expect(allRows[2]['name'], equals('Charlie'));
-    });
+        final allRows = (data['allRows'] as List).cast<Map<String, dynamic>>();
+        expect(allRows.length, equals(3));
+        expect(allRows[0]['name'], equals('Alice'));
+        expect(allRows[1]['name'], equals('Bob'));
+        expect(allRows[2]['name'], equals('Charlie'));
+      },
+    );
 
     test('GC and memory management methods execute safely', () {
       expect(() => runtime.setMemoryLimit(128 * 1024 * 1024), returnsNormally);
@@ -167,23 +179,32 @@ void main() {
       expect(() => runtime.gc(), returnsNormally);
     });
 
-    test('Multiple concurrent QuickJsRuntime instances maintain isolated state',
-        () async {
-      final runtime2 = await QuickJsRuntime.create();
-      try {
-        runtime.eval('globalThis.instanceName = "RUNTIME_ONE";');
-        runtime2.eval('globalThis.instanceName = "RUNTIME_TWO";');
+    test(
+      'Multiple concurrent QuickJsRuntime instances maintain isolated state',
+      () async {
+        final runtime2 = await QuickJsRuntime.create();
+        try {
+          runtime.eval('globalThis.instanceName = "RUNTIME_ONE";');
+          runtime2.eval('globalThis.instanceName = "RUNTIME_TWO";');
 
-        expect(runtime.eval('globalThis.instanceName'), equals('RUNTIME_ONE'));
-        expect(runtime2.eval('globalThis.instanceName'), equals('RUNTIME_TWO'));
-      } finally {
-        runtime2.dispose();
-      }
-    });
+          expect(
+            runtime.eval('globalThis.instanceName'),
+            equals('RUNTIME_ONE'),
+          );
+          expect(
+            runtime2.eval('globalThis.instanceName'),
+            equals('RUNTIME_TWO'),
+          );
+        } finally {
+          runtime2.dispose();
+        }
+      },
+    );
 
     test('load bridge_server_quickjs bundle without top-level error', () {
       final bundleFile = File(
-          '../sequelize_orm/lib/src/bridge/bridge_server_quickjs.bundle.js');
+        '../sequelize_orm/lib/src/bridge/bridge_server_quickjs.bundle.js',
+      );
       expect(bundleFile.existsSync(), isTrue);
       final bundleJs = bundleFile.readAsStringSync();
       final res = runtime.loadBundle(bundleJs);

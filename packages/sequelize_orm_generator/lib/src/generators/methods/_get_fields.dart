@@ -121,8 +121,9 @@ Future<List<_FieldInfo>> _getFields(
         final defaultValue = reader.peek('defaultValue')?.literalValue;
         final columnName = reader.peek('columnName')?.stringValue;
         final comment = reader.peek('comment')?.stringValue;
-        final autoIncrementIdentity =
-            reader.peek('autoIncrementIdentity')?.boolValue;
+        final autoIncrementIdentity = reader
+            .peek('autoIncrementIdentity')
+            ?.boolValue;
 
         // Extract unique
         Object? unique;
@@ -149,8 +150,10 @@ Future<List<_FieldInfo>> _getFields(
         // Extract validate option
         final validateCode = _extractValidateCode(reader.peek('validate'));
 
-        final dartType =
-            _getDartTypeForQuery(dataType, jsonDartTypeHint: jsonDartTypeHint);
+        final dartType = _getDartTypeForQuery(
+          dataType,
+          jsonDartTypeHint: jsonDartTypeHint,
+        );
 
         fields.add(
           _FieldInfo(
@@ -474,8 +477,10 @@ Future<_FieldInfo?> _extractFromAttributeField(
 
   // Default to nullable (allowNull = null) if no @NotNull decorator
 
-  final dartType =
-      _getDartTypeForQuery(dataType, jsonDartTypeHint: jsonDartTypeHint);
+  final dartType = _getDartTypeForQuery(
+    dataType,
+    jsonDartTypeHint: jsonDartTypeHint,
+  );
 
   // Use columnName if provided, otherwise use fieldName (will be converted to snake_case)
   final name = columnName ?? fieldName;

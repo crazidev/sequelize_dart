@@ -9,7 +9,8 @@ void _generateGetAttributesMethod(
   buffer.writeln('  List<ColumnDefinition> \$getAttributes() {');
   buffer.writeln('    return [');
   for (var field in fields) {
-    final hasExtraProperties = field.autoIncrement ||
+    final hasExtraProperties =
+        field.autoIncrement ||
         field.primaryKey ||
         field.allowNull != null ||
         field.defaultValue != null ||

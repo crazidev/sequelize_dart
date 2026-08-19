@@ -59,9 +59,10 @@ part 'generators/methods/_to_camel_case.dart';
 ///
 /// This is used to support non-const initializers without depending on
 /// `BuildStep.resolver.astNodeFor(...)` (e.g. in a standalone analyzer CLI).
-typedef InitializerSourceProvider = Future<String?> Function(
-  FieldElement field,
-);
+typedef InitializerSourceProvider =
+    Future<String?> Function(
+      FieldElement field,
+    );
 
 /// Shared implementation used by both build_runner and the standalone CLI.
 Future<String> _generateForClassElement(
@@ -110,9 +111,11 @@ Future<String> _generateForClassElement(
     tableAnnotation,
   );
 
-  final singularName = (tableAnnotation['name']?['singular'] as String?) ??
+  final singularName =
+      (tableAnnotation['name']?['singular'] as String?) ??
       _toCamelCase(className);
-  final pluralName = (tableAnnotation['name']?['plural'] as String?) ??
+  final pluralName =
+      (tableAnnotation['name']?['plural'] as String?) ??
       _toCamelCase(className);
 
   final baseCallbackName = namingConfig.getWhereCallbackName(

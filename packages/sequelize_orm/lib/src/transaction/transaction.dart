@@ -31,7 +31,8 @@ class Transaction {
   Future<void> commit() async {
     if (_finished) {
       throw StateError(
-          'Transaction has already been committed or rolled back.');
+        'Transaction has already been committed or rolled back.',
+      );
     }
     _finished = true;
     try {
@@ -46,12 +47,14 @@ class Transaction {
   Future<void> rollback() async {
     if (_finished) {
       throw StateError(
-          'Transaction has already been committed or rolled back.');
+        'Transaction has already been committed or rolled back.',
+      );
     }
     _finished = true;
     try {
-      await _bridge
-          .call('rollbackTransaction', {'transactionId': transactionId});
+      await _bridge.call('rollbackTransaction', {
+        'transactionId': transactionId,
+      });
     } catch (e) {
       // Even if it fails, we consider it finished/unusable
       rethrow;

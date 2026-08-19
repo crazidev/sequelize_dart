@@ -806,8 +806,9 @@ class QueryEngine extends QueryEngineInterface {
       return _toModelInstanceData(result);
     } catch (e) {
       if (e is SequelizeException) {
-        throw e
-            .copyWithContext('Exception: failed to execute associationGet()');
+        throw e.copyWithContext(
+          'Exception: failed to execute associationGet()',
+        );
       }
       throw SequelizeException(
         e.toString(),
@@ -843,8 +844,9 @@ class QueryEngine extends QueryEngineInterface {
       });
     } catch (e) {
       if (e is SequelizeException) {
-        throw e
-            .copyWithContext('Exception: failed to execute associationSet()');
+        throw e.copyWithContext(
+          'Exception: failed to execute associationSet()',
+        );
       }
       throw SequelizeException(
         e.toString(),
@@ -878,8 +880,9 @@ class QueryEngine extends QueryEngineInterface {
       });
     } catch (e) {
       if (e is SequelizeException) {
-        throw e
-            .copyWithContext('Exception: failed to execute associationAdd()');
+        throw e.copyWithContext(
+          'Exception: failed to execute associationAdd()',
+        );
       }
       throw SequelizeException(
         e.toString(),

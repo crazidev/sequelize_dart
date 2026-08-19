@@ -20,9 +20,7 @@ final sequelize = Sequelize().createInstance(
 Future<void> main() async {
   // Create and configure Sequelize instance
 
-  await sequelize.initialize(
-    models: Db.allModels(),
-  );
+  await sequelize.initialize(models: Db.allModels());
 
   // await sequelize.sync(alter: true);
 

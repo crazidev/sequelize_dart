@@ -96,13 +96,18 @@ class QuickJsRuntime {
   }
 
   void _handleBinaryBridgeCall(
-      int promiseId, Pointer<Uint8> bytes, int length) {
+    int promiseId,
+    Pointer<Uint8> bytes,
+    int length,
+  ) {
     try {
       final uint8List = bytes.asTypedList(length);
       final decoded = FastMsgPackDecoder.decode(uint8List);
       if (decoded is Map && decoded.containsKey('error')) {
         final err = decoded['error'];
-        _pendingPromises.remove(promiseId)?.completeError(
+        _pendingPromises
+            .remove(promiseId)
+            ?.completeError(
               Exception(err?.toString() ?? 'Unknown error'),
             );
       } else if (decoded is Map && decoded.containsKey('value')) {
@@ -230,21 +235,23 @@ class QuickJsRuntime {
     final useTls = args['tls'] as bool? ?? false;
 
     _DartSocketContext.connect(
-      socketId: socketId,
-      host: host,
-      port: port,
-      useTls: useTls,
-      onData: (data) => _onSocketData(socketId, data),
-      onClose: () => _onSocketClose(socketId),
-      onError: (e) => _onSocketError(socketId, e.toString()),
-    ).then((ctx) {
-      _sockets[socketId] = ctx;
-      _bindings.emitSocketEvent(_handle, socketId, 'connect');
-      _bindings.pumpAll(_handle);
-    }).catchError((e) {
-      _bindings.emitSocketError(_handle, socketId, e.toString());
-      _bindings.pumpAll(_handle);
-    });
+          socketId: socketId,
+          host: host,
+          port: port,
+          useTls: useTls,
+          onData: (data) => _onSocketData(socketId, data),
+          onClose: () => _onSocketClose(socketId),
+          onError: (e) => _onSocketError(socketId, e.toString()),
+        )
+        .then((ctx) {
+          _sockets[socketId] = ctx;
+          _bindings.emitSocketEvent(_handle, socketId, 'connect');
+          _bindings.pumpAll(_handle);
+        })
+        .catchError((e) {
+          _bindings.emitSocketError(_handle, socketId, e.toString());
+          _bindings.pumpAll(_handle);
+        });
   }
 
   // ────────────────────────────────────────────────────────────────────────

@@ -35,8 +35,9 @@ void main() {
     });
 
     test('fromBigInt constructor', () {
-      final bigInt =
-          SequelizeBigInt.fromBigInt(BigInt.parse('9223372036854775807'));
+      final bigInt = SequelizeBigInt.fromBigInt(
+        BigInt.parse('9223372036854775807'),
+      );
       expect(bigInt.value, equals('9223372036854775807'));
     });
 
@@ -103,44 +104,51 @@ void main() {
   });
 
   group('BIGINT column - database round-trip', () {
-    test('create with max int64 value and read back',
-        skip: isSqlite
-            ? 'SQLite stores large integers as IEEE doubles, losing precision'
-            : null, () async {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final maxInt64 = '9223372036854775807';
+    test(
+      'create with max int64 value and read back',
+      skip: isSqlite
+          ? 'SQLite stores large integers as IEEE doubles, losing precision'
+          : null,
+      () async {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final maxInt64 = '9223372036854775807';
 
-      final created = await Users.model.create(CreateUsers(
-        email: 'bigint_max_$timestamp@test.com',
-        firstName: 'BigInt',
-        lastName: 'Max',
-        phoneNumber: SequelizeBigInt(maxInt64),
-      ));
+        final created = await Users.model.create(
+          CreateUsers(
+            email: 'bigint_max_$timestamp@test.com',
+            firstName: 'BigInt',
+            lastName: 'Max',
+            phoneNumber: SequelizeBigInt(maxInt64),
+          ),
+        );
 
-      expect(created.phoneNumber, isNotNull);
-      expect(created.phoneNumber, isA<SequelizeBigInt>());
-      expect(created.phoneNumber?.value, equals(maxInt64));
+        expect(created.phoneNumber, isNotNull);
+        expect(created.phoneNumber, isA<SequelizeBigInt>());
+        expect(created.phoneNumber?.value, equals(maxInt64));
 
-      // Read back from database
-      final found = await Users.model.findOne(
-        where: (u) => u.id.eq(created.id),
-      );
+        // Read back from database
+        final found = await Users.model.findOne(
+          where: (u) => u.id.eq(created.id),
+        );
 
-      expect(found, isNotNull);
-      expect(found?.phoneNumber, isNotNull);
-      expect(found?.phoneNumber, isA<SequelizeBigInt>());
-      expect(found?.phoneNumber?.value, equals(maxInt64));
-    });
+        expect(found, isNotNull);
+        expect(found?.phoneNumber, isNotNull);
+        expect(found?.phoneNumber, isA<SequelizeBigInt>());
+        expect(found?.phoneNumber?.value, equals(maxInt64));
+      },
+    );
 
     test('create with small bigint value', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      final created = await Users.model.create(CreateUsers(
-        email: 'bigint_small_$timestamp@test.com',
-        firstName: 'BigInt',
-        lastName: 'Small',
-        phoneNumber: SequelizeBigInt.fromInt(42),
-      ));
+      final created = await Users.model.create(
+        CreateUsers(
+          email: 'bigint_small_$timestamp@test.com',
+          firstName: 'BigInt',
+          lastName: 'Small',
+          phoneNumber: SequelizeBigInt.fromInt(42),
+        ),
+      );
 
       expect(created.phoneNumber?.value, equals('42'));
       expect(created.phoneNumber?.toInt(), equals(42));
@@ -149,49 +157,60 @@ void main() {
     test('create with null bigint value', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      final created = await Users.model.create(CreateUsers(
-        email: 'bigint_null_$timestamp@test.com',
-        firstName: 'BigInt',
-        lastName: 'Null',
-      ));
+      final created = await Users.model.create(
+        CreateUsers(
+          email: 'bigint_null_$timestamp@test.com',
+          firstName: 'BigInt',
+          lastName: 'Null',
+        ),
+      );
 
       expect(created.phoneNumber, isNull);
     });
 
-    test('toJson serializes bigint as string',
-        skip: isSqlite
-            ? 'SQLite stores large integers as IEEE doubles, losing precision'
-            : null, () async {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
+    test(
+      'toJson serializes bigint as string',
+      skip: isSqlite
+          ? 'SQLite stores large integers as IEEE doubles, losing precision'
+          : null,
+      () async {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      final created = await Users.model.create(CreateUsers(
-        email: 'bigint_json_$timestamp@test.com',
-        firstName: 'BigInt',
-        lastName: 'Json',
-        phoneNumber: SequelizeBigInt('1234567890123456789'),
-      ));
+        final created = await Users.model.create(
+          CreateUsers(
+            email: 'bigint_json_$timestamp@test.com',
+            firstName: 'BigInt',
+            lastName: 'Json',
+            phoneNumber: SequelizeBigInt('1234567890123456789'),
+          ),
+        );
 
-      final json = created.toJson();
-      expect(json['phone_number'], isA<String>());
-      expect(json['phone_number'], equals('1234567890123456789'));
-    });
+        final json = created.toJson();
+        expect(json['phone_number'], isA<String>());
+        expect(json['phone_number'], equals('1234567890123456789'));
+      },
+    );
 
     test('findAll returns correct bigint values with row context', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
       // Create two users with distinct bigint values
-      await Users.model.create(CreateUsers(
-        email: 'bigint_list_a_$timestamp@test.com',
-        firstName: 'ListA',
-        lastName: 'BigInt',
-        phoneNumber: SequelizeBigInt('1111111111111111111'),
-      ));
-      await Users.model.create(CreateUsers(
-        email: 'bigint_list_b_$timestamp@test.com',
-        firstName: 'ListB',
-        lastName: 'BigInt',
-        phoneNumber: SequelizeBigInt('2222222222222222222'),
-      ));
+      await Users.model.create(
+        CreateUsers(
+          email: 'bigint_list_a_$timestamp@test.com',
+          firstName: 'ListA',
+          lastName: 'BigInt',
+          phoneNumber: SequelizeBigInt('1111111111111111111'),
+        ),
+      );
+      await Users.model.create(
+        CreateUsers(
+          email: 'bigint_list_b_$timestamp@test.com',
+          firstName: 'ListB',
+          lastName: 'BigInt',
+          phoneNumber: SequelizeBigInt('2222222222222222222'),
+        ),
+      );
 
       final users = await Users.model.findAll(
         where: (u) => u.lastName.eq('BigInt'),
@@ -206,22 +225,27 @@ void main() {
       }
     });
 
-    test('toBigInt enables arithmetic on large values',
-        skip: isSqlite
-            ? 'SQLite stores large integers as IEEE doubles, losing precision'
-            : null, () async {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final largeValue = '9000000000000000000';
+    test(
+      'toBigInt enables arithmetic on large values',
+      skip: isSqlite
+          ? 'SQLite stores large integers as IEEE doubles, losing precision'
+          : null,
+      () async {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final largeValue = '9000000000000000000';
 
-      final created = await Users.model.create(CreateUsers(
-        email: 'bigint_arith_$timestamp@test.com',
-        firstName: 'BigInt',
-        lastName: 'Arithmetic',
-        phoneNumber: SequelizeBigInt(largeValue),
-      ));
+        final created = await Users.model.create(
+          CreateUsers(
+            email: 'bigint_arith_$timestamp@test.com',
+            firstName: 'BigInt',
+            lastName: 'Arithmetic',
+            phoneNumber: SequelizeBigInt(largeValue),
+          ),
+        );
 
-      final result = created.phoneNumber!.toBigInt() + BigInt.one;
-      expect(result, equals(BigInt.parse('9000000000000000001')));
-    });
+        final result = created.phoneNumber!.toBigInt() + BigInt.one;
+        expect(result, equals(BigInt.parse('9000000000000000001')));
+      },
+    );
   });
 }

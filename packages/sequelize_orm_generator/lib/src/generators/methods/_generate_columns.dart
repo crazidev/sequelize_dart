@@ -27,7 +27,8 @@ void _generateColumns(
     final isEnum = baseType == 'ENUM';
 
     if (isJson) {
-      final jsonTypeParam = (field.jsonDartTypeHint != null &&
+      final jsonTypeParam =
+          (field.jsonDartTypeHint != null &&
               field.jsonDartTypeHint!.startsWith('List<'))
           ? field.jsonDartTypeHint!
           : 'dynamic';
@@ -43,8 +44,10 @@ void _generateColumns(
         '  $enumClassName get ${field.fieldName} => _${field.fieldName};',
       );
     } else {
-      final dartType = _getDartTypeForQuery(field.dataType,
-          jsonDartTypeHint: field.jsonDartTypeHint);
+      final dartType = _getDartTypeForQuery(
+        field.dataType,
+        jsonDartTypeHint: field.jsonDartTypeHint,
+      );
       buffer.writeln(
         "  final ${field.fieldName} = const Column<$dartType>('${field.name}', $typeExpression);",
       );
@@ -78,11 +81,13 @@ void _generateColumns(
       // Standard operators
       buffer.writeln('  /// Equals operator');
       buffer.writeln(
-          '  $conditionClassName get eq => $conditionClassName(_column);');
+        '  $conditionClassName get eq => $conditionClassName(_column);',
+      );
       buffer.writeln();
       buffer.writeln('  /// Not equals operator');
       buffer.writeln(
-          '  $conditionClassName get not => $conditionClassName(_column, true);');
+        '  $conditionClassName get not => $conditionClassName(_column, true);',
+      );
       buffer.writeln();
 
       // Null checks as functions
@@ -96,20 +101,28 @@ void _generateColumns(
       if (hasPrefix || hasOpposite) {
         for (var enumValue in field.enumValues!) {
           if (hasPrefix) {
-            final accessorName =
-                _sanitizeEnumAccessor(enumValue, field.enumPrefix!);
+            final accessorName = _sanitizeEnumAccessor(
+              enumValue,
+              field.enumPrefix!,
+            );
             buffer.writeln(
-                '  /// Shortcut for eq.${_sanitizeIdentifier(_toCamelCase(enumValue))}');
+              '  /// Shortcut for eq.${_sanitizeIdentifier(_toCamelCase(enumValue))}',
+            );
             buffer.writeln(
-                '  QueryOperator get $accessorName => eq.${_sanitizeIdentifier(_toCamelCase(enumValue))};');
+              '  QueryOperator get $accessorName => eq.${_sanitizeIdentifier(_toCamelCase(enumValue))};',
+            );
           }
           if (hasOpposite) {
-            final accessorName =
-                _sanitizeEnumAccessor(enumValue, field.enumOpposite!);
+            final accessorName = _sanitizeEnumAccessor(
+              enumValue,
+              field.enumOpposite!,
+            );
             buffer.writeln(
-                '  /// Shortcut for not.${_sanitizeIdentifier(_toCamelCase(enumValue))}');
+              '  /// Shortcut for not.${_sanitizeIdentifier(_toCamelCase(enumValue))}',
+            );
             buffer.writeln(
-                '  QueryOperator get $accessorName => not.${_sanitizeIdentifier(_toCamelCase(enumValue))};');
+              '  QueryOperator get $accessorName => not.${_sanitizeIdentifier(_toCamelCase(enumValue))};',
+            );
           }
         }
       }
@@ -121,20 +134,25 @@ void _generateColumns(
       buffer.writeln('class $conditionClassName {');
       buffer.writeln('  final Column<String> _column;');
       buffer.writeln('  final bool _not;');
-      buffer
-          .writeln('  $conditionClassName(this._column, [this._not = false]);');
+      buffer.writeln(
+        '  $conditionClassName(this._column, [this._not = false]);',
+      );
       buffer.writeln();
 
       buffer.writeln('  /// Type-safe comparison with enum values or null');
       buffer.writeln('  QueryOperator call(dynamic value) {');
       buffer.writeln(
-          '    if (value == null) return _not ? _column.isNotNull() : _column.isNull();');
+        '    if (value == null) return _not ? _column.isNotNull() : _column.isNull();',
+      );
       buffer.writeln(
-          '    if (value is $dartEnumName) return _not ? _column.ne(value.value) : _column.eq(value.value);');
+        '    if (value is $dartEnumName) return _not ? _column.ne(value.value) : _column.eq(value.value);',
+      );
       buffer.writeln(
-          '    if (value is String) return _not ? _column.ne(value) : _column.eq(value);');
+        '    if (value is String) return _not ? _column.ne(value) : _column.eq(value);',
+      );
       buffer.writeln(
-          '    throw ArgumentError(\'Expected $dartEnumName, String or null\');');
+        '    throw ArgumentError(\'Expected $dartEnumName, String or null\');',
+      );
       buffer.writeln('  }');
       buffer.writeln();
 
@@ -143,7 +161,8 @@ void _generateColumns(
         final accessorName = _sanitizeIdentifier(_toCamelCase(enumValue));
         buffer.writeln('  /// Property access for $accessorName');
         buffer.writeln(
-            '  QueryOperator get $accessorName => _not ? _column.ne(\'$enumValue\') : _column.eq(\'$enumValue\');');
+          '  QueryOperator get $accessorName => _not ? _column.ne(\'$enumValue\') : _column.eq(\'$enumValue\');',
+        );
       }
 
       buffer.writeln('}');

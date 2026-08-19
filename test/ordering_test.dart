@@ -96,14 +96,14 @@ void main() {
                   hoistIncludeOptions: true,
                 )
               : isMysqlFamily
-                  ? MysqlConnection(
-                      url: mysqlUrl,
-                      hoistIncludeOptions: true,
-                    )
-                  : PostgresConnection(
-                      url: postgresUrl,
-                      hoistIncludeOptions: true,
-                    ),
+              ? MysqlConnection(
+                  url: mysqlUrl,
+                  hoistIncludeOptions: true,
+                )
+              : PostgresConnection(
+                  url: postgresUrl,
+                  hoistIncludeOptions: true,
+                ),
           logging: (String sql) {
             capturedSql.add(sql);
           },

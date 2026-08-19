@@ -16,14 +16,16 @@ void _extractListValidator(
   if (valuesReader == null || valuesReader.isNull) return;
 
   final values = valuesReader.listValue;
-  final valueStrings = values.map((v) {
-    final reader = ConstantReader(v);
-    if (reader.isString) return "'${reader.stringValue}'";
-    if (reader.isInt) return '${reader.intValue}';
-    if (reader.isDouble) return '${reader.doubleValue}';
-    if (reader.isBool) return '${reader.boolValue}';
-    return 'null';
-  }).join(', ');
+  final valueStrings = values
+      .map((v) {
+        final reader = ConstantReader(v);
+        if (reader.isString) return "'${reader.stringValue}'";
+        if (reader.isInt) return '${reader.intValue}';
+        if (reader.isDouble) return '${reader.doubleValue}';
+        if (reader.isBool) return '${reader.boolValue}';
+        return 'null';
+      })
+      .join(', ');
 
   final msg = msgReader?.isNull == false ? msgReader?.stringValue : null;
 

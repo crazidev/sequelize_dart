@@ -89,8 +89,9 @@ class SqlCast extends SqlExpression {
   Map<String, dynamic> toJson() {
     return {
       '__type': 'cast',
-      'expression':
-          expression is SqlExpression ? expression.toJson() : expression,
+      'expression': expression is SqlExpression
+          ? expression.toJson()
+          : expression,
       'type': type,
     };
   }

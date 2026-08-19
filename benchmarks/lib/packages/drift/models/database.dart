@@ -10,19 +10,19 @@ class Users extends Table {
   TextColumn get firstName => text().named('first_name')();
   TextColumn get lastName => text().named('last_name').nullable()();
   Int64Column get phoneNumber => int64().named('phone_number').nullable()();
-  Column<PgDateTime> get deletedAt => customType(PgTypes.timestampWithTimezone)
-      .named('deleted_at')
-      .nullable()();
+  Column<PgDateTime> get deletedAt => customType(
+    PgTypes.timestampWithTimezone,
+  ).named('deleted_at').nullable()();
   TextColumn get status => text().nullable()();
   TextColumn get tags => text().nullable()();
   TextColumn get scores => text().nullable()();
   TextColumn get metadata => text().nullable()();
-  Column<PgDateTime> get createdAt => customType(PgTypes.timestampWithTimezone)
-      .named('created_at')
-      .nullable()();
-  Column<PgDateTime> get updatedAt => customType(PgTypes.timestampWithTimezone)
-      .named('updated_at')
-      .nullable()();
+  Column<PgDateTime> get createdAt => customType(
+    PgTypes.timestampWithTimezone,
+  ).named('created_at').nullable()();
+  Column<PgDateTime> get updatedAt => customType(
+    PgTypes.timestampWithTimezone,
+  ).named('updated_at').nullable()();
 }
 
 @DataClassName('DriftPost')
@@ -45,12 +45,12 @@ class PostDetails extends Table {
   TextColumn get metadata => text().nullable()();
   IntColumn get postId => integer().named('post_id').nullable()();
   IntColumn get userId => integer().named('user_id').nullable()();
-  Column<PgDateTime> get createdAt => customType(PgTypes.timestampWithTimezone)
-      .named('created_at')
-      .nullable()();
-  Column<PgDateTime> get updatedAt => customType(PgTypes.timestampWithTimezone)
-      .named('updated_at')
-      .nullable()();
+  Column<PgDateTime> get createdAt => customType(
+    PgTypes.timestampWithTimezone,
+  ).named('created_at').nullable()();
+  Column<PgDateTime> get updatedAt => customType(
+    PgTypes.timestampWithTimezone,
+  ).named('updated_at').nullable()();
 }
 
 @DriftDatabase(tables: [Users, Posts, PostDetails])

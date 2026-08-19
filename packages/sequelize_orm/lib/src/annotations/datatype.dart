@@ -101,24 +101,24 @@ class IntegerDataType extends DataType {
 
   /// Support for DataType.INTEGER(10)
   IntegerDataType call([int? length]) => IntegerDataType._(
-        name,
-        length: length,
-        unsigned: unsigned,
-        zerofill: zerofill,
-      );
+    name,
+    length: length,
+    unsigned: unsigned,
+    zerofill: zerofill,
+  );
 
   IntegerDataType get UNSIGNED => IntegerDataType._(
-        name,
-        length: length,
-        unsigned: true,
-        zerofill: zerofill,
-      );
+    name,
+    length: length,
+    unsigned: true,
+    zerofill: zerofill,
+  );
   IntegerDataType get ZEROFILL => IntegerDataType._(
-        name,
-        length: length,
-        unsigned: unsigned,
-        zerofill: true,
-      );
+    name,
+    length: length,
+    unsigned: unsigned,
+    zerofill: true,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -141,11 +141,11 @@ class IntegerDataType extends DataType {
 
   @override
   Map<String, dynamic> toJson() => {
-        'type': typeName,
-        if (length != null) 'length': length,
-        if (unsigned) 'unsigned': true,
-        if (zerofill) 'zerofill': true,
-      };
+    'type': typeName,
+    if (length != null) 'length': length,
+    if (unsigned) 'unsigned': true,
+    if (zerofill) 'zerofill': true,
+  };
 }
 
 /// Decimals (DECIMAL, FLOAT, DOUBLE)
@@ -175,27 +175,27 @@ class DecimalDataType extends DataType {
   /// Support for DataType.DECIMAL(10, 2)
   @protected
   DecimalDataType call([int? precision, int? scale]) => DecimalDataType._(
-        name,
-        length: precision ?? length,
-        scale: scale ?? this.scale,
-        unsigned: unsigned,
-        zerofill: zerofill,
-      );
+    name,
+    length: precision ?? length,
+    scale: scale ?? this.scale,
+    unsigned: unsigned,
+    zerofill: zerofill,
+  );
 
   DecimalDataType get UNSIGNED => DecimalDataType._(
-        name,
-        length: length,
-        scale: scale,
-        unsigned: true,
-        zerofill: zerofill,
-      );
+    name,
+    length: length,
+    scale: scale,
+    unsigned: true,
+    zerofill: zerofill,
+  );
   DecimalDataType get ZEROFILL => DecimalDataType._(
-        name,
-        length: length,
-        scale: scale,
-        unsigned: unsigned,
-        zerofill: true,
-      );
+    name,
+    length: length,
+    scale: scale,
+    unsigned: unsigned,
+    zerofill: true,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -211,8 +211,9 @@ class DecimalDataType extends DataType {
 
   @override
   String toString() {
-    String out =
-        (length != null && scale != null) ? '$name($length, $scale)' : name;
+    String out = (length != null && scale != null)
+        ? '$name($length, $scale)'
+        : name;
     if (unsigned) out += ' UNSIGNED';
     if (zerofill) out += ' ZEROFILL';
     return out;
@@ -220,12 +221,12 @@ class DecimalDataType extends DataType {
 
   @override
   Map<String, dynamic> toJson() => {
-        'type': typeName,
-        if (length != null) 'length': length,
-        if (scale != null) 'scale': scale,
-        if (unsigned) 'unsigned': true,
-        if (zerofill) 'zerofill': true,
-      };
+    'type': typeName,
+    if (length != null) 'length': length,
+    if (scale != null) 'scale': scale,
+    if (unsigned) 'unsigned': true,
+    if (zerofill) 'zerofill': true,
+  };
 }
 
 /// Strings (STRING, CHAR)
@@ -271,10 +272,10 @@ class StringDataType extends DataType {
 
   @override
   Map<String, dynamic> toJson() => {
-        'type': typeName,
-        if (length != null) 'length': length,
-        if (binary) 'binary': true,
-      };
+    'type': typeName,
+    if (length != null) 'length': length,
+    if (binary) 'binary': true,
+  };
 }
 
 /// Text types
@@ -302,9 +303,9 @@ class TextDataType extends DataType {
 
   @override
   Map<String, dynamic> toJson() => {
-        'type': typeName,
-        if (variant != null) 'variant': variant,
-      };
+    'type': typeName,
+    if (variant != null) 'variant': variant,
+  };
 }
 
 /// Blob types
@@ -332,9 +333,9 @@ class BlobDataType extends DataType {
 
   @override
   Map<String, dynamic> toJson() => {
-        'type': typeName,
-        if (variant != null) 'variant': variant,
-      };
+    'type': typeName,
+    if (variant != null) 'variant': variant,
+  };
 }
 
 /// JSON / JSONB types with optional Dart type hint.
@@ -383,9 +384,9 @@ class JsonDataType extends DataType {
 
   @override
   Map<String, dynamic> toJson() => {
-        'type': typeName,
-        if (dartType != null) 'dartType': dartType,
-      };
+    'type': typeName,
+    if (dartType != null) 'dartType': dartType,
+  };
 
   /// Maps a Dart [Type] literal to its string representation.
   static String _typeToString(Type type) {
@@ -430,7 +431,7 @@ class EnumDataType extends DataType {
 
   @override
   Map<String, dynamic> toJson() => {
-        'type': typeName,
-        'values': values,
-      };
+    'type': typeName,
+    'values': values,
+  };
 }

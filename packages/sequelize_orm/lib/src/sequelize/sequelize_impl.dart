@@ -1,7 +1,6 @@
 // ignore_for_file: avoid_print
 
 import 'package:sequelize_orm/sequelize_orm.dart';
-import 'package:sequelize_orm/src/bridge/bridge_client.dart';
 import 'package:sequelize_orm/src/sequelize/sequelize_interface.dart';
 
 /// Unified Sequelize implementation for both Dart VM and dart2js.
@@ -130,15 +129,17 @@ class Sequelize extends SequelizeInterface {
       model.define(model.modelName, this);
       _models[model.modelName] = model;
 
-      _bridge.call('defineModel', {
-        'name': model.modelName,
-        'attributes': model.$getAttributesJson(),
-        'options': model.getOptionsJson(),
-      }).catchError((error) {
-        print(
-          '[Sequelize] Failed to define model "${model.modelName}": $error',
-        );
-      });
+      _bridge
+          .call('defineModel', {
+            'name': model.modelName,
+            'attributes': model.$getAttributesJson(),
+            'options': model.getOptionsJson(),
+          })
+          .catchError((error) {
+            print(
+              '[Sequelize] Failed to define model "${model.modelName}": $error',
+            );
+          });
     }
   }
 
@@ -154,13 +155,15 @@ class Sequelize extends SequelizeInterface {
       );
     }
 
-    _bridge.call('defineModel', {
-      'name': name,
-      'attributes': attributes,
-      'options': options,
-    }).catchError((error) {
-      print('[Sequelize] Failed to define model "$name": $error');
-    });
+    _bridge
+        .call('defineModel', {
+          'name': name,
+          'attributes': attributes,
+          'options': options,
+        })
+        .catchError((error) {
+          print('[Sequelize] Failed to define model "$name": $error');
+        });
   }
 
   /// Get a registered model by name
@@ -223,10 +226,9 @@ class Sequelize extends SequelizeInterface {
     bool? withoutForeignKeyChecks,
   }) async {
     final options = <String, dynamic>{
-      if (cascade != null) 'cascade': cascade,
-      if (restartIdentity != null) 'restartIdentity': restartIdentity,
-      if (withoutForeignKeyChecks != null)
-        'withoutForeignKeyChecks': withoutForeignKeyChecks,
+      'cascade': ?cascade,
+      'restartIdentity': ?restartIdentity,
+      'withoutForeignKeyChecks': ?withoutForeignKeyChecks,
     };
     await _bridge.call('sequelizeTruncate', {'options': options});
   }
@@ -240,8 +242,8 @@ class Sequelize extends SequelizeInterface {
     bool? individualHooks,
   }) async {
     final options = <String, dynamic>{
-      if (force != null) 'force': force,
-      if (individualHooks != null) 'individualHooks': individualHooks,
+      'force': ?force,
+      'individualHooks': ?individualHooks,
     };
     await _bridge.call('sequelizeDestroyAll', {'options': options});
   }

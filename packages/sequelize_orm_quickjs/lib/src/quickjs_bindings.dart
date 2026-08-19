@@ -26,118 +26,139 @@ typedef _FreeRuntimeC = Void Function(QjsDartRuntimePtr);
 typedef _FreeRuntime = void Function(QjsDartRuntimePtr);
 
 // DartBridgeCallback type: const char* (*)(const char* name, const char* args)
-typedef DartBridgeCallbackC = Pointer<Utf8> Function(
-  Pointer<Utf8> name,
-  Pointer<Utf8> argsJson,
-);
-typedef DartBridgeCallbackNative = Pointer<Utf8> Function(
-  Pointer<Utf8> name,
-  Pointer<Utf8> argsJson,
-);
+typedef DartBridgeCallbackC =
+    Pointer<Utf8> Function(
+      Pointer<Utf8> name,
+      Pointer<Utf8> argsJson,
+    );
+typedef DartBridgeCallbackNative =
+    Pointer<Utf8> Function(
+      Pointer<Utf8> name,
+      Pointer<Utf8> argsJson,
+    );
 
 // qjs_dart_set_callback(DartBridgeCallback)
-typedef _SetCallbackC = Void Function(
-  Pointer<NativeFunction<DartBridgeCallbackC>>,
-);
-typedef _SetCallback = void Function(
-  Pointer<NativeFunction<DartBridgeCallbackC>>,
-);
+typedef _SetCallbackC =
+    Void Function(
+      Pointer<NativeFunction<DartBridgeCallbackC>>,
+    );
+typedef _SetCallback =
+    void Function(
+      Pointer<NativeFunction<DartBridgeCallbackC>>,
+    );
 
 // qjs_dart_set_runtime_callback(QjsDartRuntime*, DartBridgeCallback)
-typedef _SetRuntimeCallbackC = Void Function(
-  QjsDartRuntimePtr handle,
-  Pointer<NativeFunction<DartBridgeCallbackC>>,
-);
-typedef _SetRuntimeCallback = void Function(
-  QjsDartRuntimePtr handle,
-  Pointer<NativeFunction<DartBridgeCallbackC>>,
-);
+typedef _SetRuntimeCallbackC =
+    Void Function(
+      QjsDartRuntimePtr handle,
+      Pointer<NativeFunction<DartBridgeCallbackC>>,
+    );
+typedef _SetRuntimeCallback =
+    void Function(
+      QjsDartRuntimePtr handle,
+      Pointer<NativeFunction<DartBridgeCallbackC>>,
+    );
 
-typedef DartBridgeBinaryCallbackC = Void Function(
-  QjsDartRuntimePtr handle,
-  Int32 promiseId,
-  Pointer<Uint8> bytes,
-  Int32 length,
-);
+typedef DartBridgeBinaryCallbackC =
+    Void Function(
+      QjsDartRuntimePtr handle,
+      Int32 promiseId,
+      Pointer<Uint8> bytes,
+      Int32 length,
+    );
 
-typedef _SetRuntimeBinaryCallbackC = Void Function(
-  QjsDartRuntimePtr handle,
-  Pointer<NativeFunction<DartBridgeBinaryCallbackC>>,
-);
-typedef _SetRuntimeBinaryCallback = void Function(
-  QjsDartRuntimePtr handle,
-  Pointer<NativeFunction<DartBridgeBinaryCallbackC>>,
-);
+typedef _SetRuntimeBinaryCallbackC =
+    Void Function(
+      QjsDartRuntimePtr handle,
+      Pointer<NativeFunction<DartBridgeBinaryCallbackC>>,
+    );
+typedef _SetRuntimeBinaryCallback =
+    void Function(
+      QjsDartRuntimePtr handle,
+      Pointer<NativeFunction<DartBridgeBinaryCallbackC>>,
+    );
 
 // qjs_dart_eval(QjsDartRuntime*, const char* js) -> char*
-typedef _EvalC = Pointer<Utf8> Function(
-  QjsDartRuntimePtr handle,
-  Pointer<Utf8> jsCode,
-);
-typedef _Eval = Pointer<Utf8> Function(
-  QjsDartRuntimePtr handle,
-  Pointer<Utf8> jsCode,
-);
+typedef _EvalC =
+    Pointer<Utf8> Function(
+      QjsDartRuntimePtr handle,
+      Pointer<Utf8> jsCode,
+    );
+typedef _Eval =
+    Pointer<Utf8> Function(
+      QjsDartRuntimePtr handle,
+      Pointer<Utf8> jsCode,
+    );
 
 // qjs_dart_call_async(QjsDartRuntime*, int promise_id, const char* json_args) -> int
-typedef _CallAsyncC = Int32 Function(
-  QjsDartRuntimePtr handle,
-  Int32 promiseId,
-  Pointer<Utf8> jsonArgs,
-);
-typedef _CallAsync = int Function(
-  QjsDartRuntimePtr handle,
-  int promiseId,
-  Pointer<Utf8> jsonArgs,
-);
+typedef _CallAsyncC =
+    Int32 Function(
+      QjsDartRuntimePtr handle,
+      Int32 promiseId,
+      Pointer<Utf8> jsonArgs,
+    );
+typedef _CallAsync =
+    int Function(
+      QjsDartRuntimePtr handle,
+      int promiseId,
+      Pointer<Utf8> jsonArgs,
+    );
 
 // qjs_dart_trigger_timer(QjsDartRuntime*, int timer_id) -> int
-typedef _TriggerTimerC = Int32 Function(
-  QjsDartRuntimePtr handle,
-  Int32 timerId,
-);
-typedef _TriggerTimer = int Function(
-  QjsDartRuntimePtr handle,
-  int timerId,
-);
+typedef _TriggerTimerC =
+    Int32 Function(
+      QjsDartRuntimePtr handle,
+      Int32 timerId,
+    );
+typedef _TriggerTimer =
+    int Function(
+      QjsDartRuntimePtr handle,
+      int timerId,
+    );
 
 // qjs_dart_emit_socket_data(QjsDartRuntime*, int socket_id, const uint8_t* bytes, size_t len) -> int
-typedef _EmitSocketDataC = Int32 Function(
-  QjsDartRuntimePtr handle,
-  Int32 socketId,
-  Pointer<Uint8> bytes,
-  IntPtr len,
-);
-typedef _EmitSocketData = int Function(
-  QjsDartRuntimePtr handle,
-  int socketId,
-  Pointer<Uint8> bytes,
-  int len,
-);
+typedef _EmitSocketDataC =
+    Int32 Function(
+      QjsDartRuntimePtr handle,
+      Int32 socketId,
+      Pointer<Uint8> bytes,
+      IntPtr len,
+    );
+typedef _EmitSocketData =
+    int Function(
+      QjsDartRuntimePtr handle,
+      int socketId,
+      Pointer<Uint8> bytes,
+      int len,
+    );
 
 // qjs_dart_emit_socket_event(QjsDartRuntime*, int socket_id, const char* event_name) -> int
-typedef _EmitSocketEventC = Int32 Function(
-  QjsDartRuntimePtr handle,
-  Int32 socketId,
-  Pointer<Utf8> eventName,
-);
-typedef _EmitSocketEvent = int Function(
-  QjsDartRuntimePtr handle,
-  int socketId,
-  Pointer<Utf8> eventName,
-);
+typedef _EmitSocketEventC =
+    Int32 Function(
+      QjsDartRuntimePtr handle,
+      Int32 socketId,
+      Pointer<Utf8> eventName,
+    );
+typedef _EmitSocketEvent =
+    int Function(
+      QjsDartRuntimePtr handle,
+      int socketId,
+      Pointer<Utf8> eventName,
+    );
 
 // qjs_dart_emit_socket_error(QjsDartRuntime*, int socket_id, const char* error_msg) -> int
-typedef _EmitSocketErrorC = Int32 Function(
-  QjsDartRuntimePtr handle,
-  Int32 socketId,
-  Pointer<Utf8> errorMsg,
-);
-typedef _EmitSocketError = int Function(
-  QjsDartRuntimePtr handle,
-  int socketId,
-  Pointer<Utf8> errorMsg,
-);
+typedef _EmitSocketErrorC =
+    Int32 Function(
+      QjsDartRuntimePtr handle,
+      Int32 socketId,
+      Pointer<Utf8> errorMsg,
+    );
+typedef _EmitSocketError =
+    int Function(
+      QjsDartRuntimePtr handle,
+      int socketId,
+      Pointer<Utf8> errorMsg,
+    );
 
 // qjs_dart_pump(QjsDartRuntime*) -> int
 typedef _PumpC = Int32 Function(QjsDartRuntimePtr handle);
@@ -148,15 +169,15 @@ typedef _PumpAllC = Int32 Function(QjsDartRuntimePtr handle);
 typedef _PumpAll = int Function(QjsDartRuntimePtr handle);
 
 // qjs_dart_set_memory_limit(QjsDartRuntime*, size_t limit)
-typedef _SetMemoryLimitC = Void Function(
-    QjsDartRuntimePtr handle, IntPtr limit);
+typedef _SetMemoryLimitC =
+    Void Function(QjsDartRuntimePtr handle, IntPtr limit);
 typedef _SetMemoryLimit = void Function(QjsDartRuntimePtr handle, int limit);
 
 // qjs_dart_set_gc_threshold(QjsDartRuntime*, size_t threshold)
-typedef _SetGcThresholdC = Void Function(
-    QjsDartRuntimePtr handle, IntPtr threshold);
-typedef _SetGcThreshold = void Function(
-    QjsDartRuntimePtr handle, int threshold);
+typedef _SetGcThresholdC =
+    Void Function(QjsDartRuntimePtr handle, IntPtr threshold);
+typedef _SetGcThreshold =
+    void Function(QjsDartRuntimePtr handle, int threshold);
 
 // qjs_dart_run_gc(QjsDartRuntime*)
 typedef _RunGcC = Void Function(QjsDartRuntimePtr handle);
@@ -176,15 +197,16 @@ DynamicLibrary _loadLibrary() {
   final libName = Platform.isMacOS
       ? 'lib$assetName.dylib'
       : Platform.isWindows
-          ? '$assetName.dll'
-          : 'lib$assetName.so';
+      ? '$assetName.dll'
+      : 'lib$assetName.so';
 
   if (Platform.isIOS) {
     return DynamicLibrary.process();
   }
 
   // 1. Check environment variable override
-  final envLib = Platform.environment['QUICKJS_DART_LIB'] ??
+  final envLib =
+      Platform.environment['QUICKJS_DART_LIB'] ??
       Platform.environment['LIBQUICKJS_PATH'];
   if (envLib != null && envLib.isNotEmpty) {
     final envFile = File(envLib);
@@ -226,9 +248,11 @@ DynamicLibrary _loadLibrary() {
       candidatePaths.add('${scriptDir.path}/../../native/quickjs/$libName');
       candidatePaths.add('${scriptDir.path}/../../../native/quickjs/$libName');
       candidatePaths.add(
-          '${scriptDir.path}/../../packages/sequelize_orm_quickjs/native/quickjs/$libName');
+        '${scriptDir.path}/../../packages/sequelize_orm_quickjs/native/quickjs/$libName',
+      );
       candidatePaths.add(
-          '${scriptDir.path}/../../../packages/sequelize_orm_quickjs/native/quickjs/$libName');
+        '${scriptDir.path}/../../../packages/sequelize_orm_quickjs/native/quickjs/$libName',
+      );
     }
   } catch (_) {}
 
@@ -304,11 +328,13 @@ class QuickJsBindings {
         .asFunction();
     _setRuntimeCallback = _lib
         .lookup<NativeFunction<_SetRuntimeCallbackC>>(
-            'qjs_dart_set_runtime_callback')
+          'qjs_dart_set_runtime_callback',
+        )
         .asFunction();
     _setRuntimeBinaryCallback = _lib
         .lookup<NativeFunction<_SetRuntimeBinaryCallbackC>>(
-            'qjs_dart_set_runtime_binary_callback')
+          'qjs_dart_set_runtime_binary_callback',
+        )
         .asFunction();
     _eval = _lib.lookup<NativeFunction<_EvalC>>('qjs_dart_eval').asFunction();
     _callAsync = _lib
@@ -336,8 +362,9 @@ class QuickJsBindings {
     _setGcThreshold = _lib
         .lookup<NativeFunction<_SetGcThresholdC>>('qjs_dart_set_gc_threshold')
         .asFunction();
-    _runGc =
-        _lib.lookup<NativeFunction<_RunGcC>>('qjs_dart_run_gc').asFunction();
+    _runGc = _lib
+        .lookup<NativeFunction<_RunGcC>>('qjs_dart_run_gc')
+        .asFunction();
     _freeString = _lib
         .lookup<NativeFunction<_FreeStringC>>('qjs_dart_free_string')
         .asFunction();
@@ -421,7 +448,10 @@ class QuickJsBindings {
 
   /// Directly emit a socket event (e.g. 'connect', 'close').
   int emitSocketEvent(
-      QjsDartRuntimePtr handle, int socketId, String eventName) {
+    QjsDartRuntimePtr handle,
+    int socketId,
+    String eventName,
+  ) {
     final namePtr = eventName.toNativeUtf8();
     final res = _emitSocketEvent(handle, socketId, namePtr);
     calloc.free(namePtr);

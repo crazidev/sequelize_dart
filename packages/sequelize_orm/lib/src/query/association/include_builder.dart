@@ -96,13 +96,13 @@ class IncludeBuilder<T> {
     this.subQuery,
     this.paranoid,
   }) : assert(
-          (all == true && association == null && model == null) ||
-              ((all == null || all == false) &&
-                  association != null &&
-                  model != null),
-          'When all is true, association and model must be null. '
-          'When all is not true, association and model are required.',
-        );
+         (all == true && association == null && model == null) ||
+             ((all == null || all == false) &&
+                 association != null &&
+                 model != null),
+         'When all is true, association and model must be null. '
+         'When all is not true, association and model are required.',
+       );
 
   /// Create a copy of this [IncludeBuilder] with the given fields replaced.
   IncludeBuilder<T> copyWith({
@@ -296,8 +296,9 @@ class IncludeBuilder<T> {
           final functionResult = (include as dynamic)(includeHelper);
           if (functionResult is List) {
             // Convert the list to List<IncludeBuilder>
-            resolvedIncludes =
-                functionResult.map((item) => item as IncludeBuilder).toList();
+            resolvedIncludes = functionResult
+                .map((item) => item as IncludeBuilder)
+                .toList();
           } else {
             throw ArgumentError(
               'Include function must return a List<IncludeBuilder>.',

@@ -1,15 +1,16 @@
 import 'dart:io';
+
+import 'package:orm_benchmarks/packages/sequelize/connection.dart';
+import 'package:orm_benchmarks/packages/sequelize/models/post.model.dart';
+import 'package:orm_benchmarks/packages/sequelize/models/post_details.model.dart';
+import 'package:orm_benchmarks/packages/sequelize/models/users.model.dart';
 import 'package:postgres/postgres.dart';
 import 'package:sequelize_orm/sequelize_orm.dart';
-import 'connection.dart';
-import 'models/users.model.dart';
-import 'models/post.model.dart';
-import 'models/post_details.model.dart';
 
 /// Synchronizes the database schema and seeds identical data for all benchmarks
 Future<void> setupAndSeedDatabase({
-  int userCount = 50,
-  int postCount = 200,
+  int userCount = 500,
+  int postCount = 500,
 }) async {
   print('Setting up database tables using Sequelize ORM...');
   final sequelize = await initSequelize();
@@ -79,20 +80,18 @@ Future<void> _initServerpodMetadataTables() async {
 
   if (!migrationFile.existsSync()) {
     // Try relative to the script path
-    final scriptDir = File(Platform.script.toFilePath())
-        .parent
-        .parent
-        .parent
-        .parent
-        .parent
-        .path;
+    final scriptDir = File(
+      Platform.script.toFilePath(),
+    ).parent.parent.parent.parent.parent.path;
     migrationFile = File(
-        '$scriptDir/benchmarks/migrations/20260816191505752/migration.sql');
+      '$scriptDir/benchmarks/migrations/20260816191505752/migration.sql',
+    );
   }
 
   if (!migrationFile.existsSync()) {
     print(
-        'WARNING: Serverpod migration file not found! Serverpod benchmark might fail.');
+      'WARNING: Serverpod migration file not found! Serverpod benchmark might fail.',
+    );
     return;
   }
 
@@ -100,7 +99,9 @@ Future<void> _initServerpodMetadataTables() async {
   final statements = sql
       .replaceAll('CREATE TABLE "', 'CREATE TABLE IF NOT EXISTS "')
       .replaceAll(
-          'CREATE UNIQUE INDEX "', 'CREATE UNIQUE INDEX IF NOT EXISTS "')
+        'CREATE UNIQUE INDEX "',
+        'CREATE UNIQUE INDEX IF NOT EXISTS "',
+      )
       .replaceAll('CREATE INDEX "', 'CREATE INDEX IF NOT EXISTS "')
       .split(';')
       .map((s) => s.trim())
@@ -111,7 +112,6 @@ Future<void> _initServerpodMetadataTables() async {
     conn = await Connection.open(
       Endpoint(
         host: 'localhost',
-        port: 5432,
         database: 'postgres',
         username: 'postgres',
         password: 'postgres',

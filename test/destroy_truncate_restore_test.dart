@@ -35,8 +35,11 @@ void main() {
       );
 
       expect(user.id, isNotNull, reason: 'User should be created');
-      expect(user.deletedAt, isNull,
-          reason: 'deletedAt should be null initially');
+      expect(
+        user.deletedAt,
+        isNull,
+        reason: 'deletedAt should be null initially',
+      );
 
       clearCapturedSql();
 
@@ -167,74 +170,76 @@ void main() {
     });
   });
 
-  group('Model.truncate() - Static Method',
-      skip: isSqlite ? 'SQLite does not support TRUNCATE with CASCADE' : null,
-      () {
-    test('truncate removes all records from table', () async {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
+  group(
+    'Model.truncate() - Static Method',
+    skip: isSqlite ? 'SQLite does not support TRUNCATE with CASCADE' : null,
+    () {
+      test('truncate removes all records from table', () async {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      // Create some test users
-      await Users.model.create(
-        CreateUsers(
-          email: 'truncate1_$timestamp@example.com',
-          firstName: 'Truncate1',
-          lastName: 'Test',
-        ),
-      );
-      await Users.model.create(
-        CreateUsers(
-          email: 'truncate2_$timestamp@example.com',
-          firstName: 'Truncate2',
-          lastName: 'Test',
-        ),
-      );
+        // Create some test users
+        await Users.model.create(
+          CreateUsers(
+            email: 'truncate1_$timestamp@example.com',
+            firstName: 'Truncate1',
+            lastName: 'Test',
+          ),
+        );
+        await Users.model.create(
+          CreateUsers(
+            email: 'truncate2_$timestamp@example.com',
+            firstName: 'Truncate2',
+            lastName: 'Test',
+          ),
+        );
 
-      // Verify users exist
-      final countBefore = await Users.model.count();
-      expect(
-        countBefore,
-        greaterThanOrEqualTo(2),
-        reason: 'Should have at least 2 users before truncate',
-      );
+        // Verify users exist
+        final countBefore = await Users.model.count();
+        expect(
+          countBefore,
+          greaterThanOrEqualTo(2),
+          reason: 'Should have at least 2 users before truncate',
+        );
 
-      clearCapturedSql();
+        clearCapturedSql();
 
-      // Truncate the table
-      await Users.model.truncate(cascade: true);
+        // Truncate the table
+        await Users.model.truncate(cascade: true);
 
-      // On MySQL/MariaDB truncate runs in a transaction (SET FK checks, TRUNCATE, COMMIT), so lastSql may be COMMIT
-      expect(
-        capturedSql.any((s) => s.toLowerCase().contains('truncate')),
-        isTrue,
-        reason: 'truncate() should use TRUNCATE statement',
-      );
+        // On MySQL/MariaDB truncate runs in a transaction (SET FK checks, TRUNCATE, COMMIT), so lastSql may be COMMIT
+        expect(
+          capturedSql.any((s) => s.toLowerCase().contains('truncate')),
+          isTrue,
+          reason: 'truncate() should use TRUNCATE statement',
+        );
 
-      // Verify all records are removed
-      final countAfter = await Users.model.count();
-      expect(
-        countAfter,
-        equals(0),
-        reason: 'All records should be removed after truncate',
-      );
-    });
+        // Verify all records are removed
+        final countAfter = await Users.model.count();
+        expect(
+          countAfter,
+          equals(0),
+          reason: 'All records should be removed after truncate',
+        );
+      });
 
-    test('truncate with restartIdentity option', () async {
-      clearCapturedSql();
+      test('truncate with restartIdentity option', () async {
+        clearCapturedSql();
 
-      // Truncate with restartIdentity
-      await Users.model.truncate(
-        cascade: true,
-        restartIdentity: true,
-      );
+        // Truncate with restartIdentity
+        await Users.model.truncate(
+          cascade: true,
+          restartIdentity: true,
+        );
 
-      // On MySQL/MariaDB truncate runs in a transaction, so lastSql may be COMMIT
-      expect(
-        capturedSql.any((s) => s.toLowerCase().contains('truncate')),
-        isTrue,
-        reason: 'truncate() should use TRUNCATE statement',
-      );
-    });
-  });
+        // On MySQL/MariaDB truncate runs in a transaction, so lastSql may be COMMIT
+        expect(
+          capturedSql.any((s) => s.toLowerCase().contains('truncate')),
+          isTrue,
+          reason: 'truncate() should use TRUNCATE statement',
+        );
+      });
+    },
+  );
 
   group('Model.restore() - Static Method', () {
     test('restore soft-deleted record with where clause', () async {
@@ -438,41 +443,43 @@ void main() {
     });
   });
 
-  group('Sequelize.truncate() - Instance Method',
-      skip: isSqlite ? 'SQLite does not support TRUNCATE with CASCADE' : null,
-      () {
-    test('sequelize truncate all tables', () async {
-      // Create test data
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      await Users.model.create(
-        CreateUsers(
-          email: 'seq_truncate_$timestamp@example.com',
-          firstName: 'Seq',
-          lastName: 'Truncate',
-        ),
-      );
+  group(
+    'Sequelize.truncate() - Instance Method',
+    skip: isSqlite ? 'SQLite does not support TRUNCATE with CASCADE' : null,
+    () {
+      test('sequelize truncate all tables', () async {
+        // Create test data
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        await Users.model.create(
+          CreateUsers(
+            email: 'seq_truncate_$timestamp@example.com',
+            firstName: 'Seq',
+            lastName: 'Truncate',
+          ),
+        );
 
-      clearCapturedSql();
+        clearCapturedSql();
 
-      // Truncate all tables
-      await sequelize.truncate(cascade: true);
+        // Truncate all tables
+        await sequelize.truncate(cascade: true);
 
-      // On MySQL/MariaDB truncate runs in a transaction, so lastSql may be COMMIT
-      expect(
-        capturedSql.any((s) => s.toLowerCase().contains('truncate')),
-        isTrue,
-        reason: 'sequelize.truncate() should use TRUNCATE statement',
-      );
+        // On MySQL/MariaDB truncate runs in a transaction, so lastSql may be COMMIT
+        expect(
+          capturedSql.any((s) => s.toLowerCase().contains('truncate')),
+          isTrue,
+          reason: 'sequelize.truncate() should use TRUNCATE statement',
+        );
 
-      // Verify all records are removed
-      final userCount = await Users.model.count();
-      expect(
-        userCount,
-        equals(0),
-        reason: 'All users should be removed after sequelize.truncate()',
-      );
-    });
-  });
+        // Verify all records are removed
+        final userCount = await Users.model.count();
+        expect(
+          userCount,
+          equals(0),
+          reason: 'All users should be removed after sequelize.truncate()',
+        );
+      });
+    },
+  );
 
   group('Sequelize.destroyAll() - Instance Method', () {
     test('sequelize destroyAll removes all records', () async {
@@ -536,8 +543,7 @@ void main() {
       );
     });
 
-    test('findAll with paranoid: false includes soft-deleted records',
-        () async {
+    test('findAll with paranoid: false includes soft-deleted records', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
       // Create and soft delete a user
@@ -607,8 +613,7 @@ void main() {
       );
     });
 
-    test('findOne with paranoid: false includes soft-deleted records',
-        () async {
+    test('findOne with paranoid: false includes soft-deleted records', () async {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
       // Create and soft delete a user
@@ -712,18 +717,27 @@ void main() {
       final afterDelete = await Users.model.findOne(
         where: (u) => u.id.eq(user.id),
       );
-      expect(afterDelete, isNull,
-          reason: 'User should not be found after soft delete');
+      expect(
+        afterDelete,
+        isNull,
+        reason: 'User should not be found after soft delete',
+      );
 
       // 4. Verify exists with paranoid: false
       final withParanoid = await Users.model.findOne(
         where: (u) => u.id.eq(user.id),
         paranoid: false,
       );
-      expect(withParanoid, isNotNull,
-          reason: 'User should exist with paranoid: false');
-      expect(withParanoid?.deletedAt, isNotNull,
-          reason: 'deletedAt should be set');
+      expect(
+        withParanoid,
+        isNotNull,
+        reason: 'User should exist with paranoid: false',
+      );
+      expect(
+        withParanoid?.deletedAt,
+        isNotNull,
+        reason: 'deletedAt should be set',
+      );
 
       // 5. Restore
       await Users.model.restore(
@@ -734,26 +748,38 @@ void main() {
       final afterRestore = await Users.model.findOne(
         where: (u) => u.id.eq(user.id),
       );
-      expect(afterRestore, isNotNull,
-          reason: 'User should be found after restore');
-      expect(afterRestore?.deletedAt, isNull,
-          reason: 'deletedAt should be null after restore');
+      expect(
+        afterRestore,
+        isNotNull,
+        reason: 'User should be found after restore',
+      );
+      expect(
+        afterRestore?.deletedAt,
+        isNull,
+        reason: 'deletedAt should be null after restore',
+      );
 
       // 7. Hard delete
       final hardDeleteCount = await Users.model.destroy(
         where: (u) => u.id.eq(user.id),
         force: true,
       );
-      expect(hardDeleteCount, equals(1),
-          reason: 'Hard delete should affect 1 row');
+      expect(
+        hardDeleteCount,
+        equals(1),
+        reason: 'Hard delete should affect 1 row',
+      );
 
       // 8. Verify completely gone
       final afterHardDelete = await Users.model.findOne(
         where: (u) => u.id.eq(user.id),
         paranoid: false,
       );
-      expect(afterHardDelete, isNull,
-          reason: 'User should be completely gone after hard delete');
+      expect(
+        afterHardDelete,
+        isNull,
+        reason: 'User should be completely gone after hard delete',
+      );
     });
   });
 }

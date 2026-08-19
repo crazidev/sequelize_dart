@@ -131,12 +131,12 @@ class _PostImpl extends Post {
     int? userId,
     int? views,
   }) : super._(
-          id: id,
-          title: title,
-          content: content,
-          userId: userId,
-          views: views,
-        );
+         id: id,
+         title: title,
+         content: content,
+         userId: userId,
+         views: views,
+       );
 
   /// Returns a shallow copy of this [Post]
   /// with some or all fields replaced by the given arguments.
@@ -163,24 +163,24 @@ class PostUpdateTable extends _i1.UpdateTable<PostTable> {
   PostUpdateTable(super.table);
 
   _i1.ColumnValue<String, String> title(String? value) => _i1.ColumnValue(
-        table.title,
-        value,
-      );
+    table.title,
+    value,
+  );
 
   _i1.ColumnValue<String, String> content(String? value) => _i1.ColumnValue(
-        table.content,
-        value,
-      );
+    table.content,
+    value,
+  );
 
   _i1.ColumnValue<int, int> userId(int? value) => _i1.ColumnValue(
-        table.userId,
-        value,
-      );
+    table.userId,
+    value,
+  );
 
   _i1.ColumnValue<int, int> views(int? value) => _i1.ColumnValue(
-        table.views,
-        value,
-      );
+    table.views,
+    value,
+  );
 }
 
 class PostTable extends _i1.Table<int?> {
@@ -217,12 +217,12 @@ class PostTable extends _i1.Table<int?> {
 
   @override
   List<_i1.Column> get columns => [
-        id,
-        title,
-        content,
-        userId,
-        views,
-      ];
+    id,
+    title,
+    content,
+    userId,
+    views,
+  ];
 }
 
 class PostInclude extends _i1.IncludeObject {

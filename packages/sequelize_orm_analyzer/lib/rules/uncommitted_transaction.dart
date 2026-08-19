@@ -14,11 +14,11 @@ class UncommittedTransaction extends AnalysisRule {
   );
 
   UncommittedTransaction()
-      : super(
-          name: 'uncommitted_transaction',
-          description:
-              'Ensures that any variable of type Transaction is eventually committed or rolled back.',
-        );
+    : super(
+        name: 'uncommitted_transaction',
+        description:
+            'Ensures that any variable of type Transaction is eventually committed or rolled back.',
+      );
 
   @override
   LintCode get diagnosticCode => code;

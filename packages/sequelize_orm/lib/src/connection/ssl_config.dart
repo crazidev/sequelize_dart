@@ -119,20 +119,20 @@ class SslConfig {
   /// **Warning:** This disables certificate validation and should only
   /// be used in development/testing environments. Never use in production.
   const SslConfig.selfSigned()
-      : ca = null,
-        cert = null,
-        key = null,
-        passphrase = null,
-        pfx = null,
-        rejectUnauthorized = false,
-        ciphers = null,
-        honorCipherOrder = null,
-        minDHSize = null,
-        checkServerIdentity = null,
-        secureProtocol = null,
-        ecdhCurve = null,
-        crl = null,
-        dhparam = null;
+    : ca = null,
+      cert = null,
+      key = null,
+      passphrase = null,
+      pfx = null,
+      rejectUnauthorized = false,
+      ciphers = null,
+      honorCipherOrder = null,
+      minDHSize = null,
+      checkServerIdentity = null,
+      secureProtocol = null,
+      ecdhCurve = null,
+      crl = null,
+      dhparam = null;
 
   /// Converts this SSL configuration to a JSON-serializable map.
   Map<String, dynamic> toJson() {

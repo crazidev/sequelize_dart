@@ -1,13 +1,16 @@
 part of '../run.dart';
 
 /// Builds the native AOT benchmark binary using Dart's native assets build system
-Future<File> cmdBuildBenchmark(Directory root,
-    [List<String> args = const []]) async {
+Future<File> cmdBuildBenchmark(
+  Directory root, [
+  List<String> args = const [],
+]) async {
   cmdlog('Building native AOT benchmark executable with dart build cli...');
   final benchmarksDir = Directory('${root.path}/benchmarks');
   if (!benchmarksDir.existsSync()) {
     stderr.writeln(
-        'Error: benchmarks directory not found at ${benchmarksDir.path}');
+      'Error: benchmarks directory not found at ${benchmarksDir.path}',
+    );
     exit(1);
   }
 
@@ -21,14 +24,16 @@ Future<File> cmdBuildBenchmark(Directory root,
   final buildCode = await buildProcess.exitCode;
   if (buildCode != 0) {
     stderr.writeln(
-        'Failed to build native benchmark binary (exit code $buildCode)');
+      'Failed to build native benchmark binary (exit code $buildCode)',
+    );
     exit(buildCode);
   }
 
   final executable = _findNativeBenchmarkExecutable(benchmarksDir);
   if (executable == null || !executable.existsSync()) {
     stderr.writeln(
-        'Error: Could not locate compiled native benchmark binary in ${benchmarksDir.path}/build');
+      'Error: Could not locate compiled native benchmark binary in ${benchmarksDir.path}/build',
+    );
     exit(1);
   }
 
@@ -60,7 +65,8 @@ Future<void> cmdBenchmark(Directory root, List<String> args) async {
   final benchmarksDir = Directory('${root.path}/benchmarks');
   if (!benchmarksDir.existsSync()) {
     stderr.writeln(
-        'Error: benchmarks directory not found at ${benchmarksDir.path}');
+      'Error: benchmarks directory not found at ${benchmarksDir.path}',
+    );
     exit(1);
   }
 
@@ -79,7 +85,8 @@ Future<void> cmdBenchmark(Directory root, List<String> args) async {
     );
   } else {
     cmdlog(
-        'Running multi-ORM benchmark suite in benchmarks/... (pass --native for AOT mode)');
+      'Running multi-ORM benchmark suite in benchmarks/... (pass --native for AOT mode)',
+    );
     process = await Process.start(
       'dart',
       ['run', 'bin/benchmark.dart', ...passArgs],
@@ -87,46 +94,44 @@ Future<void> cmdBenchmark(Directory root, List<String> args) async {
     );
   }
 
-  process.stdout
-      .transform(utf8.decoder)
-      .transform(const LineSplitter())
-      .listen((line) {
-    // Filter Serverpod lifecycle banners and DB integrity check noise
-    final trimmed = line.trim();
-    if (trimmed.startsWith('SERVERPOD') ||
-        trimmed.startsWith('runMode:') ||
-        trimmed.startsWith('serverId:') ||
-        trimmed.startsWith('role:') ||
-        trimmed.startsWith('loggingMode:') ||
-        trimmed.startsWith('applyMigrations:') ||
-        trimmed.startsWith('applyRepairMigration:') ||
-        trimmed.contains('Insights server disabled') ||
-        trimmed.contains('WARNING: The database does not match') ||
-        trimmed.contains('Table "') ||
-        trimmed.contains('Column "') ||
-        trimmed.contains('expected type') ||
-        trimmed.contains('expected default') ||
-        trimmed.contains('expected isNullable') ||
-        trimmed.contains('Missing Foreign key') ||
-        trimmed.startsWith('Hint: Did you forget')) {
-      return;
-    }
+  process.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen(
+    (line) {
+      // Filter Serverpod lifecycle banners and DB integrity check noise
+      final trimmed = line.trim();
+      if (trimmed.startsWith('SERVERPOD') ||
+          trimmed.startsWith('runMode:') ||
+          trimmed.startsWith('serverId:') ||
+          trimmed.startsWith('role:') ||
+          trimmed.startsWith('loggingMode:') ||
+          trimmed.startsWith('applyMigrations:') ||
+          trimmed.startsWith('applyRepairMigration:') ||
+          trimmed.contains('Insights server disabled') ||
+          trimmed.contains('WARNING: The database does not match') ||
+          trimmed.contains('Table "') ||
+          trimmed.contains('Column "') ||
+          trimmed.contains('expected type') ||
+          trimmed.contains('expected default') ||
+          trimmed.contains('expected isNullable') ||
+          trimmed.contains('Missing Foreign key') ||
+          trimmed.startsWith('Hint: Did you forget')) {
+        return;
+      }
 
-    stdout.writeln(line);
-  });
+      stdout.writeln(line);
+    },
+  );
 
-  process.stderr
-      .transform(utf8.decoder)
-      .transform(const LineSplitter())
-      .listen((line) {
-    final trimmed = line.trim();
-    if (trimmed.contains('WARNING') ||
-        trimmed.startsWith('-') ||
-        trimmed.startsWith('Hint:')) {
-      return;
-    }
-    stderr.writeln(line);
-  });
+  process.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen(
+    (line) {
+      final trimmed = line.trim();
+      if (trimmed.contains('WARNING') ||
+          trimmed.startsWith('-') ||
+          trimmed.startsWith('Hint:')) {
+        return;
+      }
+      stderr.writeln(line);
+    },
+  );
 
   final code = await process.exitCode;
   if (code != 0) {

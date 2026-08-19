@@ -18,8 +18,9 @@ void _extractNotContainsValidator(
     valueCode = "'${valueReader.stringValue}'";
   } else if (valueReader.isList) {
     final values = valueReader.listValue;
-    final valueStrings =
-        values.map((v) => "'${ConstantReader(v).stringValue}'").join(', ');
+    final valueStrings = values
+        .map((v) => "'${ConstantReader(v).stringValue}'")
+        .join(', ');
     valueCode = '[$valueStrings]';
   } else {
     return;

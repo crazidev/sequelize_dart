@@ -1,6 +1,6 @@
 name: _
 environment:
-  sdk: ^3.6.0
+  sdk: ^3.8.0
 
 workspace:
   - packages/sequelize_orm

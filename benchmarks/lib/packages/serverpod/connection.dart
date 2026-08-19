@@ -11,7 +11,8 @@ class ServerpodConnection {
   Session get session {
     if (_session == null) {
       throw StateError(
-          'Serverpod session is not initialized. Call init() first.');
+        'Serverpod session is not initialized. Call init() first.',
+      );
     }
     return _session!;
   }

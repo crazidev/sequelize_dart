@@ -227,8 +227,9 @@ void _generateBelongsToInstanceMethods(
   required GeneratorNamingConfig namingConfig,
   required bool hasPrimaryKey,
 }) {
-  final belongsToAssocs =
-      associations.where((a) => a.associationType == 'belongsTo').toList();
+  final belongsToAssocs = associations
+      .where((a) => a.associationType == 'belongsTo')
+      .toList();
   if (belongsToAssocs.isEmpty) return;
 
   // These methods require a primary key to locate the instance in JS.
@@ -296,8 +297,9 @@ void _generateBelongsToInstanceMethods(
       '    if (targetOrKey is $targetValuesClassName) {',
     );
     // Best-effort: default to id or targetKey if configured.
-    final targetKeyExpr =
-        assoc.targetKey != null ? "'${assoc.targetKey}'" : "'id'";
+    final targetKeyExpr = assoc.targetKey != null
+        ? "'${assoc.targetKey}'"
+        : "'id'";
     buffer.writeln('      final json = targetOrKey.toJson();');
     buffer.writeln('      key = json[$targetKeyExpr] ?? json[\'id\'];');
     buffer.writeln('    }');
@@ -372,7 +374,8 @@ void _generateMixinMethods(
   // Override reload() to also set previousDataValues after reloading
   buffer.writeln('  @override');
   buffer.writeln(
-      '  Future<$valuesClassName?> reload({Transaction? transaction}) async {');
+    '  Future<$valuesClassName?> reload({Transaction? transaction}) async {',
+  );
   buffer.writeln('    final pk = getPrimaryKeyMap();');
   buffer.writeln('    if (pk == null || pk.isEmpty) {');
   buffer.writeln(

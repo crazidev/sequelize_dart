@@ -100,7 +100,8 @@ Future<void> main(List<String> args) async {
       } else {
         _info('\nSkipping GitHub releases: gh CLI is not installed.');
         _info(
-            '  Install it from https://cli.github.com/ then re-run with --github-release');
+          '  Install it from https://cli.github.com/ then re-run with --github-release',
+        );
       }
     }
 
@@ -188,8 +189,11 @@ Future<void> _ensureCleanTree() async {
 }
 
 Future<void> _mergeDevToMain() async {
-  final branch =
-      (await _capture('git', ['rev-parse', '--abbrev-ref', 'HEAD'])).trim();
+  final branch = (await _capture('git', [
+    'rev-parse',
+    '--abbrev-ref',
+    'HEAD',
+  ])).trim();
 
   _info('Current branch: $branch');
 
@@ -234,8 +238,13 @@ Future<void> _createTag(_Package pkg) async {
     return;
   }
 
-  await _run(
-      'git', ['tag', '-a', tag, '-m', 'Release ${pkg.name} ${pkg.version}']);
+  await _run('git', [
+    'tag',
+    '-a',
+    tag,
+    '-m',
+    'Release ${pkg.name} ${pkg.version}',
+  ]);
   await _run('git', ['push', 'origin', tag]);
 }
 
@@ -251,7 +260,8 @@ Future<bool> _isAlreadyPublished(_Package pkg) async {
     try {
       final request = await client.getUrl(
         Uri.parse(
-            'https://pub.dev/api/packages/${pkg.name}/versions/${pkg.version}'),
+          'https://pub.dev/api/packages/${pkg.name}/versions/${pkg.version}',
+        ),
       );
       final response = await request.close();
       await response.drain<void>();

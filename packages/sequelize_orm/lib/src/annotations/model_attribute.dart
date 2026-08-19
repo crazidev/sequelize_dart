@@ -540,37 +540,37 @@ class Validate extends Validator {
   const Validate.IsDate([String? msg]) : this._(msg: msg);
 
   const Validate.Is(String pattern, [String? msg])
-      : this._(pattern: pattern, msg: msg);
+    : this._(pattern: pattern, msg: msg);
   const Validate.IsWithFlags(String pattern, String flags, [String? msg])
-      : this._(pattern: pattern, flags: flags, msg: msg);
+    : this._(pattern: pattern, flags: flags, msg: msg);
 
   const Validate.Not(String pattern, [String? msg])
-      : this._(pattern: pattern, msg: msg);
+    : this._(pattern: pattern, msg: msg);
   const Validate.NotWithFlags(String pattern, String flags, [String? msg])
-      : this._(pattern: pattern, flags: flags, msg: msg);
+    : this._(pattern: pattern, flags: flags, msg: msg);
 
   const Validate.Equals(String value, [String? msg])
-      : this._(value: value, msg: msg);
+    : this._(value: value, msg: msg);
   const Validate.Contains(String value, [String? msg])
-      : this._(value: value, msg: msg);
+    : this._(value: value, msg: msg);
   const Validate.IsAfter(String date, [String? msg])
-      : this._(value: date, msg: msg);
+    : this._(value: date, msg: msg);
   const Validate.IsBefore(String date, [String? msg])
-      : this._(value: date, msg: msg);
+    : this._(value: date, msg: msg);
 
   const Validate.Max(num value, [String? msg]) : this._(value: value, msg: msg);
   const Validate.Min(num value, [String? msg]) : this._(value: value, msg: msg);
   const Validate.IsUUID(int version, [String? msg])
-      : this._(value: version, msg: msg);
+    : this._(value: version, msg: msg);
   const Validate.Len(int min, int max, [String? msg])
-      : this._(min: min, max: max, msg: msg);
+    : this._(min: min, max: max, msg: msg);
 
   const Validate.IsIn(List<dynamic> values, [String? msg])
-      : this._(value: values, msg: msg);
+    : this._(value: values, msg: msg);
   const Validate.NotIn(List<dynamic> values, [String? msg])
-      : this._(value: values, msg: msg);
+    : this._(value: values, msg: msg);
   const Validate.NotContains(Object value, [String? msg])
-      : this._(value: value, msg: msg);
+    : this._(value: value, msg: msg);
 
   @override
   Object toJson() {
@@ -772,13 +772,13 @@ class ColumnDefinition {
     bool? notNull,
     this.primaryKey,
     this.autoIncrement,
-  })  : allowNull = notNull == true ? false : null,
-        columnName = null,
-        unique = null,
-        index = null,
-        autoIncrementIdentity = null,
-        comment = null,
-        validate = null;
+  }) : allowNull = notNull == true ? false : null,
+       columnName = null,
+       unique = null,
+       index = null,
+       autoIncrementIdentity = null,
+       comment = null,
+       validate = null;
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{

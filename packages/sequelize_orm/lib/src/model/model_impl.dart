@@ -144,12 +144,13 @@ abstract class Model<T> extends ModelInterface {
       paranoid: paranoid,
     );
     return QueryEngine().findAll(
-      modelName: modelName,
-      query: query,
-      sequelize: sequelizeInstance,
-      model: sequelizeModel,
-      transaction: transaction,
-    ) as Future<List<T>>;
+          modelName: modelName,
+          query: query,
+          sequelize: sequelizeInstance,
+          model: sequelizeModel,
+          transaction: transaction,
+        )
+        as Future<List<T>>;
   }
 
   /// Searches for a single instance that matches the query options.
@@ -174,28 +175,31 @@ abstract class Model<T> extends ModelInterface {
       paranoid: paranoid,
     );
     return QueryEngine().findOne(
-      modelName: modelName,
-      query: query,
-      sequelize: sequelizeInstance,
-      model: sequelizeModel,
-      transaction: transaction,
-    ) as Future<T?>;
+          modelName: modelName,
+          query: query,
+          sequelize: sequelizeInstance,
+          model: sequelizeModel,
+          transaction: transaction,
+        )
+        as Future<T?>;
   }
 
   /// Creates a new instance in the database and returns the created model
   /// instance with all auto-generated fields populated.
   Future<T> create(covariant dynamic data, {Transaction? transaction}) {
     // Convert data to Map if it's not already (for Create classes)
-    final Map<String, dynamic> dataMap =
-        data is Map<String, dynamic> ? data : (data as dynamic).toJson();
+    final Map<String, dynamic> dataMap = data is Map<String, dynamic>
+        ? data
+        : (data as dynamic).toJson();
 
     return QueryEngine().create(
-      modelName: modelName,
-      data: dataMap,
-      sequelize: sequelizeInstance,
-      model: sequelizeModel,
-      transaction: transaction,
-    ) as Future<T>;
+          modelName: modelName,
+          data: dataMap,
+          sequelize: sequelizeInstance,
+          model: sequelizeModel,
+          transaction: transaction,
+        )
+        as Future<T>;
   }
 
   /// Counts the number of instances matching the optional [where] clause.

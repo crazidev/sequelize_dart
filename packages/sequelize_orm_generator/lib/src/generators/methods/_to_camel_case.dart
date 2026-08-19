@@ -9,8 +9,9 @@ String _toCamelCase(String str) {
   final buffer = StringBuffer(parts[0].toLowerCase());
   for (var i = 1; i < parts.length; i++) {
     if (parts[i].isEmpty) continue;
-    buffer
-        .write(parts[i][0].toUpperCase() + parts[i].substring(1).toLowerCase());
+    buffer.write(
+      parts[i][0].toUpperCase() + parts[i].substring(1).toLowerCase(),
+    );
   }
   return buffer.toString();
 }

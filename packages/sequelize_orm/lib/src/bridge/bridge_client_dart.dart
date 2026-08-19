@@ -144,8 +144,11 @@ class BridgeClient implements BridgeClientInterface {
             break;
           }
 
-          final frameBytes =
-              Uint8List.sublistView(bytes, offset + 4, offset + 4 + frameLen);
+          final frameBytes = Uint8List.sublistView(
+            bytes,
+            offset + 4,
+            offset + 4 + frameLen,
+          );
           offset += 4 + frameLen;
 
           try {
@@ -173,17 +176,19 @@ class BridgeClient implements BridgeClientInterface {
     );
 
     // Listen to stderr for errors
-    _process!.stderr.transform(utf8.decoder).listen(
-      (data) {
-        stderrBuffer.writeln(data);
-      },
-      onDone: () {
-        stderrCompleter.complete();
-      },
-      onError: (error) {
-        stderrCompleter.completeError(error);
-      },
-    );
+    _process!.stderr
+        .transform(utf8.decoder)
+        .listen(
+          (data) {
+            stderrBuffer.writeln(data);
+          },
+          onDone: () {
+            stderrCompleter.complete();
+          },
+          onError: (error) {
+            stderrCompleter.completeError(error);
+          },
+        );
 
     // Handle process exit
     final bridgeProcess = _process;
@@ -264,8 +269,9 @@ class BridgeClient implements BridgeClientInterface {
   /// Find the bridge server path relative to the package
   Future<String> _findBridgeServerPath() async {
     try {
-      final packageUri =
-          Uri.parse('package:sequelize_orm/src/bridge/bridge_server.bundle.js');
+      final packageUri = Uri.parse(
+        'package:sequelize_orm/src/bridge/bridge_server.bundle.js',
+      );
       final resolvedUri = await Isolate.resolvePackageUri(packageUri);
       if (resolvedUri != null && resolvedUri.scheme == 'file') {
         final filePath = resolvedUri.toFilePath();
@@ -284,10 +290,14 @@ class BridgeClient implements BridgeClientInterface {
       'packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
       '../packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
       '../../packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
-      p.join(p.dirname(Platform.resolvedExecutable),
-          'packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js'),
-      p.join(p.dirname(Platform.resolvedExecutable),
-          '../packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js'),
+      p.join(
+        p.dirname(Platform.resolvedExecutable),
+        'packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
+      ),
+      p.join(
+        p.dirname(Platform.resolvedExecutable),
+        '../packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
+      ),
     ];
 
     for (final candidate in candidatePaths) {
@@ -299,8 +309,12 @@ class BridgeClient implements BridgeClientInterface {
     // Traverse upward from Directory.current to find repo root
     var dir = Directory.current;
     for (var i = 0; i < 5; i++) {
-      final probe = File(p.join(dir.path,
-          'packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js'));
+      final probe = File(
+        p.join(
+          dir.path,
+          'packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
+        ),
+      );
       if (probe.existsSync()) {
         return probe.absolute.path;
       }
@@ -439,8 +453,9 @@ class BridgeClient implements BridgeClientInterface {
         BridgeLatencyInfo(
           method: method,
           roundTrip: stopwatch.elapsed,
-          serverTime:
-              serverMs != null ? Duration(milliseconds: serverMs) : null,
+          serverTime: serverMs != null
+              ? Duration(milliseconds: serverMs)
+              : null,
         ),
       );
     } else {

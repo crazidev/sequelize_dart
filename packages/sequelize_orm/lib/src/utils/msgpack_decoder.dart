@@ -200,7 +200,8 @@ class FastMsgPackDecoder {
     if (b >= 0xe0) return b - 256;
 
     throw FormatException(
-        'Unknown MessagePack byte header: 0x${b.toRadixString(16)}');
+      'Unknown MessagePack byte header: 0x${b.toRadixString(16)}',
+    );
   }
 
   Map<String, dynamic> _readMap(int len) {
@@ -229,8 +230,9 @@ class FastMsgPackDecoder {
 
   String _readString(int len) {
     if (len == 0) return '';
-    final str =
-        utf8.decode(Uint8List.sublistView(_bytes, _offset, _offset + len));
+    final str = utf8.decode(
+      Uint8List.sublistView(_bytes, _offset, _offset + len),
+    );
     _offset += len;
     return str;
   }
@@ -241,26 +243,28 @@ class FastMsgPackDecoder {
       if (len == 4) {
         final sec = _bd.getUint32(_offset);
         _offset += 4;
-        return DateTime.fromMillisecondsSinceEpoch(sec * 1000, isUtc: true)
-            .toIso8601String();
+        return DateTime.fromMillisecondsSinceEpoch(
+          sec * 1000,
+          isUtc: true,
+        ).toIso8601String();
       } else if (len == 8) {
         final data64 = _bd.getUint64(_offset);
         _offset += 8;
         final nsec = (data64 >> 34) & 0x3fffffff;
         final sec = data64 & 0x00000003ffffffff;
         return DateTime.fromMillisecondsSinceEpoch(
-                sec * 1000 + (nsec ~/ 1000000),
-                isUtc: true)
-            .toIso8601String();
+          sec * 1000 + (nsec ~/ 1000000),
+          isUtc: true,
+        ).toIso8601String();
       } else if (len == 12) {
         final nsec = _bd.getUint32(_offset);
         _offset += 4;
         final sec = _bd.getInt64(_offset);
         _offset += 8;
         return DateTime.fromMillisecondsSinceEpoch(
-                sec * 1000 + (nsec ~/ 1000000),
-                isUtc: true)
-            .toIso8601String();
+          sec * 1000 + (nsec ~/ 1000000),
+          isUtc: true,
+        ).toIso8601String();
       }
     }
     final slice = Uint8List.sublistView(_bytes, _offset, _offset + len);
