@@ -15,18 +15,21 @@ export interface ModelResponse {
 
 /**
  * Converts a Sequelize model instance to a standard response format
- * TODO: Enable isNewRecord, changed & previous
+ * Fast-paths direct dataValues extraction to avoid toJSON overhead.
  */
 export function toModelResponse(instance: any): ModelResponse {
-  if (instance && typeof instance.toJSON === 'function') {
-    return {
-      data: instance.toJSON(),
-    };
+  if (!instance) {
+    return { data: {} };
+  }
+  if (typeof instance.toJSON === 'function') {
+    return { data: instance.toJSON() };
   }
   return {
     data: instance || {},
   };
 }
+
+
 
 /**
  * Converts an array of Sequelize model instances to standard response format

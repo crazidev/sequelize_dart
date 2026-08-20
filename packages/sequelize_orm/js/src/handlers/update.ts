@@ -32,13 +32,19 @@ export async function handleUpdate(params: UpdateParams): Promise<number> {
   const model = models.get(modelName);
   checkModelDefinition(model, modelName);
 
+  const updateOptions = {
+    validate: false,
+    ...options,
+  };
+
   const tDbStart = now();
   // Sequelize update returns [affectedCount, affectedRows]
   // affectedCount is the number of rows affected
-  const result = await model.update(data, options);
+  const result = await model.update(data, updateOptions);
   if (timings) {
     timings.dbMs = Math.round((now() - tDbStart) * 1000) / 1000;
   }
+
 
   const affectedCount = result[0];
 

@@ -55,7 +55,7 @@ void _generateFindOneMethod(
     '        final instance = $valuesClassName.fromJson(result.data, operation: \'findOne\');',
   );
   buffer.writeln('        instance.originalQuery = query;');
-  buffer.writeln('        instance.setPreviousDataValues(instance.toJson());');
+  buffer.writeln('        instance.setPreviousDataValues(result.data);');
   buffer.writeln('        return instance;');
   buffer.writeln('      })() : null');
   buffer.writeln('    );');

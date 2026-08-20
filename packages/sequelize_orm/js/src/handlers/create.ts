@@ -41,9 +41,15 @@ export async function handleCreate(
       return [];
     }
 
+    const bulkCreateOptions = {
+      validate: false,
+      individualHooks: false,
+      ...options,
+    };
+
     const tDbStart = now();
     // bulkCreate returns an array of instances
-    const results: Model[] = await model.bulkCreate(data, options);
+    const results: Model[] = await model.bulkCreate(data, bulkCreateOptions);
     if (timings) {
       timings.dbMs = Math.round((now() - tDbStart) * 1000) / 1000;
     }
@@ -56,9 +62,14 @@ export async function handleCreate(
     return responseArray;
   }
 
+  const createOptions = {
+    validate: false,
+    ...options,
+  };
+
   // Single create
   const tDbStart = now();
-  const result = await model.create(data, options);
+  const result = await model.create(data, createOptions);
   if (timings) {
     timings.dbMs = Math.round((now() - tDbStart) * 1000) / 1000;
   }
@@ -69,6 +80,7 @@ export async function handleCreate(
     timings.serializeMs = Math.round((now() - tSerializeStart) * 1000) / 1000;
   }
   return response;
+
 }
 
 export const handleBulkCreate = handleCreate;

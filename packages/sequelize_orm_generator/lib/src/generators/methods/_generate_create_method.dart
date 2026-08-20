@@ -67,7 +67,7 @@ void _generateCreateMethod(
     '      final instance = $valuesClassName.fromJson(result.data, operation: \'create\');',
   );
   buffer.writeln('      instance.originalQuery = query;');
-  buffer.writeln('      instance.setPreviousDataValues(instance.toJson());');
+  buffer.writeln('      instance.setPreviousDataValues(result.data);');
   buffer.writeln('      return instance;');
   buffer.writeln('    });');
   buffer.writeln('  }');
@@ -161,7 +161,7 @@ void _generateCreateMethod(
   buffer.writeln('          rowIndex: rowIndex,');
   buffer.writeln('        );');
   buffer.writeln('        instance.originalQuery = query;');
-  buffer.writeln('        instance.setPreviousDataValues(instance.toJson());');
+  buffer.writeln('        instance.setPreviousDataValues(result.data);');
   buffer.writeln('        return instance;');
   buffer.writeln('      }).toList();');
   buffer.writeln('    });');
