@@ -178,21 +178,25 @@ class QueryEngine extends QueryEngineInterface {
     required String modelName,
     required List<Map<String, dynamic>> data,
     Query? query,
+    Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
     Transaction? transaction,
   }) async {
     try {
-      final options = query?.toJson() ?? {};
+      final opts = {
+        if (query != null) ...query.toJson(),
+        if (options != null) ...options,
+      };
       final tx = _resolveTransaction(transaction);
       if (tx != null) {
-        options['transactionId'] = tx.transactionId;
+        opts['transactionId'] = tx.transactionId;
       }
 
-      final result = await getBridge(sequelize).call('create', {
+      final result = await getBridge(sequelize).call('bulkCreate', {
         'model': modelName,
         'data': data,
-        'options': options,
+        'options': opts,
       });
 
       if (result is List) {

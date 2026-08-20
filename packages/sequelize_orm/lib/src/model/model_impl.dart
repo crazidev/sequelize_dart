@@ -202,6 +202,47 @@ abstract class Model<T> extends ModelInterface {
         as Future<T>;
   }
 
+  /// Creates and inserts multiple instances in bulk.
+  ///
+  /// The future resolves with a list of created model instances.
+  Future<List<T>> bulkCreate(
+    covariant dynamic records, {
+    Transaction? transaction,
+    bool? validate,
+    bool? individualHooks,
+    bool? ignoreDuplicates,
+    List<String>? updateOnDuplicate,
+    List<String>? fields,
+    bool? returning,
+  }) {
+    final List<Map<String, dynamic>> dataList = (records as List)
+        .map(
+          (item) => item is Map<String, dynamic>
+              ? item
+              : (item as dynamic).toJson() as Map<String, dynamic>,
+        )
+        .toList();
+
+    final options = <String, dynamic>{
+      'validate': ?validate,
+      'individualHooks': ?individualHooks,
+      'ignoreDuplicates': ?ignoreDuplicates,
+      'updateOnDuplicate': ?updateOnDuplicate,
+      'fields': ?fields,
+      'returning': ?returning,
+    };
+
+    return QueryEngine().bulkCreate(
+          modelName: modelName,
+          data: dataList,
+          options: options.isNotEmpty ? options : null,
+          sequelize: sequelizeInstance,
+          model: sequelizeModel,
+          transaction: transaction,
+        )
+        as Future<List<T>>;
+  }
+
   /// Counts the number of instances matching the optional [where] clause.
   ///
   /// Returns the total count as an [int].
@@ -250,9 +291,9 @@ abstract class Model<T> extends ModelInterface {
     final query = Query.fromCallbacks(where: where);
     final options = <String, dynamic>{
       ...query.toJson(),
-      if (force != null) 'force': force,
-      if (limit != null) 'limit': limit,
-      if (individualHooks != null) 'individualHooks': individualHooks,
+      'force': ?force,
+      'limit': ?limit,
+      'individualHooks': ?individualHooks,
     };
     return QueryEngine().destroy(
       modelName: modelName,
@@ -273,9 +314,9 @@ abstract class Model<T> extends ModelInterface {
     Transaction? transaction,
   }) {
     final options = <String, dynamic>{
-      if (cascade != null) 'cascade': cascade,
-      if (restartIdentity != null) 'restartIdentity': restartIdentity,
-      if (force != null) 'force': force,
+      'cascade': ?cascade,
+      'restartIdentity': ?restartIdentity,
+      'force': ?force,
     };
     return QueryEngine().truncate(
       modelName: modelName,
@@ -297,8 +338,8 @@ abstract class Model<T> extends ModelInterface {
     final query = Query.fromCallbacks(where: where);
     final options = <String, dynamic>{
       ...query.toJson(),
-      if (limit != null) 'limit': limit,
-      if (individualHooks != null) 'individualHooks': individualHooks,
+      'limit': ?limit,
+      'individualHooks': ?individualHooks,
     };
     return QueryEngine().restore(
       modelName: modelName,

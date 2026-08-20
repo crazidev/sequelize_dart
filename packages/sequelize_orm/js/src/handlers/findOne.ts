@@ -1,13 +1,14 @@
-import { Attributes, FindOptions, Model } from '@sequelize/core';
+import { Attributes, FindOptions } from '@sequelize/core';
 import { checkConnection, checkModelDefinition } from '../utils/checkUtils';
 import { convertQueryOptions } from '../utils/queryConverter';
-import { getModels, getSequelize, sendNotification } from '../utils/state';
+import { getModels, getSequelize } from '../utils/state';
 import { toModelResponse, ModelResponse } from '../utils/modelResponse';
-import { printLogs } from '../utils/printLogs';
+import { now } from '../utils/timer';
 
 type FindOneParams = {
   model: string;
   options?: FindOptions<Attributes<any>>;
+  _timings?: Record<string, number>;
 };
 
 export async function handleFindOne(params: FindOneParams): Promise<ModelResponse | null> {
@@ -15,7 +16,13 @@ export async function handleFindOne(params: FindOneParams): Promise<ModelRespons
   checkConnection(sequelize);
 
   const modelName = params.model;
+  const timings = params._timings;
+
+  const tConvertStart = now();
   const options = convertQueryOptions(params.options || {});
+  if (timings) {
+    timings.convertMs = Math.round((now() - tConvertStart) * 1000) / 1000;
+  }
 
   const models = getModels();
   const model = models.get(modelName);
@@ -24,6 +31,17 @@ export async function handleFindOne(params: FindOneParams): Promise<ModelRespons
   const hasInclude = options.include && (Array.isArray(options.include) ? options.include.length > 0 : true);
   const findOptions = hasInclude ? options : { ...options, raw: true };
 
+  const tDbStart = now();
   const result: any = await model.findOne(findOptions);
-  return result ? toModelResponse(result) : null;
+  if (timings) {
+    timings.dbMs = Math.round((now() - tDbStart) * 1000) / 1000;
+  }
+
+  const tSerializeStart = now();
+  const response = result ? toModelResponse(result) : null;
+  if (timings) {
+    timings.serializeMs = Math.round((now() - tSerializeStart) * 1000) / 1000;
+  }
+  return response;
 }
+

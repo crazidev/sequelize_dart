@@ -73,10 +73,12 @@ Future<void> cmdBenchmark(Directory root, List<String> args) async {
   Process process;
   if (isNative) {
     cmdlog('Running in Native AOT mode...');
-    var executable = _findNativeBenchmarkExecutable(benchmarksDir);
-    if (executable == null || !executable.existsSync()) {
-      executable = await cmdBuildBenchmark(root);
-    }
+
+    // Automatically skip sqlite build hook if downloaded
+    _patchSqliteHookToSupportLock();
+
+    // Always build when --native is passed
+    var executable = await cmdBuildBenchmark(root);
 
     process = await Process.start(
       executable.path,
@@ -136,5 +138,36 @@ Future<void> cmdBenchmark(Directory root, List<String> args) async {
   final code = await process.exitCode;
   if (code != 0) {
     exit(code);
+  }
+}
+
+void _patchSqliteHookToSupportLock() {
+  try {
+    final pubCache =
+        Platform.environment['PUB_CACHE'] ??
+        '${Platform.environment['HOME']}/.pub-cache';
+
+    final sqliteDir = Directory('$pubCache/hosted/pub.dev')
+        .listSync()
+        .firstWhere(
+          (e) => e is Directory && p.basename(e.path).startsWith('sqlite3-'),
+          orElse: () => Directory(''),
+        );
+
+    if (sqliteDir.existsSync()) {
+      final hookFile = File('${sqliteDir.path}/hook/build.dart');
+      if (hookFile.existsSync()) {
+        final content = hookFile.readAsStringSync();
+        if (!content.contains('sqlite_build_hook.lock')) {
+          final patched = content.replaceFirst(
+            'void main(List<String> args) async {',
+            'void main(List<String> args) async {\n  if (File(".dart_tool/sqlite_build_hook.lock").existsSync()) return;\n',
+          );
+          hookFile.writeAsStringSync(patched);
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore
   }
 }

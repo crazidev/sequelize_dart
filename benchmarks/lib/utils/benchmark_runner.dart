@@ -1,6 +1,6 @@
 import 'package:benchmark_harness/benchmark_harness.dart';
-import 'base_benchmark.dart';
-import 'step_profiler.dart';
+import 'package:orm_benchmarks/utils/base_benchmark.dart';
+import 'package:orm_benchmarks/utils/step_profiler.dart';
 
 /// Holds the benchmark result for a single query test measured via [AsyncBenchmarkBase]
 class QueryBenchmarkResult {
@@ -252,6 +252,54 @@ class BenchmarkRunner {
       await measure(
         'findAll (complex where)',
         () => benchmark.complexWhere(10, 50, 20),
+        warmupMillis: warmupMillis,
+        exerciseMillis: exerciseMillis,
+        stepProfiler: profiler,
+      ),
+    );
+
+    // 9. create single post
+    print('Measuring createPost...');
+    results.add(
+      await measure(
+        'createPost',
+        () => benchmark.createPost(),
+        warmupMillis: warmupMillis,
+        exerciseMillis: exerciseMillis,
+        stepProfiler: profiler,
+      ),
+    );
+
+    // 10. update single post
+    print('Measuring updatePost...');
+    results.add(
+      await measure(
+        'updatePost',
+        () => benchmark.updatePost(),
+        warmupMillis: warmupMillis,
+        exerciseMillis: exerciseMillis,
+        stepProfiler: profiler,
+      ),
+    );
+
+    // 11. bulk create posts (count 10)
+    print('Measuring bulkCreatePosts (count 10)...');
+    results.add(
+      await measure(
+        'bulkCreatePosts (count 10)',
+        () => benchmark.bulkCreatePosts(10),
+        warmupMillis: warmupMillis,
+        exerciseMillis: exerciseMillis,
+        stepProfiler: profiler,
+      ),
+    );
+
+    // 12. delete single post
+    print('Measuring deletePost...');
+    results.add(
+      await measure(
+        'deletePost',
+        () => benchmark.deletePost(),
         warmupMillis: warmupMillis,
         exerciseMillis: exerciseMillis,
         stepProfiler: profiler,

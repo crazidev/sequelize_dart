@@ -386,11 +386,17 @@ class BridgeClient implements BridgeClientInterface {
 
       final id = response['id'];
 
-      if (id != null && _pendingRequests.containsKey(id)) {
+      if (id is int && _pendingRequests.containsKey(id)) {
         final completer = _pendingRequests.remove(id)!;
 
-        // Stash the server-side elapsed time so call() can pick it up.
-        _serverMsById[id as int] = response['_serverMs'] as int?;
+        // Stash the server-side elapsed time and breakdown so call() can pick it up.
+        _serverMsById[id] = response['_serverMs'] as int?;
+        if (response['_serverBreakdown'] is Map) {
+          final rawMap = response['_serverBreakdown'] as Map;
+          _serverBreakdownById[id] = rawMap.map(
+            (k, v) => MapEntry(k.toString(), (v as num).toDouble()),
+          );
+        }
 
         if (response.containsKey('error')) {
           final error = response['error'];
@@ -415,6 +421,7 @@ class BridgeClient implements BridgeClientInterface {
 
   // Per-pending-request server-time storage (populated by _handleResponse).
   final Map<int, int?> _serverMsById = {};
+  final Map<int, Map<String, double>?> _serverBreakdownById = {};
 
   @override
   Future<dynamic> call(String method, Map<String, dynamic> params) async {
@@ -440,6 +447,7 @@ class BridgeClient implements BridgeClientInterface {
       onTimeout: () {
         _pendingRequests.remove(id);
         _serverMsById.remove(id);
+        _serverBreakdownById.remove(id);
         throw Exception('Request timeout: $method');
       },
     );
@@ -449,6 +457,7 @@ class BridgeClient implements BridgeClientInterface {
     final cb = latencyCallback;
     if (cb != null) {
       final serverMs = _serverMsById.remove(id);
+      final serverBreakdown = _serverBreakdownById.remove(id);
       cb(
         BridgeLatencyInfo(
           method: method,
@@ -456,10 +465,12 @@ class BridgeClient implements BridgeClientInterface {
           serverTime: serverMs != null
               ? Duration(milliseconds: serverMs)
               : null,
+          serverBreakdown: serverBreakdown,
         ),
       );
     } else {
       _serverMsById.remove(id);
+      _serverBreakdownById.remove(id);
     }
 
     return result;

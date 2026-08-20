@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import 'models/database.dart';
+import 'package:orm_benchmarks/packages/drift/models/database.dart';
 
 class DriftQueries {
   /// 1. Fetch all posts
@@ -87,5 +87,49 @@ class DriftQueries {
               ..limit(limit))
             .get();
     return posts.length;
+  }
+
+  static Future<int> createPost(DriftAppDatabase db) async {
+    final id = await db
+        .into(db.posts)
+        .insert(
+          PostsCompanion.insert(
+            title: const Value('Test Post'),
+            content: const Value('Test Content'),
+            userId: const Value(1),
+          ),
+        );
+    return id;
+  }
+
+  /// 10. Update a single post
+  static Future<int> updatePost(DriftAppDatabase db, int id) async {
+    final updated = await (db.update(db.posts)..where((t) => t.id.equals(id)))
+        .write(const PostsCompanion(title: Value('Updated Title')));
+    return updated;
+  }
+
+  /// 11. Bulk create posts
+  static Future<int> bulkCreatePosts(DriftAppDatabase db, int count) async {
+    final posts = List.generate(
+      count,
+      (i) => PostsCompanion.insert(
+        title: Value('Bulk Post $i'),
+        content: Value('Content $i'),
+        userId: const Value(1),
+      ),
+    );
+    await db.batch((batch) {
+      batch.insertAll(db.posts, posts);
+    });
+    return count;
+  }
+
+  /// 12. Delete a single post
+  static Future<int> deletePost(DriftAppDatabase db, int id) async {
+    final deleted = await (db.delete(
+      db.posts,
+    )..where((t) => t.id.equals(id))).go();
+    return deleted;
   }
 }

@@ -6,39 +6,55 @@ class BenchmarkTable {
   static void displayComparison(List<PackageBenchmarkReport> reports) {
     if (reports.isEmpty) return;
 
+    // Arrange them by longest title descending for the detailed results
+    final sortedByTitleReports = List<PackageBenchmarkReport>.from(reports)
+      ..sort((a, b) => b.packageName.length.compareTo(a.packageName.length));
+
     print('\n');
     print(
       '╔═══════════════════════════════════════════════════════════════════════════════════════════════╗',
     );
     print(
-      '║                                  ORM BENCHMARK COMPARISON                                   ║',
+      '║                                  ORM BENCHMARK RESULTS                                      ║',
     );
     print(
       '╚═══════════════════════════════════════════════════════════════════════════════════════════════╝',
     );
     print('');
 
-    final testNames = reports.first.results.map((r) => r.testName).toList();
+    final testNames = sortedByTitleReports.first.results
+        .map((r) => r.testName)
+        .toList();
     const testColWidth = 32;
-    const dataColWidth = 18;
+
+    int getColWidth(String packageName) {
+      final name = packageName.toLowerCase();
+      if (name.contains('sequelize')) {
+        return 16;
+      } else if (name == 'drift' || name == 'prisma') {
+        return 9;
+      }
+      return 12;
+    }
 
     // Header row
     final headerBuffer = StringBuffer();
     headerBuffer.write('│ ${'Query / Test Name'.padRight(testColWidth)} ');
-    for (final report in reports) {
-      headerBuffer.write('│ ${report.packageName.padRight(dataColWidth)} ');
+    for (final report in sortedByTitleReports) {
+      final width = getColWidth(report.packageName);
+      headerBuffer.write('│ ${report.packageName.padRight(width)} ');
     }
     headerBuffer.write('│ Fastest'.padRight(12));
     headerBuffer.write('│');
 
     final separator =
-        '├${'─' * (testColWidth + 2)}${reports.map((_) => '┼${'─' * (dataColWidth + 2)}').join()}┼${'─' * 11}┤';
+        '├${'─' * (testColWidth + 2)}${sortedByTitleReports.map((r) => '┼${'─' * (getColWidth(r.packageName) + 2)}').join()}┼${'─' * 11}┤';
 
     final topBorder =
-        '┌${'─' * (testColWidth + 2)}${reports.map((_) => '┬${'─' * (dataColWidth + 2)}').join()}┬${'─' * 11}┐';
+        '┌${'─' * (testColWidth + 2)}${sortedByTitleReports.map((r) => '┬${'─' * (getColWidth(r.packageName) + 2)}').join()}┬${'─' * 11}┐';
 
     final bottomBorder =
-        '└${'─' * (testColWidth + 2)}${reports.map((_) => '┴${'─' * (dataColWidth + 2)}').join()}┴${'─' * 11}┘';
+        '└${'─' * (testColWidth + 2)}${sortedByTitleReports.map((r) => '┴${'─' * (getColWidth(r.packageName) + 2)}').join()}┴${'─' * 11}┘';
 
     print(topBorder);
     print(headerBuffer.toString());
@@ -53,10 +69,11 @@ class BenchmarkTable {
       double minDuration = double.infinity;
       String fastestPackage = '';
 
-      for (final report in reports) {
+      for (final report in sortedByTitleReports) {
         final result = report.results[i];
         final val = '${result.durationMs.toStringAsFixed(2)}ms';
-        rowBuffer.write('│ ${val.padLeft(dataColWidth)} ');
+        final width = getColWidth(report.packageName);
+        rowBuffer.write('│ ${val.padLeft(width)} ');
 
         if (result.durationMs < minDuration) {
           minDuration = result.durationMs;
@@ -68,201 +85,146 @@ class BenchmarkTable {
       print(rowBuffer.toString());
     }
 
-    print(separator);
-
-    // Total row
-    final totalRowBuffer = StringBuffer();
-    totalRowBuffer.write('│ ${'TOTAL TIME'.padRight(testColWidth)} ');
-    double minTotal = double.infinity;
-    String fastestTotal = '';
-    for (final report in reports) {
-      final totalStr = '${report.totalDurationMs.toStringAsFixed(2)}ms';
-      totalRowBuffer.write('│ ${totalStr.padLeft(dataColWidth)} ');
-      if (report.totalDurationMs < minTotal) {
-        minTotal = report.totalDurationMs;
-        fastestTotal = report.packageName;
-      }
-    }
-    totalRowBuffer.write('│ ${fastestTotal.padRight(10)}│');
-    print(totalRowBuffer.toString());
-
-    // Average per query row
-    final avgRowBuffer = StringBuffer();
-    avgRowBuffer.write('│ ${'AVERAGE / QUERY'.padRight(testColWidth)} ');
-    double minAvg = double.infinity;
-    String fastestAvg = '';
-    for (final report in reports) {
-      final avgStr = '${report.averageDurationMs.toStringAsFixed(2)}ms';
-      avgRowBuffer.write('│ ${avgStr.padLeft(dataColWidth)} ');
-      if (report.averageDurationMs < minAvg) {
-        minAvg = report.averageDurationMs;
-        fastestAvg = report.packageName;
-      }
-    }
-    avgRowBuffer.write('│ ${fastestAvg.padRight(10)}│');
-    print(avgRowBuffer.toString());
-
     print(bottomBorder);
     print('');
 
-    // ─── Side-by-Side Analysis ───────────────────────────────────────
-    _displayWhyAnalysis(reports);
+    // Sort reports by total duration ascending for the ranking table
+    final sortedReports = List<PackageBenchmarkReport>.from(reports)
+      ..sort((a, b) => a.totalDurationMs.compareTo(b.totalDurationMs));
+
+    print(
+      '╔══════════════════════════════════════════════════════════════════════════════════╗',
+    );
+    print(
+      '║                              ORM BENCHMARK RANKING                               ║',
+    );
+    print(
+      '╚══════════════════════════════════════════════════════════════════════════════════╝',
+    );
+    print('');
+
+    const rankCol = 6;
+    const pkgCol = 22;
+    const totalCol = 14;
+    const avgCol = 14;
+    const slowdownCol = 12;
+
+    final rankHeaderBuffer = StringBuffer();
+    rankHeaderBuffer.write('│ ${'Rank'.padRight(rankCol)} ');
+    rankHeaderBuffer.write('│ ${'Package'.padRight(pkgCol)} ');
+    rankHeaderBuffer.write('│ ${'Total Time'.padLeft(totalCol)} ');
+    rankHeaderBuffer.write('│ ${'Avg Time'.padLeft(avgCol)} ');
+    rankHeaderBuffer.write('│ ${'Slowdown'.padLeft(slowdownCol)} │');
+
+    final rankSeparator =
+        '├${'─' * (rankCol + 2)}┼${'─' * (pkgCol + 2)}┼${'─' * (totalCol + 2)}┼${'─' * (avgCol + 2)}┼${'─' * (slowdownCol + 2)}┤';
+    final rankTopBorder =
+        '┌${'─' * (rankCol + 2)}┬${'─' * (pkgCol + 2)}┬${'─' * (totalCol + 2)}┬${'─' * (avgCol + 2)}┬${'─' * (slowdownCol + 2)}┐';
+    final rankBottomBorder =
+        '└${'─' * (rankCol + 2)}┴${'─' * (pkgCol + 2)}┴${'─' * (totalCol + 2)}┴${'─' * (avgCol + 2)}┴${'─' * (slowdownCol + 2)}┘';
+
+    print(rankTopBorder);
+    print(rankHeaderBuffer.toString());
+    print(rankSeparator);
+
+    final fastestTotal = sortedReports.first.totalDurationMs;
+
+    for (var i = 0; i < sortedReports.length; i++) {
+      final report = sortedReports[i];
+      final rowBuffer = StringBuffer();
+
+      final rankStr = '#${i + 1}';
+      final totalStr = '${report.totalDurationMs.toStringAsFixed(2)}ms';
+      final avgStr = '${report.averageDurationMs.toStringAsFixed(2)}ms';
+
+      final multiplier = fastestTotal > 0
+          ? report.totalDurationMs / fastestTotal
+          : 0.0;
+      final slowdownStr = i == 0 ? '-' : '${multiplier.toStringAsFixed(2)}x';
+
+      rowBuffer.write('│ ${rankStr.padRight(rankCol)} ');
+      rowBuffer.write('│ ${report.packageName.padRight(pkgCol)} ');
+      rowBuffer.write('│ ${totalStr.padLeft(totalCol)} ');
+      rowBuffer.write('│ ${avgStr.padLeft(avgCol)} ');
+      rowBuffer.write('│ ${slowdownStr.padLeft(slowdownCol)} │');
+
+      print(rowBuffer.toString());
+    }
+
+    print(rankBottomBorder);
+    print('');
   }
 
-  /// Prints a side-by-side analysis showing where Sequelize loses time
-  static void _displayWhyAnalysis(List<PackageBenchmarkReport> reports) {
-    if (reports.length < 2) return;
-
-    // Find Sequelize and the fastest non-Sequelize package
-    PackageBenchmarkReport? seqReport;
-    PackageBenchmarkReport? fastestOther;
-    double fastestOtherTotal = double.infinity;
-
+  /// Prints detailed step profiler breakdown for packages with step-level profiling
+  static void displayStepBreakdown(List<PackageBenchmarkReport> reports) {
     for (final report in reports) {
-      if (report.packageName == 'Sequelize') {
-        seqReport = report;
-      } else if (report.totalDurationMs < fastestOtherTotal) {
-        fastestOtherTotal = report.totalDurationMs;
-        fastestOther = report;
-      }
-    }
+      final profiledResults = report.results
+          .where(
+            (r) => r.stepBreakdownMs != null && r.stepBreakdownMs!.isNotEmpty,
+          )
+          .toList();
 
-    if (seqReport == null || fastestOther == null) return;
+      if (profiledResults.isEmpty) continue;
 
-    print(
-      '╔═══════════════════════════════════════════════════════════════════════════════════════════════╗',
-    );
-    print(
-      '║                          WHY IS SEQUELIZE SLOWER?                                           ║',
-    );
-    print(
-      '╚═══════════════════════════════════════════════════════════════════════════════════════════════╝',
-    );
-    print('');
-
-    const testCol = 32;
-    const valCol = 14;
-
-    // Find all package reports for side-by-side comparison
-    final otherReports = reports
-        .where((r) => r.packageName != 'Sequelize')
-        .toList();
-
-    // Build header
-    final topParts = StringBuffer('┌${'─' * (testCol + 2)}');
-    final sepParts = StringBuffer('├${'─' * (testCol + 2)}');
-    final botParts = StringBuffer('└${'─' * (testCol + 2)}');
-
-    // Columns: Sequelize total, each other ORM, IPC overhead, multiplier
-    final colHeaders = <String>[
-      'Sequelize',
-      ...otherReports.map((r) => r.packageName),
-      'IPC Overhead',
-      'Slowdown',
-    ];
-
-    for (var i = 0; i < colHeaders.length; i++) {
-      topParts.write('┬${'─' * (valCol + 2)}');
-      sepParts.write('┼${'─' * (valCol + 2)}');
-      botParts.write('┴${'─' * (valCol + 2)}');
-    }
-    topParts.write('┐');
-    sepParts.write('┤');
-    botParts.write('┘');
-
-    print(topParts.toString());
-
-    // Header
-    final hdr = StringBuffer('│ ${'Query'.padRight(testCol)} ');
-    for (final col in colHeaders) {
-      hdr.write('│ ${col.padLeft(valCol)} ');
-    }
-    hdr.write('│');
-    print(hdr.toString());
-    print(sepParts.toString());
-
-    // Data rows
-    final testNames = seqReport.results.map((r) => r.testName).toList();
-    for (var i = 0; i < testNames.length; i++) {
-      final row = StringBuffer('│ ${testNames[i].padRight(testCol)} ');
-      final seqResult = seqReport.results[i];
-
-      // Sequelize total
-      row.write(
-        '│ ${'${seqResult.durationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ',
+      print(
+        '╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════════╗',
+      );
+      print(
+        '║                        STEP-BY-STEP LATENCY BREAKDOWN: ${report.packageName.padRight(46)}║',
+      );
+      print(
+        '╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════════╝',
       );
 
-      // Other ORMs
-      double bestOtherMs = double.infinity;
-      for (final other in otherReports) {
-        final otherResult = other.results[i];
-        row.write(
-          '│ ${'${otherResult.durationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ',
+      // Collect all distinct step names across queries
+      final allStepKeys = <String>{};
+      for (final r in profiledResults) {
+        allStepKeys.addAll(r.stepBreakdownMs!.keys);
+      }
+      final stepList = allStepKeys.toList();
+
+      const testColWidth = 28;
+      const totalColWidth = 10;
+      const stepColWidth = 12;
+
+      final headerBuffer = StringBuffer();
+      headerBuffer.write('│ ${'Query / Test Name'.padRight(testColWidth)} ');
+      headerBuffer.write('│ ${'Total'.padLeft(totalColWidth)} ');
+      for (final step in stepList) {
+        headerBuffer.write('│ ${step.padLeft(stepColWidth)} ');
+      }
+      headerBuffer.write('│');
+
+      final topBorder =
+          '┌${'─' * (testColWidth + 2)}┬${'─' * (totalColWidth + 2)}${stepList.map((_) => '┬${'─' * (stepColWidth + 2)}').join()}┐';
+      final separator =
+          '├${'─' * (testColWidth + 2)}┼${'─' * (totalColWidth + 2)}${stepList.map((_) => '┼${'─' * (stepColWidth + 2)}').join()}┤';
+      final bottomBorder =
+          '└${'─' * (testColWidth + 2)}┴${'─' * (totalColWidth + 2)}${stepList.map((_) => '┴${'─' * (stepColWidth + 2)}').join()}┘';
+
+      print(topBorder);
+      print(headerBuffer.toString());
+      print(separator);
+
+      for (final result in profiledResults) {
+        final rowBuffer = StringBuffer();
+        rowBuffer.write('│ ${result.testName.padRight(testColWidth)} ');
+        rowBuffer.write(
+          '│ ${(result.durationMs.toStringAsFixed(2) + 'ms').padLeft(totalColWidth)} ',
         );
-        if (otherResult.durationMs < bestOtherMs) {
-          bestOtherMs = otherResult.durationMs;
+
+        final breakdown = result.stepBreakdownMs!;
+        for (final step in stepList) {
+          final val = breakdown[step];
+          final valStr = val != null ? '${val.toStringAsFixed(2)}ms' : '-';
+          rowBuffer.write('│ ${valStr.padLeft(stepColWidth)} ');
         }
+        rowBuffer.write('│');
+        print(rowBuffer.toString());
       }
 
-      // IPC overhead (from step breakdown)
-      final ipc = seqResult.stepBreakdownMs?['ipc_overhead'];
-      final ipcStr = ipc != null ? '${ipc.toStringAsFixed(2)}ms' : '—';
-      row.write('│ ${ipcStr.padLeft(valCol)} ');
-
-      // Slowdown multiplier
-      final multiplier = bestOtherMs > 0
-          ? seqResult.durationMs / bestOtherMs
-          : 0.0;
-      final multStr = '${multiplier.toStringAsFixed(1)}x';
-      row.write('│ ${multStr.padLeft(valCol)} ');
-
-      row.write('│');
-      print(row.toString());
+      print(bottomBorder);
+      print('');
     }
-
-    print(sepParts.toString());
-
-    // Summary row
-    final summaryRow = StringBuffer('│ ${'TOTAL'.padRight(testCol)} ');
-
-    summaryRow.write(
-      '│ ${'${seqReport.totalDurationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ',
-    );
-
-    double bestOtherTotal = double.infinity;
-    for (final other in otherReports) {
-      summaryRow.write(
-        '│ ${'${other.totalDurationMs.toStringAsFixed(2)}ms'.padLeft(valCol)} ',
-      );
-      if (other.totalDurationMs < bestOtherTotal) {
-        bestOtherTotal = other.totalDurationMs;
-      }
-    }
-
-    // Total IPC overhead
-    double totalIpc = 0;
-    int ipcCount = 0;
-    for (final r in seqReport.results) {
-      final ipc = r.stepBreakdownMs?['ipc_overhead'];
-      if (ipc != null) {
-        totalIpc += ipc;
-        ipcCount++;
-      }
-    }
-    summaryRow.write(
-      '│ ${ipcCount > 0 ? '${totalIpc.toStringAsFixed(2)}ms' : '—'.padLeft(valCol)} ',
-    );
-
-    final totalMult = bestOtherTotal > 0
-        ? seqReport.totalDurationMs / bestOtherTotal
-        : 0.0;
-    summaryRow.write(
-      '│ ${'${totalMult.toStringAsFixed(1)}x'.padLeft(valCol)} ',
-    );
-    summaryRow.write('│');
-    print(summaryRow.toString());
-
-    print(botParts.toString());
-    print('');
   }
 }

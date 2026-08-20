@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:orm_benchmarks/packages/drift/drift_benchmark.dart';
+import 'package:orm_benchmarks/packages/prisma/prisma_benchmark.dart';
 import 'package:orm_benchmarks/packages/sequelize/sequelize_benchmark.dart';
 import 'package:orm_benchmarks/packages/sequelize/sequelize_quickjs_benchmark.dart';
 import 'package:orm_benchmarks/packages/serverpod/serverpod_benchmark.dart';
@@ -23,6 +24,7 @@ void main(List<String> args) async {
   print('  2. Drift');
   print('  3. Serverpod ORM');
   print('  4. Sequelize ORM (QuickJS)');
+  print('  5. Prisma (dart-orm)');
   print('Shared Database: PostgreSQL (localhost:5432/postgres)');
   print(
     'Settings: ${warmupMillisArg}ms warmup / ${exerciseMillisArg}ms sample window per query',
@@ -42,10 +44,11 @@ void main(List<String> args) async {
   print('[2/2] Running Benchmark Test Suites...\n');
 
   final benchmarks = <OrmBenchmark>[
-    DriftBenchmark(),
-    ServerpodOrmBenchmark(),
     SequelizeOrmBenchmark(),
     SequelizeOrmQuickjsBenchmark(),
+    DriftBenchmark(),
+    PrismaOrmBenchmark(),
+    ServerpodOrmBenchmark(),
   ];
 
   final reports = <PackageBenchmarkReport>[];
@@ -65,6 +68,9 @@ void main(List<String> args) async {
 
   // Display Comparative Summary Table
   BenchmarkTable.displayComparison(reports);
+
+  // Display Step-by-Step Breakdown for instrumented ORMs
+  BenchmarkTable.displayStepBreakdown(reports);
   exit(0);
 }
 

@@ -10,6 +10,7 @@ export 'models/database.dart';
 
 class DriftBenchmark implements OrmBenchmark {
   DriftAppDatabase? _db;
+  int _lastCreatedId = 10;
 
   @override
   String get name => 'Drift';
@@ -59,6 +60,23 @@ class DriftBenchmark implements OrmBenchmark {
   @override
   Future<int> complexWhere(int minId, int maxId, int limit) =>
       DriftQueries.complexWhere(_db!, minId, maxId, limit);
+
+  @override
+  Future<int> createPost() async {
+    final id = await DriftQueries.createPost(_db!);
+    if (id > 0) _lastCreatedId = id;
+    return id > 0 ? 1 : 0;
+  }
+
+  @override
+  Future<int> updatePost() => DriftQueries.updatePost(_db!, _lastCreatedId);
+
+  @override
+  Future<int> bulkCreatePosts(int count) =>
+      DriftQueries.bulkCreatePosts(_db!, count);
+
+  @override
+  Future<int> deletePost() => DriftQueries.deletePost(_db!, _lastCreatedId);
 
   @override
   Future<void> close() async {

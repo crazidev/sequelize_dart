@@ -193,6 +193,14 @@ class QuickJsBridgeClient implements BridgeClientInterface {
 
     // Report latency.
     final serverMs = responseMap['_serverMs'] as int?;
+    Map<String, double>? serverBreakdown;
+    if (responseMap['_serverBreakdown'] is Map) {
+      final rawMap = responseMap['_serverBreakdown'] as Map;
+      serverBreakdown = rawMap.map(
+        (k, v) => MapEntry(k.toString(), (v as num).toDouble()),
+      );
+    }
+
     final cb = latencyCallback;
     if (cb != null) {
       cb(
@@ -202,6 +210,7 @@ class QuickJsBridgeClient implements BridgeClientInterface {
           serverTime: serverMs != null
               ? Duration(milliseconds: serverMs)
               : null,
+          serverBreakdown: serverBreakdown,
         ),
       );
     }

@@ -24,10 +24,10 @@ Future<void> main() async {
 
   // await sequelize.sync(alter: true);
 
-  await sequelize.seed(
-    seeders: Db.allSeeders(),
-    syncTableMode: SyncTableMode.alter,
-  );
+  // await sequelize.seed(
+  //   seeders: Db.allSeeders(),
+  //   syncTableMode: SyncTableMode.alter,
+  // );
 
   // Run queries - all query logic is in queries.dart
   // Timer.periodic(const Duration(seconds: 1), (timer) {

@@ -23,6 +23,10 @@ class BridgeLatencyInfo {
   /// emit that field.
   final Duration? serverTime;
 
+  /// Detailed sub-timing breakdown of server operations in milliseconds.
+  /// Keys: 'convertMs', 'dbMs', 'serializeMs', 'compactMs', 'totalServerMs'.
+  final Map<String, double>? serverBreakdown;
+
   /// Pure Dart↔Node IPC overhead: serialisation, pipe write, pipe read,
   /// and deserialisation. Available only when [serverTime] is non-null.
   Duration? get bridgeOverhead {
@@ -37,6 +41,7 @@ class BridgeLatencyInfo {
     required this.method,
     required this.roundTrip,
     this.serverTime,
+    this.serverBreakdown,
   });
 
   @override
@@ -45,7 +50,7 @@ class BridgeLatencyInfo {
     final st = serverTime?.inMilliseconds;
     final oh = bridgeOverhead?.inMilliseconds;
     if (st != null && oh != null) {
-      return 'BridgeLatencyInfo($method: ${rt}ms total, ${st}ms server, ${oh}ms overhead)';
+      return 'BridgeLatencyInfo($method: ${rt}ms total, ${st}ms server, ${oh}ms overhead, breakdown: $serverBreakdown)';
     }
     return 'BridgeLatencyInfo($method: ${rt}ms total)';
   }

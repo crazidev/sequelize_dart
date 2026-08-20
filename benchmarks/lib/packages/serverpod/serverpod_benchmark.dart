@@ -8,6 +8,7 @@ export 'queries.dart';
 
 class ServerpodOrmBenchmark implements OrmBenchmark {
   final ServerpodConnection _connection = ServerpodConnection();
+  int _lastCreatedId = 10;
 
   @override
   String get name => 'Serverpod';
@@ -57,6 +58,25 @@ class ServerpodOrmBenchmark implements OrmBenchmark {
   @override
   Future<int> complexWhere(int minId, int maxId, int limit) =>
       ServerpodQueries.complexWhere(_connection.session, minId, maxId, limit);
+
+  @override
+  Future<int> createPost() async {
+    final id = await ServerpodQueries.createPost(_connection.session);
+    if (id > 0) _lastCreatedId = id;
+    return id;
+  }
+
+  @override
+  Future<int> updatePost() =>
+      ServerpodQueries.updatePost(_connection.session, _lastCreatedId);
+
+  @override
+  Future<int> bulkCreatePosts(int count) =>
+      ServerpodQueries.bulkCreatePosts(_connection.session, count);
+
+  @override
+  Future<int> deletePost() =>
+      ServerpodQueries.deletePost(_connection.session, _lastCreatedId);
 
   @override
   Future<void> close() async {

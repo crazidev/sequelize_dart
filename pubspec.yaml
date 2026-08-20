@@ -113,3 +113,11 @@ melos:
     release:publish:tag:
       description: Publish, create git tags and GitHub releases per package.
       run: dart run tools/release_publish.dart --publish --tag --github-release
+
+hooks:
+  user_defines:
+    sqlite3:
+      source: system
+
+dependency_overrides:
+  cli_util: any

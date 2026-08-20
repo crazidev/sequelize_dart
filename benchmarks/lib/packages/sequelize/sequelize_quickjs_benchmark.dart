@@ -4,7 +4,7 @@ import 'package:sequelize_orm_quickjs/sequelize_orm_quickjs.dart';
 
 class SequelizeOrmQuickjsBenchmark extends SequelizeOrmBenchmark {
   @override
-  String get name => 'Sequelize (QuickJS)';
+  String get name => 'Sequelize(QT)';
 
   @override
   Future<void> init() async {

@@ -18,6 +18,7 @@ class _Stats {
   final List<int> roundTrips = [];
   final List<int?> serverTimes = [];
   final List<int?> overheads = [];
+  final Map<String, List<double>> breakdowns = {};
 
   _Stats(this.name);
 
@@ -25,6 +26,11 @@ class _Stats {
     roundTrips.add(info.roundTrip.inMicroseconds);
     serverTimes.add(info.serverTime?.inMicroseconds);
     overheads.add(info.bridgeOverhead?.inMicroseconds);
+    if (info.serverBreakdown != null) {
+      for (final entry in info.serverBreakdown!.entries) {
+        breakdowns.putIfAbsent(entry.key, () => []).add(entry.value);
+      }
+    }
   }
 
   double _avgMs(List<int> us) =>
@@ -62,6 +68,19 @@ class _Stats {
       stdout.writeln(
         '    IPC overhead min=${_minMs(oh).toStringAsFixed(2)}ms avg=${_avgMs(oh).toStringAsFixed(2)}ms p95=${_p95Ms(oh).toStringAsFixed(2)}ms max=${_maxMs(oh).toStringAsFixed(2)}ms',
       );
+    }
+
+    if (breakdowns.isNotEmpty) {
+      final parts = breakdowns.entries
+          .map((e) {
+            final list = e.value;
+            final avg = list.isEmpty
+                ? 0.0
+                : list.reduce((a, b) => a + b) / list.length;
+            return '${e.key}=${avg.toStringAsFixed(3)}ms';
+          })
+          .join(' ');
+      stdout.writeln('    JS breakdown $parts');
     }
     stdout.writeln();
   }

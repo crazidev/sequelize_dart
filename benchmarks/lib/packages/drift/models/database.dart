@@ -32,7 +32,7 @@ class Posts extends Table {
   TextColumn get content => text().nullable()();
   IntColumn get userId => integer().named('user_id').nullable()();
   IntColumn get views =>
-      integer().named('views').withDefault(const Constant(0))();
+      integer().named('views').nullable().withDefault(const Constant(0))();
 }
 
 @DataClassName('DriftPostDetail')

@@ -395,6 +395,29 @@ export function convertQueryOptions(options: any): any {
     result.individualHooks = options.individualHooks;
   }
 
+  // Pass through bulkCreate options
+  if (options.validate !== undefined && options.validate !== null) {
+    result.validate = options.validate;
+  }
+  if (options.ignoreDuplicates !== undefined && options.ignoreDuplicates !== null) {
+    result.ignoreDuplicates = options.ignoreDuplicates;
+  }
+  if (options.updateOnDuplicate !== undefined && options.updateOnDuplicate !== null) {
+    result.updateOnDuplicate = options.updateOnDuplicate;
+  }
+  if (options.returning !== undefined && options.returning !== null) {
+    result.returning = options.returning;
+  }
+  if (options.fields !== undefined && options.fields !== null) {
+    result.fields = options.fields;
+  }
+  if (options.conflictAttributes !== undefined && options.conflictAttributes !== null) {
+    result.conflictAttributes = options.conflictAttributes;
+  }
+  if (options.conflictWhere !== undefined && options.conflictWhere !== null) {
+    result.conflictWhere = convertWhereClause(options.conflictWhere);
+  }
+
   // Pass through truncate-specific options
   if (options.cascade !== undefined && options.cascade !== null) {
     result.cascade = options.cascade;

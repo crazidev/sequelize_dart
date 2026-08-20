@@ -20,6 +20,20 @@ dependencies:
   serverpod_auth_core_server: 3.4.12
   meta: ^1.16.0
   benchmark_harness: ^2.3.1
+  orm: ^5.3.4
 
 dev_dependencies:
   lints: ^6.0.0
+  build_runner: ^2.4.11
+  drift_dev: ^2.24.0
+  sequelize_orm_generator:
+    path: ../packages/sequelize_orm_generator
+
+dependency_overrides:
+  mime: ^2.0.0
+  http: ^1.2.0
+
+hooks:
+  user_defines:
+    sqlite3:
+      source: system

@@ -864,4 +864,176 @@ void main() {
       );
     });
   });
+
+  group('Bulk Create Method - Static Implementation', () {
+    test('bulkCreate() with empty list returns empty list', () async {
+      final results = await Users.model.bulkCreate([]);
+      expect(results, isEmpty);
+    });
+
+    test(
+      'bulkCreate() inserts multiple records and returns instances',
+      () async {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final createList = [
+          CreateUsers(
+            email: 'bulk_1_$timestamp@example.com',
+            firstName: 'BulkFirst1',
+            lastName: 'BulkLast1',
+          ),
+          CreateUsers(
+            email: 'bulk_2_$timestamp@example.com',
+            firstName: 'BulkFirst2',
+            lastName: 'BulkLast2',
+          ),
+          CreateUsers(
+            email: 'bulk_3_$timestamp@example.com',
+            firstName: 'BulkFirst3',
+            lastName: 'BulkLast3',
+          ),
+        ];
+
+        clearCapturedSql();
+
+        final createdUsers = await Users.model.bulkCreate(createList);
+
+        expect(createdUsers.length, equals(3));
+        for (var i = 0; i < createdUsers.length; i++) {
+          expect(createdUsers[i], isA<UsersValues>());
+          expect(createdUsers[i].email, equals(createList[i].email));
+          expect(createdUsers[i].firstName, equals(createList[i].firstName));
+          expect(createdUsers[i].lastName, equals(createList[i].lastName));
+        }
+
+        // Verify they exist in database
+        for (final createData in createList) {
+          final fetched = await Users.model.findOne(
+            where: (u) => u.email.eq(createData.email),
+          );
+          expect(fetched, isNotNull);
+          expect(fetched?.firstName, equals(createData.firstName));
+        }
+      },
+    );
+
+    test(
+      'bulkCreate() with nested associations creates associated records',
+      () async {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final createList = [
+          CreateUsers(
+            email: 'bulk_assoc_1_$timestamp@example.com',
+            firstName: 'AssocUser1',
+            lastName: 'Bulk',
+            post: CreatePost(
+              title: 'bulk_post_1_$timestamp',
+              content: 'Bulk Post Content 1',
+              views: 10,
+            ),
+          ),
+          CreateUsers(
+            email: 'bulk_assoc_2_$timestamp@example.com',
+            firstName: 'AssocUser2',
+            lastName: 'Bulk',
+            posts: [
+              CreatePost(
+                title: 'bulk_multi_post_1_$timestamp',
+                content: 'Bulk Multi Post Content 1',
+                views: 20,
+              ),
+              CreatePost(
+                title: 'bulk_multi_post_2_$timestamp',
+                content: 'Bulk Multi Post Content 2',
+                views: 30,
+              ),
+            ],
+          ),
+        ];
+
+        final createdUsers = await Users.model.bulkCreate(createList);
+
+        expect(createdUsers.length, equals(2));
+
+        // Verify user 1 and its post
+        final user1 = await Users.model.findOne(
+          where: (u) => u.email.eq('bulk_assoc_1_$timestamp@example.com'),
+          include: (include) => [include.post()],
+        );
+        expect(user1, isNotNull);
+        expect(user1?.post, isNotNull);
+        expect(user1?.post?.title, equals('bulk_post_1_$timestamp'));
+
+        // Verify user 2 and its posts
+        final user2 = await Users.model.findOne(
+          where: (u) => u.email.eq('bulk_assoc_2_$timestamp@example.com'),
+          include: (include) => [include.posts()],
+        );
+        expect(user2, isNotNull);
+        expect(user2?.posts?.length, equals(2));
+      },
+    );
+
+    test('bulkCreate() with transaction commits records correctly', () async {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final transaction = await sequelize.startUnmanagedTransaction();
+
+      try {
+        final createdUsers = await Users.model.bulkCreate(
+          [
+            CreateUsers(
+              email: 'bulk_tx_1_$timestamp@example.com',
+              firstName: 'TxUser1',
+              lastName: 'Bulk',
+            ),
+            CreateUsers(
+              email: 'bulk_tx_2_$timestamp@example.com',
+              firstName: 'TxUser2',
+              lastName: 'Bulk',
+            ),
+          ],
+          transaction: transaction,
+        );
+
+        expect(createdUsers.length, equals(2));
+        await transaction.commit();
+      } catch (e) {
+        await transaction.rollback();
+        rethrow;
+      }
+
+      final fetched1 = await Users.model.findOne(
+        where: (u) => u.email.eq('bulk_tx_1_$timestamp@example.com'),
+      );
+      final fetched2 = await Users.model.findOne(
+        where: (u) => u.email.eq('bulk_tx_2_$timestamp@example.com'),
+      );
+      expect(fetched1, isNotNull);
+      expect(fetched2, isNotNull);
+    });
+
+    test('bulkCreate() with validate option', () async {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final createdUsers = await Users.model.bulkCreate(
+        [
+          CreateUsers(
+            email: 'bulk_val_1_$timestamp@example.com',
+            firstName: 'Valid1',
+            lastName: 'Bulk',
+          ),
+          CreateUsers(
+            email: 'bulk_val_2_$timestamp@example.com',
+            firstName: 'Valid2',
+            lastName: 'Bulk',
+          ),
+        ],
+        validate: true,
+      );
+
+      expect(createdUsers.length, equals(2));
+      expect(
+        createdUsers[0].email,
+        equals('bulk_val_1_$timestamp@example.com'),
+      );
+    });
+  });
 }

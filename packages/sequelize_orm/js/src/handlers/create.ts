@@ -6,12 +6,14 @@ import {
   toModelResponseArray,
   ModelResponse,
 } from '../utils/modelResponse';
-import { Model, sql } from '@sequelize/core';
+import { Model } from '@sequelize/core';
+import { now } from '../utils/timer';
 
 type CreateParams = {
   model: string;
   data?: Record<string, any> | Record<string, any>[];
   options?: any;
+  _timings?: Record<string, number>;
 };
 
 export async function handleCreate(
@@ -22,7 +24,13 @@ export async function handleCreate(
 
   const modelName = params.model;
   const data = params.data || {};
+  const timings = params._timings;
+
+  const tConvertStart = now();
   const options = convertQueryOptions(params.options || {});
+  if (timings) {
+    timings.convertMs = Math.round((now() - tConvertStart) * 1000) / 1000;
+  }
 
   const model = getModels().get(modelName);
   checkModelDefinition(model, modelName);
@@ -30,15 +38,39 @@ export async function handleCreate(
   // Support bulk create (array of data)
   if (Array.isArray(data)) {
     if (data.length === 0) {
-      throw new Error('Cannot create: data array is empty');
+      return [];
     }
 
+    const tDbStart = now();
     // bulkCreate returns an array of instances
     const results: Model[] = await model.bulkCreate(data, options);
-    return toModelResponseArray(results);
+    if (timings) {
+      timings.dbMs = Math.round((now() - tDbStart) * 1000) / 1000;
+    }
+
+    const tSerializeStart = now();
+    const responseArray = toModelResponseArray(results);
+    if (timings) {
+      timings.serializeMs = Math.round((now() - tSerializeStart) * 1000) / 1000;
+    }
+    return responseArray;
   }
 
   // Single create
+  const tDbStart = now();
   const result = await model.create(data, options);
-  return toModelResponse(result);
+  if (timings) {
+    timings.dbMs = Math.round((now() - tDbStart) * 1000) / 1000;
+  }
+
+  const tSerializeStart = now();
+  const response = toModelResponse(result);
+  if (timings) {
+    timings.serializeMs = Math.round((now() - tSerializeStart) * 1000) / 1000;
+  }
+  return response;
 }
+
+export const handleBulkCreate = handleCreate;
+
+

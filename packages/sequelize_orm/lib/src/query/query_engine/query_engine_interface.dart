@@ -39,6 +39,7 @@ abstract class QueryEngineInterface {
     required String modelName,
     required List<Map<String, dynamic>> data,
     Query? query,
+    Map<String, dynamic>? options,
     dynamic sequelize,
     dynamic model,
     Transaction? transaction,

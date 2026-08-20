@@ -1,5 +1,6 @@
 import { formatError } from './utils/errorFormatter';
 import { getSequelize, getOptions } from './utils/state';
+import { now } from './utils/timer';
 
 import { handleReady } from './handlers/ready';
 import { handleConnect } from './handlers/connect';
@@ -45,6 +46,8 @@ export type JsonRpcResponse = {
   sql?: string;
   /** Wall-clock milliseconds spent inside the Node.js request handler (JS + DB). */
   _serverMs?: number;
+  /** Sub-timing breakdown of server operations in milliseconds. */
+  _serverBreakdown?: Record<string, number>;
 };
 
 export type ResponseCallback = (response: JsonRpcResponse) => void;
@@ -57,8 +60,11 @@ export async function processRequest(
   request: JsonRpcRequest,
   sendResponse: ResponseCallback,
 ): Promise<void> {
-  const { id, method, params } = request;
-  const _startMs = Date.now();
+  const { id, method } = request;
+  const _startMs = now();
+  const timings: Record<string, number> = {};
+
+  const params = request.params ? { ...request.params, _timings: timings } : { _timings: timings };
 
   try {
     let result: any;
@@ -89,6 +95,10 @@ export async function processRequest(
         break;
 
       case 'create':
+        result = await handleCreate(params);
+        break;
+
+      case 'bulkCreate':
         result = await handleCreate(params);
         break;
 
@@ -208,11 +218,28 @@ export async function processRequest(
         throw new Error(`Unknown method: ${method}`);
     }
 
-    sendResponse({ id, result: compactResult(result), _serverMs: Date.now() - _startMs });
+    const tCompactStart = now();
+    const compacted = compactResult(result);
+    timings.compactMs = Math.round((now() - tCompactStart) * 1000) / 1000;
+    timings.totalServerMs = Math.round((now() - _startMs) * 1000) / 1000;
+
+    sendResponse({
+      id,
+      result: compacted,
+      _serverMs: Math.round(now() - _startMs),
+      _serverBreakdown: timings,
+    });
   } catch (error: any) {
-    sendResponse({ id, error: formatError(error), _serverMs: Date.now() - _startMs });
+    timings.totalServerMs = Math.round((now() - _startMs) * 1000) / 1000;
+    sendResponse({
+      id,
+      error: formatError(error),
+      _serverMs: Math.round(now() - _startMs),
+      _serverBreakdown: timings,
+    });
   }
 }
+
 
 function compactResult(result: any): any {
   if (!Array.isArray(result) || result.length <= 1) {

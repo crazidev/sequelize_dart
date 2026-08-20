@@ -16,6 +16,7 @@ export 'setup.dart';
 class SequelizeOrmBenchmark implements OrmBenchmark {
   Sequelize? _sequelize;
   final StepProfiler _profiler = StepProfiler();
+  int _lastCreatedId = 10;
 
   /// Latency info from the most recent bridge call (captured via callback).
   BridgeLatencyInfo? _lastLatency;
@@ -52,6 +53,33 @@ class SequelizeOrmBenchmark implements OrmBenchmark {
       }
       if (_lastLatency!.bridgeOverhead != null) {
         _profiler.record('ipc_overhead', _lastLatency!.bridgeOverhead!);
+      }
+      final breakdown = _lastLatency!.serverBreakdown;
+      if (breakdown != null) {
+        if (breakdown.containsKey('convertMs')) {
+          _profiler.recordMicros(
+            'js_convert',
+            (breakdown['convertMs']! * 1000).round(),
+          );
+        }
+        if (breakdown.containsKey('dbMs')) {
+          _profiler.recordMicros(
+            'js_db_exec',
+            (breakdown['dbMs']! * 1000).round(),
+          );
+        }
+        if (breakdown.containsKey('serializeMs')) {
+          _profiler.recordMicros(
+            'js_serialize',
+            (breakdown['serializeMs']! * 1000).round(),
+          );
+        }
+        if (breakdown.containsKey('compactMs')) {
+          _profiler.recordMicros(
+            'js_compact',
+            (breakdown['compactMs']! * 1000).round(),
+          );
+        }
       }
     }
   }
@@ -149,6 +177,58 @@ class SequelizeOrmBenchmark implements OrmBenchmark {
     _profiler.stop('total');
     _recordLatency();
     return posts.length;
+  }
+
+  @override
+  Future<int> createPost() async {
+    _lastLatency = null;
+    _profiler.start('total');
+    final post = await Post.model.create(
+      CreatePost(title: 'New Post', content: 'Content', userId: 1),
+    );
+    _profiler.stop('total');
+    _recordLatency();
+    _lastCreatedId = post.id ?? 10;
+    return _lastCreatedId;
+  }
+
+  @override
+  Future<int> updatePost() async {
+    _lastLatency = null;
+    _profiler.start('total');
+    final updatedCount = await Post.model.update(
+      title: 'Updated Title',
+      where: (p) => p.id.eq(_lastCreatedId),
+    );
+    _profiler.stop('total');
+    _recordLatency();
+    return updatedCount;
+  }
+
+  @override
+  Future<int> bulkCreatePosts(int count) async {
+    _lastLatency = null;
+    _profiler.start('total');
+    final values = List.generate(
+      count,
+      (i) => CreatePost(title: 'Bulk $i', content: '...', userId: 7),
+    );
+    final inserted = await Post.model.bulkCreate(values);
+    _profiler.stop('total');
+    _recordLatency();
+    return inserted.length;
+  }
+
+  @override
+  Future<int> deletePost() async {
+    _lastLatency = null;
+    _profiler.start('total');
+    final deleted = await Post.model.destroy(
+      where: (p) => p.id.eq(_lastCreatedId),
+    );
+    _profiler.stop('total');
+    _recordLatency();
+    return deleted;
   }
 
   @override

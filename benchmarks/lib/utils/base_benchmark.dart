@@ -39,6 +39,18 @@ abstract class OrmBenchmark {
   /// Benchmark 8: Complex query with AND conditions and limit
   Future<int> complexWhere(int minId, int maxId, int limit);
 
+  /// Benchmark 9: Create a single post
+  Future<int> createPost();
+
+  /// Benchmark 10: Update a single post (e.g., id = 1)
+  Future<int> updatePost();
+
+  /// Benchmark 11: Bulk create multiple posts
+  Future<int> bulkCreatePosts(int count);
+
+  /// Benchmark 12: Delete a single post (e.g., max id)
+  Future<int> deletePost();
+
   /// Close connection and clean up resources
   Future<void> close();
 }
