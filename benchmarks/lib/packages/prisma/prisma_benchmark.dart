@@ -1,7 +1,6 @@
-import 'dart:io';
-
 import 'package:orm/orm.dart';
 import 'package:orm_benchmarks/prisma_client/client.dart';
+
 import 'package:orm_benchmarks/prisma_client/prisma.dart';
 import 'package:orm_benchmarks/utils/base_benchmark.dart';
 import 'package:orm_benchmarks/utils/step_profiler.dart';
@@ -18,18 +17,6 @@ class PrismaOrmBenchmark implements OrmBenchmark {
 
   @override
   Future<void> init() async {
-    final candidatePaths = [
-      'prisma/prisma-query-engine',
-      'benchmarks/prisma/prisma-query-engine',
-      '../benchmarks/prisma/prisma-query-engine',
-    ];
-    for (final p in candidatePaths) {
-      final f = File(p);
-      if (f.existsSync()) {
-        Platform.environment['PRISMA_QUERY_ENGINE_BINARY'] = f.absolute.path;
-        break;
-      }
-    }
     _prisma = PrismaClient();
     await _prisma.$connect();
   }
