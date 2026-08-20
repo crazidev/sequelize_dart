@@ -1,0 +1,9 @@
+targets:
+  $default:
+    builders:
+      sequelize_orm_generator|sequelize_model_builder:
+        generate_for:
+          - lib/packages/sequelize/models/**.model.dart
+      source_gen|combining_builder:
+        generate_for:
+          - lib/packages/drift/models/**.dart

@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-dart"
+  output   = "../lib/prisma_client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:postgres@localhost:5432/postgres?schema=public"
+}
+
+model Users {
+  id           Int       @id @default(autoincrement())
+  email        String?
+  first_name   String?
+  last_name    String?
+  phone_number BigInt?
+  deleted_at   DateTime?
+  status       String?
+  tags         String?
+  scores       String?
+  metadata     String?
+  created_at   DateTime? @default(now())
+  updated_at   DateTime? @updatedAt
+
+  posts        Posts[]
+  post_details PostDetails[]
+
+  @@map("users")
+}
+
+model Posts {
+  id           Int          @id @default(autoincrement())
+  title        String?
+  content      String?
+  user_id      Int?
+  views        Int?         @default(0)
+
+  user         Users?       @relation(fields: [user_id], references: [id])
+  post_details PostDetails?
+
+  @@map("posts")
+}
+
+model PostDetails {
+  id           Int       @id @default(autoincrement())
+  likes        Int?
+  metadata     String?
+  post_id      Int?      @unique
+  user_id      Int?
+  created_at   DateTime? @default(now())
+  updated_at   DateTime? @updatedAt
+
+  post         Posts?    @relation(fields: [post_id], references: [id])
+  user         Users?    @relation(fields: [user_id], references: [id])
+
+  @@map("post_details")
+}
