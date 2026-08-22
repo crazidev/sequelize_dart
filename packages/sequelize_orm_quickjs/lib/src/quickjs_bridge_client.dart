@@ -275,17 +275,17 @@ class QuickJsBridgeClient implements BridgeClientInterface {
           'lib',
           'src',
           'bridge',
-          'bridge_server_quickjs.bundle.js',
+          'bridge_server.bundle.js',
         ),
       );
       candidatePaths.add(
-        p.join(bundleDir.path, 'assets', 'bridge_server_quickjs.bundle.js'),
+        p.join(bundleDir.path, 'assets', 'bridge_server.bundle.js'),
       );
     } catch (_) {}
 
     try {
       final pkgUri = Uri.parse(
-        'package:sequelize_orm/src/bridge/bridge_server_quickjs.bundle.js',
+        'package:sequelize_orm/src/bridge/bridge_server.bundle.js',
       );
       final resolved = await Isolate.resolvePackageUri(pkgUri);
       if (resolved != null && resolved.scheme == 'file') {
@@ -302,7 +302,7 @@ class QuickJsBridgeClient implements BridgeClientInterface {
         'lib',
         'src',
         'bridge',
-        'bridge_server_quickjs.bundle.js',
+        'bridge_server.bundle.js',
       ),
       p.join(
         cwd,
@@ -311,9 +311,9 @@ class QuickJsBridgeClient implements BridgeClientInterface {
         'lib',
         'src',
         'bridge',
-        'bridge_server_quickjs.bundle.js',
+        'bridge_server.bundle.js',
       ),
-      p.join(cwd, 'lib', 'src', 'bridge', 'bridge_server_quickjs.bundle.js'),
+      p.join(cwd, 'lib', 'src', 'bridge', 'bridge_server.bundle.js'),
     ]);
 
     for (final path in candidatePaths) {
@@ -324,7 +324,7 @@ class QuickJsBridgeClient implements BridgeClientInterface {
     }
 
     throw StateError(
-      'Could not find bridge_server_quickjs.bundle.js. Tried:\n'
+      'Could not find bridge_server.bundle.js. Tried:\n'
       '${candidatePaths.map((e) => ' - $e').join('\n')}',
     );
   }

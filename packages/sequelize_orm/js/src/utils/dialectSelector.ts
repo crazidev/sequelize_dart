@@ -13,11 +13,8 @@ export function selectDialect(dialect: string): any {
       return mariadb.MariaDbDialect || mariadb.default?.MariaDbDialect || mariadb;
     }
     case 'sqlite': {
-      const err = new Error(
-        'SQLite3 is currently not supported but we are working on using build hook or providing custom script for downloading the operating system specific sqlite3 native drivers since we cannot package it with sequelize_orm package.'
-      );
-      err.name = 'SequelizeConnectionError';
-      throw err;
+      const sqlite = require('@sequelize/sqlite3');
+      return sqlite.SqliteDialect || sqlite.default?.SqliteDialect || sqlite;
     }
     default: {
       const pg = require('@sequelize/postgres');

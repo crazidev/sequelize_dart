@@ -40,7 +40,9 @@ class SequelizeException implements Exception {
   factory SequelizeException.fromBridge(Map<String, dynamic> error) {
     final String name = error['name'] as String? ?? 'SequelizeBaseError';
     final String message = error['message'] as String? ?? 'Unknown error';
-    final int? code = error['code'] as int?;
+    final int? code = error['code'] is int
+        ? error['code'] as int
+        : int.tryParse(error['code']?.toString() ?? '');
     final String? stack = error['stack'] as String?;
     final String? sql = error['sql'] as String?;
     final Map<String, dynamic>? original = error['original'] != null

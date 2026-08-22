@@ -201,12 +201,21 @@ void main() {
       },
     );
 
-    test('load bridge_server_quickjs bundle without top-level error', () {
-      final bundleFile = File(
-        '../sequelize_orm/lib/src/bridge/bridge_server_quickjs.bundle.js',
-      );
-      expect(bundleFile.existsSync(), isTrue);
-      final bundleJs = bundleFile.readAsStringSync();
+    test('load unified bridge_server bundle without top-level error', () {
+      final candidates = [
+        '../sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
+        'packages/sequelize_orm/lib/src/bridge/bridge_server.bundle.js',
+      ];
+      File? bundleFile;
+      for (final c in candidates) {
+        final f = File(c);
+        if (f.existsSync()) {
+          bundleFile = f;
+          break;
+        }
+      }
+      expect(bundleFile, isNotNull);
+      final bundleJs = bundleFile!.readAsStringSync();
       final res = runtime.loadBundle(bundleJs);
       // If eval fails, eval returns the stack trace string
       expect(res, isNot(contains('at ')));

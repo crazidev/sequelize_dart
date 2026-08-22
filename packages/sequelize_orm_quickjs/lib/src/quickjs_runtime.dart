@@ -1125,6 +1125,20 @@ class QuickJsRuntime {
       }
       return this;
     }
+    serialize(callback) {
+      if (typeof callback === 'function') callback();
+      return this;
+    }
+    parallelize(callback) {
+      if (typeof callback === 'function') callback();
+      return this;
+    }
+    configure(option, value) {
+      return this;
+    }
+    interrupt() {
+      return this;
+    }
     exec(sql, callback) {
       try {
         if (_sqlite) _sqlite.exec(this._handle, sql);
@@ -1251,9 +1265,41 @@ class QuickJsRuntime {
     async_hooks: _asyncHooks,
     fs: {
       readFileSync: () => '',
+      writeFileSync: () => {},
       existsSync: () => false,
-      promises: { readFile: async () => '', access: async () => {} },
-      default: { readFileSync: () => '', existsSync: () => false },
+      mkdirSync: () => {},
+      statSync: () => ({ isDirectory: () => true, isFile: () => true }),
+      promises: {
+        readFile: async () => '',
+        writeFile: async () => {},
+        mkdir: async () => {},
+        stat: async () => ({ isDirectory: () => true, isFile: () => true }),
+        access: async () => {},
+      },
+      default: {
+        readFileSync: () => '',
+        writeFileSync: () => {},
+        existsSync: () => false,
+        mkdirSync: () => {},
+        statSync: () => ({ isDirectory: () => true, isFile: () => true }),
+        mkdir: async () => {},
+        stat: async () => ({ isDirectory: () => true, isFile: () => true }),
+        access: async () => {},
+      },
+    },
+    'fs/promises': {
+      readFile: async () => '',
+      writeFile: async () => {},
+      mkdir: async () => {},
+      stat: async () => ({ isDirectory: () => true, isFile: () => true }),
+      access: async () => {},
+      default: {
+        readFile: async () => '',
+        writeFile: async () => {},
+        mkdir: async () => {},
+        stat: async () => ({ isDirectory: () => true, isFile: () => true }),
+        access: async () => {},
+      },
     },
     os: {
       platform: () => 'linux',
@@ -1286,6 +1332,11 @@ class QuickJsRuntime {
       ok: (val, msg) => { if (!val) throw new Error(msg || 'Assertion failed'); },
       strictEqual: (a, b, msg) => { if (a !== b) throw new Error(msg || `${a} !== ${b}`); },
     }),
+    worker_threads: {
+      parentPort: null,
+      isMainThread: true,
+      default: { parentPort: null, isMainThread: true },
+    },
     zlib: {
       gzipSync: (b) => b,
       gunzipSync: (b) => b,

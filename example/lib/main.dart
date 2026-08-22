@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:sequelize_orm/sequelize_orm.dart';
+import 'package:sequelize_orm_sqlite/sequelize_orm_sqlite.dart';
 import 'package:sequelize_orm_example/db/db.dart';
 import 'package:sequelize_orm_example/queries.dart';
 
@@ -9,8 +10,9 @@ const postgresConnectionString =
     'postgresql://postgres:postgres@localhost:5432/postgres';
 
 final sequelize = Sequelize().createInstance(
-  connection: SequelizeConnection.postgres(url: postgresConnectionString),
+  // connection: SequelizeConnection.postgres(url: postgresConnectionString),
   // connection: SequelizeConnection.mysql(url: connectionString),
+  connection: SequelizeSqliteConnection(storage: '../test_db.db'),
   normalizeJsonTypes: false,
   debug: true,
   logging: SqlFormatter.printFormatted,
@@ -22,7 +24,7 @@ Future<void> main() async {
 
   await sequelize.initialize(models: Db.allModels());
 
-  // await sequelize.sync(alter: true);
+  await sequelize.sync(alter: true);
 
   // await sequelize.seed(
   //   seeders: Db.allSeeders(),

@@ -55,7 +55,7 @@ class SqliteConnection extends SequelizeCoreOptions {
   final bool foreignKeys;
 
   SqliteConnection({
-    required this.storage,
+    this.storage = ':memory:',
     this.mode,
     this.sqlitePassword,
     this.foreignKeys = true,

@@ -47,3 +47,6 @@ docs/node_modules/*
 .idea/
 *.iml
 .vscode/
+prisma/
+*.db
+*.db-journal

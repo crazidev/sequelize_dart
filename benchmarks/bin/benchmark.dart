@@ -70,7 +70,7 @@ void main(List<String> args) async {
   BenchmarkTable.displayComparison(reports);
 
   // Display Step-by-Step Breakdown for instrumented ORMs
-  BenchmarkTable.displayStepBreakdown(reports);
+  // BenchmarkTable.displayStepBreakdown(reports);
   exit(0);
 }
 

@@ -168,25 +168,6 @@ class SequelizeConnection {
     );
   }
 
-  /// Creates a SQLite connection configuration.
-  ///
-  /// See: https://sequelize.org/docs/v7/databases/sqlite/#connection-options
-  static SqliteConnection sqlite({
-    required String storage,
-    List<SqliteMode>? mode,
-    String? password,
-    bool foreignKeys = true,
-    bool hoistIncludeOptions = false,
-  }) {
-    return SqliteConnection(
-      storage: storage,
-      mode: mode,
-      sqlitePassword: password,
-      foreignKeys: foreignKeys,
-      hoistIncludeOptions: hoistIncludeOptions,
-    );
-  }
-
   /// Creates a Microsoft SQL Server (MSSQL) connection configuration.
   ///
   /// See: https://sequelize.org/docs/v7/databases/mssql/#connection-options

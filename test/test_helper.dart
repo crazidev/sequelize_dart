@@ -5,6 +5,7 @@ import 'package:sequelize_orm_example/db/models/post.model.dart';
 import 'package:sequelize_orm_example/db/models/post_details.model.dart';
 import 'package:sequelize_orm_example/db/models/users.model.dart';
 import 'package:sequelize_orm_quickjs/sequelize_orm_quickjs.dart';
+import 'package:sequelize_orm_sqlite/sequelize_orm_sqlite.dart';
 import 'package:test/test.dart';
 
 /// Connection strings for test databases
@@ -78,7 +79,7 @@ Future<void> initTestEnvironment() async {
       if (dbFile.existsSync()) {
         dbFile.deleteSync();
       }
-      connection = SqliteConnection(storage: sqliteStorage);
+      connection = SequelizeSqliteConnection(storage: sqliteStorage);
       normalizeJsonTypes = false;
       break;
     case 'postgres':

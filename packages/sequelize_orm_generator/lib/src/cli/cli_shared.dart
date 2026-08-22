@@ -1179,7 +1179,7 @@ SequelizeCoreOptions _connectionFrom({
       );
     case 'sqlite':
       final storage = hasUrl ? url : (database ?? ':memory:');
-      return SequelizeConnection.sqlite(storage: storage);
+      return SqliteConnection(storage: storage);
     default:
       throw ArgumentError(
         'Unsupported dialect "\$normalized". Pass --dialect or use a URL scheme like postgresql://, mysql://, mariadb://, sqlite://',

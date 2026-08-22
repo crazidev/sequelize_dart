@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 import 'package:sequelize_orm/src/bridge/bridge_client_interface.dart';
 import 'package:sequelize_orm/src/bridge/bridge_exception.dart';
+import 'package:sequelize_orm/src/bridge/bridge_host_dispatcher.dart';
 import 'package:sequelize_orm/src/bridge/bridge_latency.dart';
 import 'package:sequelize_orm/src/bridge/sequelize_exceptions.dart';
 import 'package:sequelize_orm/src/utils/msgpack_decoder.dart';
@@ -384,13 +385,28 @@ class BridgeClient implements BridgeClientInterface {
         return;
       }
 
+      // Handle bidirectional host calls from the JS bridge (e.g. SQLite queries)
+      if (response['notification'] == 'host_call') {
+        final callId = response['callId'];
+        final method = response['method'] as String?;
+        final params = response['params'] is Map
+            ? Map<String, dynamic>.from(response['params'] as Map)
+            : <String, dynamic>{};
+
+        if (callId != null && method != null) {
+          _handleHostCall(callId, method, params);
+        }
+        return;
+      }
+
       final id = response['id'];
 
       if (id is int && _pendingRequests.containsKey(id)) {
         final completer = _pendingRequests.remove(id)!;
 
-        // Stash the server-side elapsed time and breakdown so call() can pick it up.
-        _serverMsById[id] = response['_serverMs'] as int?;
+        _serverMsById[id] = response['_serverMs'] is num
+            ? (response['_serverMs'] as num).round()
+            : int.tryParse(response['_serverMs']?.toString() ?? '');
         if (response['_serverBreakdown'] is Map) {
           final rawMap = response['_serverBreakdown'] as Map;
           _serverBreakdownById[id] = rawMap.map(
@@ -416,6 +432,32 @@ class BridgeClient implements BridgeClientInterface {
     } catch (e) {
       // ignore: avoid_print
       print('[BridgeClient] Failed to parse response: $e');
+    }
+  }
+
+  Future<void> _handleHostCall(
+    dynamic callId,
+    String method,
+    Map<String, dynamic> params,
+  ) async {
+    try {
+      final result = await BridgeHostDispatcher.dispatch(method, params);
+      final responsePayload = jsonEncode({
+        'notification_response': true,
+        'callId': callId,
+        'result': result,
+      });
+      _process?.stdin.writeln(responsePayload);
+    } catch (e, stack) {
+      final responsePayload = jsonEncode({
+        'notification_response': true,
+        'callId': callId,
+        'error': {
+          'message': e.toString(),
+          'stack': stack.toString(),
+        },
+      });
+      _process?.stdin.writeln(responsePayload);
     }
   }
 

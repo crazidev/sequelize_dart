@@ -1,0 +1,28 @@
+name: sequelize_orm_sqlite
+description: >-
+  SQLite dialect support for Sequelize Dart, powered by package:sqlite3.
+version: 0.2.0
+repository: https://github.com/crazidev/sequelize_orm_dart/tree/main/packages/sequelize_orm_sqlite
+resolution: workspace
+
+topics:
+  - orm
+  - database
+  - sql
+  - sqlite
+  - code-generation
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  sequelize_orm: any
+  sqlite3: ^2.5.0
+  meta: ^1.17.0
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  windows:

@@ -7,6 +7,7 @@ export 'src/annotations.dart';
 export 'src/association/association_model.dart';
 export 'src/bridge/bridge_client.dart';
 export 'src/bridge/bridge_exception.dart';
+export 'src/bridge/bridge_host_dispatcher.dart';
 export 'src/bridge/bridge_latency.dart';
 export 'src/bridge/sequelize_exceptions.dart';
 // Connection exports

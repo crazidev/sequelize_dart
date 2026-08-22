@@ -6,6 +6,7 @@ workspace:
   - packages/sequelize_orm
   - packages/sequelize_orm_generator
   - packages/sequelize_orm_quickjs
+  - packages/sequelize_orm_sqlite
   - example
   - packages/sequelize_orm_analyzer
   - benchmarks
@@ -16,6 +17,7 @@ dev_dependencies:
   test: ^1.28.0
   sequelize_orm: any
   sequelize_orm_quickjs: any
+  sequelize_orm_sqlite: any
   sequelize_orm_example: any
 
 melos:
@@ -114,10 +116,6 @@ melos:
       description: Publish, create git tags and GitHub releases per package.
       run: dart run tools/release_publish.dart --publish --tag --github-release
 
-hooks:
-  user_defines:
-    sqlite3:
-      source: system
 
 dependency_overrides:
   cli_util: any
