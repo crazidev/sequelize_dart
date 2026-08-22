@@ -29,6 +29,31 @@ export async function handleConnect(params: ConnectParams): Promise<{ connected:
     if (pool.evict !== undefined && pool.evict !== null) poolConfig.evict = pool.evict;
   }
 
+  // Temporary SQLite databases (`:memory:` / '') are destroyed together with
+  // their connection. Sequelize v7 rejects any pool configuration that could
+  // close idle connections or open more than one connection. Instead of
+  // failing, auto-apply the only valid pool configuration so users don't have
+  // to configure this manually.
+  const isTemporarySqlite =
+    normalizedDialect === 'sqlite' &&
+    (sequelizeConfig.storage === ':memory:' || sequelizeConfig.storage === '');
+
+  if (isTemporarySqlite) {
+    const hadUserPool = Object.keys(poolConfig).length > 0;
+    poolConfig.min = 1;
+    poolConfig.max = 1;
+    poolConfig.idle = Infinity;
+    poolConfig.maxUses = Infinity;
+    sendNotification({
+      notification: 'log',
+      level: 'warn',
+      message:
+        'SQLite temporary database detected: the connection pool was automatically ' +
+        'configured to a single never-closed connection.' +
+        (hadUserPool ? ' User-provided pool options were overridden.' : ''),
+    });
+  }
+
   const loggingFn = logging
     ? (sql: any) => {
       // Send notification via the bridge (works for both stdio and Worker Thread)

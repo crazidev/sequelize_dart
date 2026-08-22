@@ -9,7 +9,7 @@
 - ✅ PostgreSQL
 - ✅ MySQL
 - ✅ MariaDB
-- ⚠️ SQLite — Dart API only and JS bridge wired, missing native sqlite3 drivers
+- ✅ SQLite — via the [`sequelize_orm_sqlite`](./packages/sequelize_orm_sqlite) companion package
 - ⚠️ MSSQL — Dart API only, JS bridge not wired
 - ⚠️ DB2 — Dart API only, JS bridge not wired
 - ❌ DB2 for IBM i

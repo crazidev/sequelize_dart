@@ -23,6 +23,27 @@ dev_dependencies:
 
 Then run `dart pub get`.
 
+## SQLite Support
+
+SQLite is provided by the companion package `sequelize_orm_sqlite`, powered by
+[`package:sqlite3`](https://pub.dev/packages/sqlite3).
+
+```yaml
+dependencies:
+  sequelize_orm_sqlite: ^0.2.0
+```
+
+```dart
+import 'package:sequelize_orm_sqlite/sequelize_orm_sqlite.dart';
+
+final sequelize = Sequelize().createInstance(
+  connection: SequelizeSqliteConnection.fromPath('./database.sqlite'),
+);
+```
+
+For temporary databases, use `SequelizeSqliteConnection.tempMemory()` or
+`.tempDisk()`.
+
 ## Database Connection
 
 ```dart
@@ -40,7 +61,8 @@ final sequelize = Sequelize().createInstance(
 );
 ```
 
-Supported dialects: **PostgreSQL**, **MySQL**, **MariaDB**, **SQLite**.
+Supported dialects: **PostgreSQL**, **MySQL**, **MariaDB**, and
+**SQLite** (via `package:sequelize_orm_sqlite`).
 
 ## Define a Model
 

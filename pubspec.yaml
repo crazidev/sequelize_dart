@@ -41,29 +41,25 @@ melos:
       linkToCommits: true
       workspaceChangelog: true
 
-    publish:
-      packageFilters:
-        category: packages
-
   scripts:
     # ─── Analysis & Linting ─────────────────────────────
     analyze:
       description: Run dart analyze across all packages.
-      run: dart analyze --fatal-infos
       exec:
+        command: dart analyze --fatal-infos
         concurrency: 1
 
     fix:
       description: Apply dart fix across all packages.
-      run: dart fix --apply
       exec:
+        command: dart fix --apply
         concurrency: 1
 
     # ─── Testing ────────────────────────────────────────
     test:
       description: Run tests across all packages.
-      run: dart test
       exec:
+        command: dart test
         concurrency: 1
         failFast: true
       packageFilters:
@@ -72,8 +68,8 @@ melos:
     # ─── Code Generation ───────────────────────────────
     generate:
       description: Run build_runner for code generation.
-      run: dart run build_runner build --delete-conflicting-outputs
       exec:
+        command: dart run build_runner build --delete-conflicting-outputs
         concurrency: 1
         orderDependents: true
       packageFilters:
@@ -81,24 +77,24 @@ melos:
 
     generate:watch:
       description: Watch and regenerate code on changes.
-      run: dart run build_runner watch --delete-conflicting-outputs
       exec:
+        command: dart run build_runner watch --delete-conflicting-outputs
         concurrency: 1
       packageFilters:
         dependsOn: build_runner
 
     generate:models:
       description: Generate models from database.
-      run: dart run sequelize_orm_generator:generate --generate
       exec:
+        command: dart run sequelize_orm_generator:generate --generate
         concurrency: 1
       packageFilters:
         category: examples
 
     generate:seed:
       description: Generate seeders from database.
-      run: dart run sequelize_orm_generator:generate --seed
       exec:
+        command: dart run sequelize_orm_generator:generate --seed
         concurrency: 1
       packageFilters:
         category: examples

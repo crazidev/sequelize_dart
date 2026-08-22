@@ -1,13 +1,6 @@
-# Ignore JS source files (TypeScript sources, config, etc.)
-js/src/
-js/tsconfig.json
-js/package.json
-js/package-lock.json
-js/node_modules/
-
-# Keep the production built bridge:
-# lib/src/bridge/bridge_server.bundle.js
-# js/preamble.js
+# Ship only the compiled bridge bundle (lib/src/bridge/bridge_server.bundle.js).
+# The JS/TypeScript sources under js/ are only needed for development.
+js/
 
 # Other
 .DS_Store

@@ -16,7 +16,7 @@ environment:
   sdk: ^3.8.0
 
 dependencies:
-  sequelize_orm: any
+  sequelize_orm: ^0.2.0
   sqlite3: ^2.5.0
   meta: ^1.17.0
 

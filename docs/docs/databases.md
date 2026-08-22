@@ -160,40 +160,46 @@ Choose your database dialect below to see specific connection examples and confi
 
     ### SQLite
 
-    Connect to SQLite using `SequelizeConnection.sqlite()`.
+    SQLite is provided through the companion package **`sequelize_orm_sqlite`**, powered by [`package:sqlite3`](https://pub.dev/packages/sqlite3).
 
-    #### Persistent File Storage
-    By default, SQLite creates the database file if it doesn't exist.
-    ```dart
-    SequelizeConnection.sqlite(
-      storage: './data/database.sqlite',
-    )
+    #### 1. Install the SQLite Package
+
+    ```bash
+    dart pub add sequelize_orm_sqlite
     ```
 
-    #### Temporary Storages
-    SQLite supports two types of temporary storage (destroyed on close):
-    - **Memory-based**: Set `storage: ':memory:'`.
-    - **Disk-based**: Set `storage: ''` (empty string).
+    #### 2. Connect Using `SequelizeSqliteConnection`
 
-    :::warning
-    Using temporary storage requires configuring the **Connection Pool** to keep exactly one connection alive, otherwise state is lost between queries.
+    ##### Persistent File Storage
+    SQLite creates the database file if it doesn't exist.
+    ```dart
+    import 'package:sequelize_orm_sqlite/sequelize_orm_sqlite.dart';
+
+    SequelizeSqliteConnection.fromPath('./assets/database.sqlite')
+    ```
+
+    ##### Temporary Storages
+    SQLite supports two types of temporary storage (destroyed on close):
+    - **Memory-based**: `SequelizeSqliteConnection.tempMemory()`
+    - **Disk-based**: `SequelizeSqliteConnection.tempDisk()`
+
+    :::note
+    Temporary storages require a single never-closed connection to preserve data. This pool configuration is applied automatically — no manual setup needed.
     :::
 
     ```dart
     final sequelize = Sequelize().createInstance(
-      connection: SequelizeConnection.sqlite(storage: ':memory:'),
-      pool: SequelizePoolOptions(
-        max: 1,
-        idle: 999999, // Keep the connection alive
-      ),
+      connection: SequelizeSqliteConnection.tempMemory(),
     );
     ```
 
     #### Configuration Options
 
+    All constructors accept the options below.
+
     | Option | Type | Default | Description |
     |--------|------|---------|-------------|
-    | `storage` | `String` | - | Path to file, `':memory:'`, or `''`. |
+    | `storage` | `String?` | `':memory:'` | Path to file, `':memory:'`, or `''`. |
     | `foreignKeys` | `bool` | `true` | If set to false, SQLite will not enforce foreign keys. |
     | `mode` | `List<SqliteMode>?` | - | Opening flags (read, write, create, mutex). |
     | `password` | `String?` | - | Password for SQLCipher encryption. |

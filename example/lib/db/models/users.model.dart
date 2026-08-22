@@ -20,6 +20,7 @@ abstract class Users {
   @ColumnName('first_name')
   @Validate.Min(4)
   @NotNull()
+  @Unique()
   DataType firstName = DataType.STRING;
 
   @ColumnName('last_name')

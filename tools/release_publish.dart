@@ -25,6 +25,10 @@ import 'dart:io';
 // ---------------------------------------------------------------------------
 
 /// Packages that get published.
+///
+/// Order matters: the main package (`sequelize_orm`) stays first because
+/// GitHub releases are created from `packages.reversed`, so it is released
+/// last and appears first on the releases page.
 const packages = <_Package>[
   _Package(
     name: 'sequelize_orm',
@@ -33,6 +37,10 @@ const packages = <_Package>[
   _Package(
     name: 'sequelize_orm_generator',
     path: 'packages/sequelize_orm_generator',
+  ),
+  _Package(
+    name: 'sequelize_orm_sqlite',
+    path: 'packages/sequelize_orm_sqlite',
   ),
 ];
 
@@ -306,8 +314,17 @@ Future<void> _publish() async {
     return;
   }
 
-  // Use melos publish which respects the package filters in pubspec.yaml
-  await _run('dart', ['run', 'melos', 'publish', '--no-dry-run', '--yes']);
+  // Scope melos publish to exactly the packages listed above.
+  // Note: `melos publish` ignores `command.publish.packageFilters` from the
+  // root pubspec.yaml, so the filters must be passed as CLI flags.
+  await _run('dart', [
+    'run',
+    'melos',
+    'publish',
+    '--no-dry-run',
+    '--yes',
+    for (final pkg in packages) '--scope=${pkg.name}',
+  ]);
 }
 
 // ---------------------------------------------------------------------------

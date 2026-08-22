@@ -1,3 +1,7 @@
+## Unreleased
+
+- **IMPROVEMENT**: The seed CLI now builds SQLite connections through the shared `SqliteConnection` base class, aligning with the new `sequelize_orm_sqlite` backend (no sqlite-specific options required in generated seed runners).
+
 ## 0.2.0
 
 - **FEAT**: All generated static and instance methods now accept `Transaction? transaction` — covering `findAll`, `findOne`, `create`, `update`, `destroy`, `restore`, `truncate`, `count`, `max`, `min`, `sum`, `increment`, `decrement`, `save`, `reload`, and all association helpers (`getX`, `setX`, `createX`, `addX`, `removeX`).

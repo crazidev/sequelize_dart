@@ -62,7 +62,7 @@ dart pub get
 
 ## Database Connection
 
-Sequelize Dart supports PostgreSQL, MySQL, MariaDB, SQLite. Here's how to set up a connection:
+Sequelize Dart supports PostgreSQL, MySQL, MariaDB, and SQLite. Here's how to set up a connection:
 
 ```dart
 import 'package:sequelize_orm/sequelize_orm.dart';
@@ -86,6 +86,35 @@ void main() async {
   await sequelize.close();
 }
 ```
+
+### Using SQLite
+
+SQLite is provided by the companion package `sequelize_orm_sqlite`.
+
+Install it alongside the ORM:
+
+```yaml
+dependencies:
+  sequelize_orm: ^0.2.0
+  sequelize_orm_sqlite: ^0.2.0
+```
+
+```bash
+dart pub add sequelize_orm_sqlite
+```
+
+Then connect using `SequelizeSqliteConnection` (no extra setup needed):
+
+```dart
+import 'package:sequelize_orm/sequelize_orm.dart';
+import 'package:sequelize_orm_sqlite/sequelize_orm_sqlite.dart';
+
+final sequelize = Sequelize().createInstance(
+  connection: SequelizeSqliteConnection.fromPath('./assets/database.sqlite'),
+);
+```
+
+See [Database Connection](./databases) for all SQLite options.
 
 ## Models & Tables
 

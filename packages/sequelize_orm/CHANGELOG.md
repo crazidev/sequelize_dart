@@ -1,3 +1,9 @@
+## Unreleased
+
+- **FEAT**: SQLite support via the companion package [`sequelize_orm_sqlite`](https://pub.dev/packages/sequelize_orm_sqlite).
+- **FEAT**: Unified bridge bundle — a single `bridge_server.bundle.js` now serves both the Node.js and embedded QuickJS runtimes.
+- **CHORE**: JS sources (`js/`) are no longer included when publishing — only the compiled bridge bundle is shipped.
+
 ## 0.2.0
 
 - **FEAT**: Full Transaction support — managed (`sequelize.transaction`) and unmanaged (`sequelize.startUnmanagedTransaction`) transactions.
